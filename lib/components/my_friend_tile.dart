@@ -1,0 +1,267 @@
+import 'package:flutter/material.dart';
+import '../models/user.dart';
+import 'my_card_tile.dart';
+
+class MyFriendTile extends StatelessWidget {
+  final UserProfile user;
+  final String? customTitle;
+
+  /// 👉 Tap on the *row / avatar / name* → go to profile
+  final VoidCallback onProfileTap;
+
+  /// 👉 Tap on the *Chat* pill → go to chat
+  final VoidCallback onChatTap;
+
+  /// Whether the friend is currently online
+  final bool isOnline;
+
+  /// Number of unread messages from this friend
+  final int unreadCount;
+
+  /// Optional: last message preview text
+  final String? lastMessagePreview;
+
+  /// Optional: last message time label (e.g. "14:32", "Mon", "19/11")
+  final String? lastMessageTimeLabel;
+
+  const MyFriendTile({
+    super.key,
+    required this.user,
+    this.customTitle,
+    required this.onProfileTap,
+    required this.onChatTap,
+    this.isOnline = false,
+    this.unreadCount = 0,
+    this.lastMessagePreview,
+    this.lastMessageTimeLabel,
+  });
+
+  String _getInitials() {
+    if (user.name.trim().isEmpty) return '';
+    final parts = user.name.trim().split(' ');
+    if (parts.length == 1) return parts.first[0].toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return MyCardTile(
+      onTap: onProfileTap,
+      child: Row(
+        children: [
+          // 👤 Avatar + online dot
+          GestureDetector(
+            onTap: onProfileTap,
+            child: Stack(
+              children: [
+                user.profilePhotoUrl.isNotEmpty
+                    ? CircleAvatar(
+                  radius: 22,
+                  backgroundImage: NetworkImage(user.profilePhotoUrl),
+                )
+                    : CircleAvatar(
+                  radius: 22,
+                  backgroundColor:
+                  colorScheme.primary.withValues(alpha: 0.12),
+                  child: Text(
+                    _getInitials(),
+                    style: TextStyle(
+                      color: colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+
+                // 🟢 Online indicator (bottom-right)
+                if (isOnline)
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      width: 11,
+                      height: 11,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF12B981), // soft green
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: colorScheme.surface,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          // 📝 Name + username + last message (also profile tap)
+          Expanded(
+            child: GestureDetector(
+              onTap: onProfileTap,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    customTitle ?? user.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+
+                  // Username + inline "Online"
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          '@${user.username}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: colorScheme.primary
+                                .withValues(alpha: 0.7),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      if (isOnline) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          width: 4,
+                          height: 4,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF12B981),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Text(
+                          'Online',
+                          style: TextStyle(
+                            color: Color(0xFF12B981),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+
+                  // Last message preview (if available)
+                  if (lastMessagePreview != null &&
+                      lastMessagePreview!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      lastMessagePreview!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: colorScheme.primary
+                            .withValues(alpha: 0.7),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 8),
+
+          // 💬 Time + Chat pill + unread badge
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (lastMessageTimeLabel != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4.0),
+                  child: Text(
+                    lastMessageTimeLabel!,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: colorScheme.primary
+                          .withValues(alpha: 0.6),
+                    ),
+                  ),
+                ),
+
+              // Chat pill – only opens chat, with unread badge on top
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  InkWell(
+                    borderRadius: BorderRadius.circular(999),
+                    onTap: onChatTap,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(999),
+                        color: colorScheme.primary.withValues(alpha: 0.08),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.chat_bubble_outline,
+                            size: 16,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Chat',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: colorScheme.primary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // 🔴 Unread messages badge on the chat pill
+                  if (unreadCount > 0)
+                    Positioned(
+                      right: -3,
+                      top: -3,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          unreadCount > 9 ? '9+' : '$unreadCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
