@@ -594,6 +594,44 @@ class _GroupChatPageState extends State<GroupChatPage> {
     );
   }
 
+  /// DELETE MESSAGE
+  Future<void> _confirmDeleteGroupMessage(String messageId) async {
+    final colorScheme = Theme.of(context).colorScheme;
+    if (_currentUserId.isEmpty) return;
+
+    final bool? shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: const Text('Delete message?'),
+          content: const Text(
+            'This message will be deleted for everyone in the group.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: colorScheme.primary),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete != true) return;
+
+    await _chatService.deleteMessageForEveryone(
+      messageId: messageId,
+      userId: _currentUserId,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -881,7 +919,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
                                 imageUrl: imageUrls.isNotEmpty
                                     ? imageUrls.first
                                     : null,
-                                videoUrl: effectiveVideoUrl,
+                                videoUrl: lastMsg.videoUrl,
                                 isCurrentUser: isCurrentUser,
                                 createdAt: lastMsg.createdAt,
                                 isRead: lastMsg.isRead,
@@ -889,6 +927,8 @@ class _GroupChatPageState extends State<GroupChatPage> {
                                 isLikedByMe: isLikedByMe,
                                 likeCount: likeCount,
                                 isUploading: lastMsg.isUploading,
+                                isDeleted: lastMsg.isDeleted,
+                                // 🆕
                                 onDoubleTap: () async {
                                   if (_currentUserId.isEmpty) return;
 
@@ -897,6 +937,11 @@ class _GroupChatPageState extends State<GroupChatPage> {
                                     userId: _currentUserId,
                                   );
                                 },
+                                onLongPress: isCurrentUser && !lastMsg.isDeleted
+                                    ? () =>
+                                          _confirmDeleteGroupMessage(lastMsg.id)
+                                    : null,
+                                // 🆕
                                 onLikeTap: likedBy.isEmpty
                                     ? null
                                     : () => _showLikesBottomSheet(likedBy),

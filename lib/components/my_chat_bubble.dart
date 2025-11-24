@@ -13,8 +13,9 @@ import 'my_chat_video_bubble.dart';
 /// - Supports "like" with double-tap
 /// - Can optionally show sender name (for group chats) inside the bubble
 /// - 🖼 Can show one or multiple images above the text
-/// - 🎥 Shows a video thumbnail; tap → fullscreen overlay video player
+/// - 🎥 Uses [ChatVideoBubble] for video thumbnails
 /// - 🆕 Shows an uploading indicator for pending video messages
+/// - 🆕 Supports soft-delete ("This message was deleted")
 class MyChatBubble extends StatelessWidget {
   final String message;
   final bool isCurrentUser;
@@ -46,8 +47,14 @@ class MyChatBubble extends StatelessWidget {
   /// 🆕 Whether the media is still uploading
   final bool isUploading;
 
+  /// 🆕 Whether the message was soft-deleted
+  final bool isDeleted;
+
   /// Optional double-tap handler (used to toggle like)
   final VoidCallback? onDoubleTap;
+
+  /// Optional long-press handler (used to delete message)
+  final VoidCallback? onLongPress;
 
   /// Optional tap handler for the like badge (heart)
   final VoidCallback? onLikeTap;
@@ -72,7 +79,9 @@ class MyChatBubble extends StatelessWidget {
     this.isLikedByMe = false,
     this.likeCount = 0,
     this.isUploading = false,
+    this.isDeleted = false, // 🆕 default
     this.onDoubleTap,
+    this.onLongPress,
     this.onLikeTap,
     this.senderName,
     this.senderColor,
@@ -96,9 +105,10 @@ class MyChatBubble extends StatelessWidget {
         ? [imageUrl!]
         : <String>[]);
 
-    final bool hasImages = effectiveImageUrls.isNotEmpty;
-    final bool hasVideo = videoUrl != null && videoUrl!.trim().isNotEmpty;
-    final bool hasText = message.trim().isNotEmpty;
+    // If deleted: never show images / videos / text content.
+    final bool hasImages = !isDeleted && effectiveImageUrls.isNotEmpty;
+    final bool hasVideo = !isDeleted && videoUrl != null && videoUrl!.trim().isNotEmpty;
+    final bool hasText = !isDeleted && message.trim().isNotEmpty;
 
     // 🟢 Sender (current user) bubble style
     final senderBg = const Color(0xFF128C7E); // WhatsApp green
@@ -111,7 +121,7 @@ class MyChatBubble extends StatelessWidget {
     final bgColor = isCurrentUser ? senderBg : receiverBg;
     final textColor = isCurrentUser ? senderText : receiverText;
 
-    // Time + ticks row
+    // Build time + ticks row
     final timeLabel = _formatTime(createdAt);
 
     IconData? tickIcon;
@@ -130,16 +140,16 @@ class MyChatBubble extends StatelessWidget {
       }
     }
 
-    // ❤️ Heart icon
+    // ❤️ Heart icon – same style for you vs others
     const heartIcon = Icon(
       Icons.favorite,
       size: 12,
       color: Colors.pinkAccent,
     );
 
-    // ❤️ Like badge: white circle OR white pill depending on count
+    // ❤️ Like badge: only if NOT deleted
     Widget? likeBadge;
-    if (likeCount > 0) {
+    if (!isDeleted && likeCount > 0) {
       if (likeCount == 1) {
         likeBadge = AnimatedScale(
           scale: isLikedByMe ? 1.12 : 1.0,
@@ -309,6 +319,10 @@ class MyChatBubble extends StatelessWidget {
       );
     }
 
+    final deletedText = isCurrentUser
+        ? 'You deleted this message'
+        : 'This message was deleted';
+
     // ---------- FULL BUBBLE ----------
 
     final bubble = Container(
@@ -340,7 +354,7 @@ class MyChatBubble extends StatelessWidget {
         isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (showSenderName) ...[
+          if (showSenderName && !isDeleted) ...[
             Text(
               senderName!,
               style: TextStyle(
@@ -352,34 +366,46 @@ class MyChatBubble extends StatelessWidget {
             const SizedBox(height: 2),
           ],
 
-          // 🎥 Video preview (tap → fullscreen overlay)
-          if (hasVideo) ...[
-            MyChatVideoBubble(
-              videoUrl: videoUrl!,
-              isUploading: isUploading,
-              senderName: senderName,
-              isCurrentUser: isCurrentUser,
-            ),
-            if (hasImages || hasText) const SizedBox(height: 6),
-          ],
-
-          // 🖼 Images (single or grid)
-          if (hasImages) ...[
-            _buildImageGrid(context),
-            if (hasText) const SizedBox(height: 6),
-          ],
-
-          // Caption / text
-          if (hasText) ...[
+          if (isDeleted) ...[
             Text(
-              message,
+              deletedText,
               style: TextStyle(
-                color: textColor,
-                fontSize: 16,
-                height: 1.3,
+                color: textColor.withValues(alpha: 0.8),
+                fontSize: 14,
+                fontStyle: FontStyle.italic,
               ),
             ),
             const SizedBox(height: 4),
+          ] else ...[
+            // 🎥 Video preview (tap → fullscreen overlay)
+            if (hasVideo) ...[
+              MyChatVideoBubble(
+                videoUrl: videoUrl!,
+                isUploading: isUploading,
+                senderName: senderName,
+                isCurrentUser: isCurrentUser,
+              ),
+              if (hasImages || hasText) const SizedBox(height: 6),
+            ],
+
+            // 🖼 Images (single or grid)
+            if (hasImages) ...[
+              _buildImageGrid(context),
+              if (hasText) const SizedBox(height: 6),
+            ],
+
+            // Caption / text
+            if (hasText) ...[
+              Text(
+                message,
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 16,
+                  height: 1.3,
+                ),
+              ),
+              const SizedBox(height: 4),
+            ],
           ],
 
           // Time + ticks
@@ -412,6 +438,7 @@ class MyChatBubble extends StatelessWidget {
       alignment: isCurrentUser ? Alignment.centerRight : Alignment.centerLeft,
       child: GestureDetector(
         onDoubleTap: onDoubleTap,
+        onLongPress: onLongPress,
         child: Stack(
           clipBehavior: Clip.none,
           children: [

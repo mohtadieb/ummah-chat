@@ -11,6 +11,8 @@ class MessageModel {
   final bool isDelivered;
   final DateTime? deliveredAt;
   final List<String> likedBy;
+  final bool isDeleted;
+
 
   // 🆕 NEW: whether this message is still uploading media
   final bool isUploading;
@@ -29,6 +31,7 @@ class MessageModel {
     this.deliveredAt,
     this.likedBy = const [],
     this.isUploading = false, // NEW default
+    this.isDeleted = false,
   });
 
   /// Safely parse DateTime from various possible types.
@@ -77,6 +80,7 @@ class MessageModel {
       likedBy: parseLikedBy(map['liked_by']),
       // 🆕 map DB column → field
       isUploading: map['is_uploading'] == true,
+      isDeleted: map['is_deleted'] == true,
     );
   }
 
@@ -94,6 +98,7 @@ class MessageModel {
       'delivered_at': deliveredAt?.toUtc().toIso8601String(),
       'liked_by': likedBy,
       'is_uploading': isUploading,
+      'is_deleted': isDeleted,
     };
 
     if (id.isNotEmpty) {
@@ -117,6 +122,7 @@ class MessageModel {
     DateTime? deliveredAt,
     List<String>? likedBy,
     bool? isUploading,
+    bool? isDeleted,
   }) {
     return MessageModel(
       id: id ?? this.id,
@@ -132,6 +138,7 @@ class MessageModel {
       deliveredAt: deliveredAt ?? this.deliveredAt,
       likedBy: likedBy ?? this.likedBy,
       isUploading: isUploading ?? this.isUploading,
+      isDeleted: isDeleted ?? this.isDeleted,
     );
   }
 }

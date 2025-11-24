@@ -954,4 +954,29 @@ class ChatService {
       rethrow;
     }
   }
+// =======================================================================
+//                              DELETE MESSAGES
+// =======================================================================
+
+  Future<void> deleteMessageForEveryone({
+    required String messageId,
+    required String userId,
+  }) async {
+    // Only allow sender to delete
+    await _supabase
+        .from('messages')
+        .update({
+      'is_deleted': true,
+      'deleted_at': DateTime.now().toUtc().toIso8601String(),
+      'message': '',
+      'image_url': null,
+      'video_url': null,
+    })
+        .match({
+      'id': messageId,
+      'sender_id': userId,
+    });
+  }
+
+
 }
