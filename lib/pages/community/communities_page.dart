@@ -104,7 +104,7 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
                       boxShadow: [
                         BoxShadow(
                           // subtle shadow under the dropdown
-                          color: Colors.black.withOpacity(0.12),
+                          color: Colors.black.withValues(alpha: 0.12),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -333,7 +333,7 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: colorScheme.primary
-                                              .withOpacity(0.75),
+                                              .withValues(alpha: 0.75),
                                         ),
                                       ),
                                   ],
@@ -349,7 +349,7 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
                                   minimumSize: const Size(0, 0),
                                   side: BorderSide(
                                     color: colorScheme.error
-                                        .withOpacity(0.9),
+                                        .withValues(alpha: 0.9),
                                   ),
                                   foregroundColor: colorScheme.error,
                                   shape: RoundedRectangleBorder(

@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart'; // 👈 for debugPrint
+import 'package:flutter/foundation.dart'; // for debugPrint
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/message.dart';
 
-/// Info about the last message exchanged with a friend
+/// Info about the last message exchanged with a friend (DM only)
 class LastMessageInfo {
   final String friendId;
   final String? text;
@@ -19,6 +19,15 @@ class LastMessageInfo {
   });
 }
 
+/// ChatService
+///
+/// Handles all DB + realtime logic for:
+/// - 1-on-1 DMs
+/// - Group chats
+/// - Typing status
+/// - Likes (reactions)
+/// - Last message summaries
+/// - Unread counters
 class ChatService {
   final SupabaseClient _supabase = Supabase.instance.client;
 
@@ -26,7 +35,7 @@ class ChatService {
   // ✉️ DIRECT MESSAGE (1-ON-1) BASICS
   // ---------------------------------------------------------------------------
 
-  /// Send a 1-on-1 message to a chat room
+  /// Send a 1-on-1 *text* message to a chat room
   ///
   /// - `chat_room_id` = room id (DM)
   /// - `sender_id`    = current user
@@ -48,9 +57,10 @@ class ChatService {
     });
   }
 
-  //// 🖼 Send a 1-on-1 *image* message
+  /// 🖼 Send a 1-on-1 *image* message
   ///
   /// - `createdAtOverride` lets us force the same timestamp for batched media
+  ///   (multi-image WhatsApp-style grouping)
   Future<void> sendImageMessage({
     required String chatRoomId,
     required String senderId,
@@ -59,8 +69,8 @@ class ChatService {
     String message = '',
     DateTime? createdAtOverride,
   }) async {
-    final createdAt = (createdAtOverride ?? DateTime.now().toUtc())
-        .toIso8601String();
+    final createdAt =
+    (createdAtOverride ?? DateTime.now().toUtc()).toIso8601String();
 
     await _supabase.from('messages').insert({
       'chat_room_id': chatRoomId,
@@ -70,6 +80,64 @@ class ChatService {
       'image_url': imageUrl,
       'created_at': createdAt,
     });
+  }
+
+  /// 🎥 Send a 1-on-1 *video* message
+  ///
+  /// - `video_url` points to Supabase Storage (chat_uploads bucket)
+  /// - `message` can be a caption (or empty)
+  Future<void> sendVideoMessage({
+    required String chatRoomId,
+    required String senderId,
+    required String receiverId,
+    required String videoUrl,
+    String message = '',
+    DateTime? createdAtOverride,
+  }) async {
+    final createdAt =
+    (createdAtOverride ?? DateTime.now().toUtc()).toIso8601String();
+
+    await _supabase.from('messages').insert({
+      'chat_room_id': chatRoomId,
+      'sender_id': senderId,
+      'receiver_id': receiverId,
+      'message': message,
+      'video_url': videoUrl,
+      'created_at': createdAt,
+    });
+  }
+
+  /// 🆕 Create a pending 1-on-1 video message (is_uploading = true)
+  Future<String> createPendingVideoMessageDM({
+    required String chatRoomId,
+    required String senderId,
+    required String receiverId,
+    required String videoUrl,
+    String message = '',
+    DateTime? createdAtOverride,
+  }) async {
+    final createdAt =
+    (createdAtOverride ?? DateTime.now().toUtc()).toIso8601String();
+
+    final inserted = await _supabase
+        .from('messages')
+        .insert({
+      'chat_room_id': chatRoomId,
+      'sender_id': senderId,
+      'receiver_id': receiverId,
+      'message': message,
+      'video_url': videoUrl,
+      'created_at': createdAt,
+      'is_uploading': true,
+    })
+        .select('id')
+        .maybeSingle();
+
+    if (inserted == null || inserted['id'] == null) {
+      throw Exception('Failed to create pending video message (DM)');
+    }
+
+    return inserted['id'].toString();
   }
 
   /// Get or create a 1-on-1 chat room ID
@@ -92,21 +160,21 @@ class ChatService {
 
     if (room != null) return room['id'] as String;
 
-    final newRoom = await _supabase
-        .from('chat_rooms')
-        .insert({
+    final newRoom =
+    await _supabase.from('chat_rooms').insert({
       'user1_id': currentUserId,
       'user2_id': friendId,
       'is_group': false,
-    })
-        .select()
-        .maybeSingle();
+    }).select().maybeSingle();
 
     return newRoom!['id'] as String;
   }
 
   /// Fetch all messages for a room (DM or group),
   /// sorted oldest → newest.
+  ///
+  /// We select everything so MessageModel.fromMap can use:
+  /// - text, image_url, video_url, liked_by, is_read, etc.
   Future<List<Map<String, dynamic>>> fetchMessages(String chatRoomId) async {
     final data = await _supabase
         .from('messages')
@@ -119,13 +187,14 @@ class ChatService {
 
   /// Realtime listener for messages in a room.
   ///
-  /// Emits both INSERTs (new messages) and UPDATEs (e.g. is_read, liked_by).
+  /// Emits both INSERTs (new messages) and UPDATEs
+  /// (e.g. is_read, liked_by, image_url, video_url).
   Stream<Map<String, dynamic>> streamMessages(String chatRoomId) {
     final controller = StreamController<Map<String, dynamic>>.broadcast();
 
     final channel = _supabase
         .channel('public:messages-room-$chatRoomId')
-    // New messages
+    // INSERT (new messages)
         .onPostgresChanges(
       event: PostgresChangeEvent.insert,
       schema: 'public',
@@ -141,7 +210,7 @@ class ChatService {
         }
       },
     )
-    // Updates (e.g. is_read / liked_by / is_delivered changed)
+    // UPDATE (e.g. is_read / liked_by / image_url / video_url updated)
         .onPostgresChanges(
       event: PostgresChangeEvent.update,
       schema: 'public',
@@ -172,10 +241,12 @@ class ChatService {
     return _supabase
         .from('profiles')
         .stream(primaryKey: ['id'])
-        .map((rows) => rows.map((r) => r as Map<String, dynamic>).toList());
+        .map(
+          (rows) => rows.map((r) => r as Map<String, dynamic>).toList(),
+    );
   }
 
-  /// Mark all messages in a chat room as read for the current user
+  /// Mark all messages in a DM chat room as read for the current user
   ///
   /// Only applies to 1-on-1 messages, because group messages have receiver_id = NULL.
   Future<void> markRoomMessagesAsRead(
@@ -190,10 +261,9 @@ class ChatService {
         .eq('is_read', false);
   }
 
-  /// Get unread message counts per friend for the current user.
+  /// Get unread message counts per friend for the current user (DM only).
   ///
   /// Returns a map: { senderId: unreadCount }
-  /// Only counts 1-on-1 messages (receiver_id = currentUserId).
   Future<Map<String, int>> fetchUnreadCountsByFriend(
       String currentUserId,
       ) async {
@@ -432,7 +502,6 @@ class ChatService {
       'avatar_url': avatarUrl,
       'created_by': creatorId,
       // For groups we don't use user1_id / user2_id.
-      // Columns are now nullable, but we explicitly send null for clarity.
       'user1_id': null,
       'user2_id': null,
     })
@@ -450,12 +519,14 @@ class ChatService {
 
     if (members.isNotEmpty) {
       final rows = members
-          .map((uid) => {
-        'chat_room_id': roomId,
-        'user_id': uid,
-        // role: creator = 'admin', others = 'member'
-        'role': uid == creatorId ? 'admin' : 'member',
-      })
+          .map(
+            (uid) => {
+          'chat_room_id': roomId,
+          'user_id': uid,
+          // role: creator = 'admin', others = 'member'
+          'role': uid == creatorId ? 'admin' : 'member',
+        },
+      )
           .toList();
 
       await _supabase.from('chat_room_members').insert(rows);
@@ -475,11 +546,13 @@ class ChatService {
     if (userIds.isEmpty) return;
 
     final rows = userIds
-        .map((uid) => {
-      'chat_room_id': chatRoomId,
-      'user_id': uid,
-      'role': 'member',
-    })
+        .map(
+          (uid) => {
+        'chat_room_id': chatRoomId,
+        'user_id': uid,
+        'role': 'member',
+      },
+    )
         .toList();
 
     await _supabase
@@ -501,7 +574,7 @@ class ChatService {
     await _supabase.from('messages').insert({
       'chat_room_id': chatRoomId,
       'sender_id': senderId,
-      'receiver_id': null, // important: group message has no single receiver
+      'receiver_id': null, // group message has no single receiver
       'message': message,
       'created_at': DateTime.now().toIso8601String(),
       // other fields use DB defaults
@@ -519,8 +592,8 @@ class ChatService {
     String message = '',
     DateTime? createdAtOverride,
   }) async {
-    final createdAt = (createdAtOverride ?? DateTime.now().toUtc())
-        .toIso8601String();
+    final createdAt =
+    (createdAtOverride ?? DateTime.now().toUtc()).toIso8601String();
 
     await _supabase.from('messages').insert({
       'chat_room_id': chatRoomId,
@@ -530,6 +603,59 @@ class ChatService {
       'image_url': imageUrl,
       'created_at': createdAt,
     });
+  }
+
+  /// 🎥 Send a *video* message to a GROUP chat
+  Future<void> sendGroupVideoMessage({
+    required String chatRoomId,
+    required String senderId,
+    required String videoUrl,
+    String message = '',
+    DateTime? createdAtOverride,
+  }) async {
+    final createdAt =
+    (createdAtOverride ?? DateTime.now().toUtc()).toIso8601String();
+
+    await _supabase.from('messages').insert({
+      'chat_room_id': chatRoomId,
+      'sender_id': senderId,
+      'receiver_id': null,
+      'message': message,
+      'video_url': videoUrl,
+      'created_at': createdAt,
+    });
+  }
+
+  /// 🆕 Create a pending GROUP video message (is_uploading = true)
+  Future<String> createPendingGroupVideoMessage({
+    required String chatRoomId,
+    required String senderId,
+    required String videoUrl,
+    String message = '',
+    DateTime? createdAtOverride,
+  }) async {
+    final createdAt =
+    (createdAtOverride ?? DateTime.now().toUtc()).toIso8601String();
+
+    final inserted = await _supabase
+        .from('messages')
+        .insert({
+      'chat_room_id': chatRoomId,
+      'sender_id': senderId,
+      'receiver_id': null,
+      'message': message,
+      'video_url': videoUrl,
+      'created_at': createdAt,
+      'is_uploading': true,
+    })
+        .select('id')
+        .maybeSingle();
+
+    if (inserted == null || inserted['id'] == null) {
+      throw Exception('Failed to create pending video message (group)');
+    }
+
+    return inserted['id'].toString();
   }
 
   /// Mark all CURRENTLY unread messages in a group as read for this user.
@@ -563,6 +689,14 @@ class ChatService {
     } catch (e) {
       debugPrint('❌ markGroupMessagesAsRead error: $e');
     }
+  }
+
+  /// 🆕 Mark a video message as fully uploaded (remove uploading badge)
+  Future<void> markVideoMessageUploaded(String messageId) async {
+    await _supabase
+        .from('messages')
+        .update({'is_uploading': false})
+        .eq('id', messageId);
   }
 
   // ---------------------------------------------------------------------------
@@ -694,11 +828,10 @@ class ChatService {
     final data = await _supabase
         .from('messages')
         .select(
-      'id, chat_room_id, sender_id, receiver_id, message, image_url, created_at, is_read, is_delivered, liked_by',
+      'id, chat_room_id, sender_id, receiver_id, message, image_url, video_url, created_at, is_read, is_delivered, liked_by',
     )
         .filter('receiver_id', 'is', null)
         .order('created_at', ascending: false);
-
 
     final Map<String, MessageModel> result = {};
 
@@ -731,7 +864,7 @@ class ChatService {
         final data = await fetchLastGroupMessages();
         yield data;
       } catch (_) {
-        // swallow errors so the stream keeps going; you can log here if needed
+        // swallow errors so the stream keeps going
       }
       await Future<void>.delayed(interval);
     }
@@ -799,6 +932,11 @@ class ChatService {
     }
   }
 
+  /// Delete group as admin via RPC.
+  ///
+  /// RPC is responsible for:
+  /// - deleting the chat_rooms row
+  /// - cascading to messages, memberships, typing_status, etc.
   Future<void> deleteGroupAsAdmin({
     required String chatRoomId,
   }) async {

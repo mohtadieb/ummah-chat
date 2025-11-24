@@ -70,7 +70,7 @@ Widget buildDayBubble({
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         decoration: BoxDecoration(
-          color: colorScheme.surface.withOpacity(0.95),
+          color: colorScheme.surface.withValues(alpha: 0.95),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: colorScheme.primary.withValues(alpha: 0.08),

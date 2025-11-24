@@ -1,21 +1,32 @@
+// lib/components/my_chat_bubble.dart
 import 'package:flutter/material.dart';
 
-/// A chat bubble that supports:
-/// - Single or multiple images
-/// - Caption / text
-/// - Ticks (sent/delivered/read)
-/// - Likes (heart badge)
-/// - Optional senderName / senderColor for group chats
+import '../pages/fullscreen_image_page.dart';
+import 'my_chat_video_bubble.dart';
+
+/// A simple chat bubble that adapts to the app's current theme.
+///
+/// - Uses Theme.of(context).colorScheme for colors
+/// - Aligns right for current user, left for others
+/// - Smooth rounded WhatsApp-style shape
+/// - Shows timestamp + ticks (for current user's messages)
+/// - Supports "like" with double-tap
+/// - Can optionally show sender name (for group chats) inside the bubble
+/// - 🖼 Can show one or multiple images above the text
+/// - 🎥 Shows a video thumbnail; tap → fullscreen overlay video player
+/// - 🆕 Shows an uploading indicator for pending video messages
 class MyChatBubble extends StatelessWidget {
   final String message;
   final bool isCurrentUser;
 
-  /// Optional single image URL (legacy).
+  /// Backwards-compatible single image URL (used when not using imageUrls).
   final String? imageUrl;
 
-  /// Optional multiple image URLs for a single bubble.
-  /// If provided, takes precedence over [imageUrl].
-  final List<String>? imageUrls;
+  /// 🖼 New: list of image URLs for multi-image batches.
+  final List<String> imageUrls;
+
+  /// 🎥 Optional video URL.
+  final String? videoUrl;
 
   /// Time the message was created (used to show HH:mm)
   final DateTime createdAt;
@@ -32,14 +43,16 @@ class MyChatBubble extends StatelessWidget {
   /// Total like count (length of likedBy from DB)
   final int likeCount;
 
+  /// 🆕 Whether the media is still uploading
+  final bool isUploading;
+
   /// Optional double-tap handler (used to toggle like)
   final VoidCallback? onDoubleTap;
 
   /// Optional tap handler for the like badge (heart)
   final VoidCallback? onLikeTap;
 
-  /// Optional: sender display name (used in group chats).
-  /// For DMs you can leave this null.
+  /// Optional: sender display name (used in group chats or passed from ChatPage).
   final String? senderName;
 
   /// Optional: specific color for the sender name text.
@@ -52,11 +65,13 @@ class MyChatBubble extends StatelessWidget {
     required this.isCurrentUser,
     required this.createdAt,
     this.imageUrl,
-    this.imageUrls,
+    this.imageUrls = const [],
+    this.videoUrl,
     this.isRead = false,
     this.isDelivered = false,
     this.isLikedByMe = false,
     this.likeCount = 0,
+    this.isUploading = false,
     this.onDoubleTap,
     this.onLikeTap,
     this.senderName,
@@ -70,146 +85,20 @@ class MyChatBubble extends StatelessWidget {
     return '$h:$m'; // WhatsApp-style short time
   }
 
-  /// All effective media URLs for this bubble
-  List<String> _effectiveImageUrls() {
-    // If imageUrls is provided, use it
-    final base = imageUrls ??
-        (imageUrl != null && imageUrl!.trim().isNotEmpty
-            ? <String>[imageUrl!]
-            : <String>[]);
-
-    return base
-        .where((u) => u.trim().isNotEmpty)
-        .toList(growable: false);
-  }
-
-  bool get _hasText => message.trim().isNotEmpty;
-
-  void _openFullscreenGallery(BuildContext context, List<String> urls, int index) {
-    if (urls.isEmpty) return;
-
-    final pageController = PageController(initialPage: index);
-
-    showDialog(
-      context: context,
-      barrierColor: Colors.black.withOpacity(0.9),
-      builder: (_) {
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => Navigator.of(context).pop(),
-          child: Center(
-            child: PageView.builder(
-              controller: pageController,
-              itemCount: urls.length,
-              itemBuilder: (context, i) {
-                final url = urls[i];
-                return InteractiveViewer(
-                  maxScale: 4,
-                  child: Image.network(
-                    url,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stack) {
-                      return const Icon(Icons.broken_image, size: 64, color: Colors.white70);
-                    },
-                    loadingBuilder: (context, child, progress) {
-                      if (progress == null) return child;
-                      return const Center(
-                        child: CircularProgressIndicator(),
-                      );
-                    },
-                  ),
-                );
-              },
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildImageGrid(BuildContext context, List<String> urls) {
-    if (urls.length == 1) {
-      final url = urls.first;
-      return GestureDetector(
-        onTap: () => _openFullscreenGallery(context, urls, 0),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Image.network(
-            url,
-            fit: BoxFit.cover,
-            loadingBuilder: (context, child, progress) {
-              if (progress == null) return child;
-              return SizedBox(
-                height: 180,
-                child: Center(
-                  child: CircularProgressIndicator(
-                    value: progress.expectedTotalBytes != null
-                        ? progress.cumulativeBytesLoaded /
-                        (progress.expectedTotalBytes ?? 1)
-                        : null,
-                  ),
-                ),
-              );
-            },
-            errorBuilder: (context, error, stack) {
-              return Container(
-                height: 180,
-                color: Colors.black12,
-                alignment: Alignment.center,
-                child: const Icon(Icons.broken_image, size: 32),
-              );
-            },
-          ),
-        ),
-      );
-    }
-
-    // 2+ images → simple grid
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        padding: EdgeInsets.zero,
-        itemCount: urls.length,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: 2,
-          crossAxisSpacing: 2,
-        ),
-        itemBuilder: (context, index) {
-          final url = urls[index];
-          return GestureDetector(
-            onTap: () => _openFullscreenGallery(context, urls, index),
-            child: Image.network(
-              url,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stack) {
-                return Container(
-                  color: Colors.black12,
-                  alignment: Alignment.center,
-                  child: const Icon(Icons.broken_image, size: 24),
-                );
-              },
-              loadingBuilder: (context, child, progress) {
-                if (progress == null) return child;
-                return const Center(
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                );
-              },
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
-    final mediaUrls = _effectiveImageUrls();
-    final hasImages = mediaUrls.isNotEmpty;
+    // Effective image list: prefer imageUrls, fall back to single imageUrl.
+    final List<String> effectiveImageUrls = imageUrls.isNotEmpty
+        ? imageUrls
+        : (imageUrl != null && imageUrl!.trim().isNotEmpty
+        ? [imageUrl!]
+        : <String>[]);
+
+    final bool hasImages = effectiveImageUrls.isNotEmpty;
+    final bool hasVideo = videoUrl != null && videoUrl!.trim().isNotEmpty;
+    final bool hasText = message.trim().isNotEmpty;
 
     // 🟢 Sender (current user) bubble style
     final senderBg = const Color(0xFF128C7E); // WhatsApp green
@@ -222,14 +111,13 @@ class MyChatBubble extends StatelessWidget {
     final bgColor = isCurrentUser ? senderBg : receiverBg;
     final textColor = isCurrentUser ? senderText : receiverText;
 
-    // Build time + ticks row
+    // Time + ticks row
     final timeLabel = _formatTime(createdAt);
 
     IconData? tickIcon;
     Color? tickColor;
 
     if (isCurrentUser) {
-      // sent / delivered / read logic
       if (isRead) {
         tickIcon = Icons.done_all;
         tickColor = Colors.lightBlueAccent;
@@ -242,7 +130,7 @@ class MyChatBubble extends StatelessWidget {
       }
     }
 
-    // ❤️ Heart icon – same style for you vs others
+    // ❤️ Heart icon
     const heartIcon = Icon(
       Icons.favorite,
       size: 12,
@@ -264,7 +152,7 @@ class MyChatBubble extends StatelessWidget {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.06),
+                  color: Colors.black.withValues(alpha: 0.06),
                   blurRadius: 3,
                   offset: const Offset(0, 1),
                 ),
@@ -282,10 +170,10 @@ class MyChatBubble extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(20), // pill shape
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.06),
+                  color: Colors.black.withValues(alpha: 0.06),
                   blurRadius: 3,
                   offset: const Offset(0, 1),
                 ),
@@ -314,9 +202,118 @@ class MyChatBubble extends StatelessWidget {
     final showSenderName =
         !isCurrentUser && senderName != null && senderName!.trim().isNotEmpty;
 
+    // ---------- IMAGE HELPERS ----------
+
+    Widget _buildSingleImage(
+        BuildContext context,
+        String url, {
+          int initialIndex = 0,
+          List<String>? allUrls,
+        }) {
+      return GestureDetector(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => FullscreenImagePage(
+                imageUrls: allUrls ?? [url],
+                initialIndex: initialIndex,
+              ),
+            ),
+          );
+        },
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.network(
+            url,
+            fit: BoxFit.cover,
+            loadingBuilder: (context, child, progress) {
+              if (progress == null) return child;
+              return SizedBox(
+                height: 160,
+                child: Center(
+                  child: CircularProgressIndicator(
+                    value: progress.expectedTotalBytes != null
+                        ? progress.cumulativeBytesLoaded /
+                        (progress.expectedTotalBytes ?? 1)
+                        : null,
+                  ),
+                ),
+              );
+            },
+            errorBuilder: (context, error, stack) {
+              return Container(
+                height: 160,
+                color: Colors.black12,
+                alignment: Alignment.center,
+                child: const Icon(Icons.broken_image, size: 32),
+              );
+            },
+          ),
+        ),
+      );
+    }
+
+    Widget _buildImageGrid(BuildContext context) {
+      if (effectiveImageUrls.length == 1) {
+        return _buildSingleImage(
+          context,
+          effectiveImageUrls.first,
+          allUrls: effectiveImageUrls,
+        );
+      }
+
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: effectiveImageUrls.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 2,
+            crossAxisSpacing: 2,
+          ),
+          itemBuilder: (context, index) {
+            final url = effectiveImageUrls[index];
+            return GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => FullscreenImagePage(
+                      imageUrls: effectiveImageUrls,
+                      initialIndex: index,
+                    ),
+                  ),
+                );
+              },
+              child: Image.network(
+                url,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return const Center(
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  );
+                },
+                errorBuilder: (context, error, stack) {
+                  return Container(
+                    color: Colors.black12,
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.broken_image, size: 24),
+                  );
+                },
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    // ---------- FULL BUBBLE ----------
+
     final bubble = Container(
       margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       constraints: BoxConstraints(
         maxWidth: MediaQuery.of(context).size.width * 0.75,
       ),
@@ -343,7 +340,6 @@ class MyChatBubble extends StatelessWidget {
         isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 🧑‍🤝‍🧑 Sender name inside bubble for group chats
           if (showSenderName) ...[
             Text(
               senderName!,
@@ -356,14 +352,25 @@ class MyChatBubble extends StatelessWidget {
             const SizedBox(height: 2),
           ],
 
-          // 🖼 Images (one or many)
-          if (hasImages) ...[
-            _buildImageGrid(context, mediaUrls),
-            if (_hasText) const SizedBox(height: 6),
+          // 🎥 Video preview (tap → fullscreen overlay)
+          if (hasVideo) ...[
+            MyChatVideoBubble(
+              videoUrl: videoUrl!,
+              isUploading: isUploading,
+              senderName: senderName,
+              isCurrentUser: isCurrentUser,
+            ),
+            if (hasImages || hasText) const SizedBox(height: 6),
           ],
 
-          // The actual message text (caption or normal text)
-          if (_hasText) ...[
+          // 🖼 Images (single or grid)
+          if (hasImages) ...[
+            _buildImageGrid(context),
+            if (hasText) const SizedBox(height: 6),
+          ],
+
+          // Caption / text
+          if (hasText) ...[
             Text(
               message,
               style: TextStyle(
@@ -375,7 +382,7 @@ class MyChatBubble extends StatelessWidget {
             const SizedBox(height: 4),
           ],
 
-          // Time + (optional) ticks
+          // Time + ticks
           Row(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.end,
@@ -383,7 +390,7 @@ class MyChatBubble extends StatelessWidget {
               Text(
                 timeLabel,
                 style: TextStyle(
-                  color: textColor.withOpacity(0.8),
+                  color: textColor.withValues(alpha: 0.8),
                   fontSize: 11,
                 ),
               ),
@@ -411,7 +418,7 @@ class MyChatBubble extends StatelessWidget {
             bubble,
             if (likeBadge != null)
               Positioned(
-                bottom: -14, // slight overlap, not blocking ticks
+                bottom: -14,
                 right: isCurrentUser ? 19 : null,
                 left: isCurrentUser ? null : 19,
                 child: GestureDetector(

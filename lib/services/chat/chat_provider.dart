@@ -4,6 +4,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'chat_service.dart';
 
+/// ChatProvider
+///
+/// - Keeps messages in memory per chat room (DM + group)
+/// - Listens to realtime changes (INSERT + UPDATE) from Supabase
+/// - Exposes a simple `getMessages(roomId)` API used by:
+///     - ChatPage (DM)
+///     - GroupChatPage
+///
+/// Messages are stored as raw maps; the UI converts them to MessageModel.
 class ChatProvider with ChangeNotifier {
   // Store messages per room as raw maps from Supabase
   final Map<String, List<Map<String, dynamic>>> _messagesByRoom = {};
@@ -15,7 +24,7 @@ class ChatProvider with ChangeNotifier {
   // Backend / Supabase helper
   final ChatService _chatService = ChatService();
 
-  /// Public getter used by ChatPage:
+  /// Public getter used by ChatPage / GroupChatPage:
   /// returns the list of raw message maps for a given room.
   List<Map<String, dynamic>> getMessages(String roomId) {
     return _messagesByRoom[roomId] ?? const [];
@@ -55,7 +64,7 @@ class ChatProvider with ChangeNotifier {
         // New message (INSERT)
         current.add(payload);
       } else {
-        // Updated message (UPDATE, e.g. is_read / liked_by changed)
+        // Updated message (UPDATE, e.g. is_read / liked_by / image_url / video_url changed)
         current[existingIndex] = payload;
       }
 
@@ -68,7 +77,7 @@ class ChatProvider with ChangeNotifier {
   }
 
   /// Helper to keep messages sorted by created_at ascending.
-  /// (ChatPage uses reverse: true so newest appears at the bottom.)
+  /// (ChatPage / GroupChatPage use reverse: true so newest appears at the bottom.)
   void _sortMessages(String roomId) {
     final msgs = _messagesByRoom[roomId];
     if (msgs == null) return;
@@ -80,7 +89,7 @@ class ChatProvider with ChangeNotifier {
     });
   }
 
-  /// Send a 1-on-1 message via ChatService
+  /// Send a 1-on-1 text message via ChatService
   Future<void> sendMessage(
       String roomId,
       String senderId,
@@ -90,7 +99,7 @@ class ChatProvider with ChangeNotifier {
     await _chatService.sendMessage(roomId, senderId, receiverId, text);
   }
 
-  /// Send a GROUP message via ChatService
+  /// Send a GROUP text message via ChatService
   ///
   /// - `roomId` is the group chat_room_id
   /// - `senderId` is the current user

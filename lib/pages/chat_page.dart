@@ -32,11 +32,12 @@ class ChatPage extends StatefulWidget {
 }
 
 /// Internal helper to group multiple DB rows into one logical bubble.
+///
 /// All messages in a group:
 /// - same sender
 /// - same caption
 /// - same createdAt
-/// - all have imageUrl (for multi-image batches)
+/// - all have some media (image or video)
 class _MessageGroup {
   final List<MessageModel> messages;
   final int firstIndex; // index in the original messages list
@@ -112,7 +113,7 @@ class _ChatPageState extends State<ChatPage> {
       const Duration(seconds: 30),
           (_) async {
         final currentUserId = _authService.getCurrentUserId();
-        if (currentUserId != null) {
+        if (currentUserId != null && currentUserId.isNotEmpty) {
           await _chatService.updateLastSeen(currentUserId);
         }
       },
@@ -122,7 +123,7 @@ class _ChatPageState extends State<ChatPage> {
   /// Initialize chat room and start real-time listener
   Future<void> _initChatRoom() async {
     final currentUserId = _authService.getCurrentUserId();
-    if (currentUserId.isEmpty) return;
+    if (currentUserId == null || currentUserId.isEmpty) return;
 
     final chatRoomId = await _chatService.getOrCreateChatRoomId(
       currentUserId,
@@ -173,7 +174,7 @@ class _ChatPageState extends State<ChatPage> {
   void _handleTypingChange() async {
     if (_chatRoomId == null) return;
     final currentUserId = _authService.getCurrentUserId();
-    if (currentUserId.isEmpty) return;
+    if (currentUserId == null || currentUserId.isEmpty) return;
 
     final hasText = _messageController.text.trim().isNotEmpty;
 
@@ -200,7 +201,7 @@ class _ChatPageState extends State<ChatPage> {
       _typingDebounce = Timer(const Duration(seconds: 4), () async {
         if (_chatRoomId == null) return;
         final uid = _authService.getCurrentUserId();
-        if (uid.isEmpty) return;
+        if (uid == null || uid.isEmpty) return;
 
         _sentTypingTrue = false;
         await _chatService.setTypingStatus(
@@ -250,7 +251,7 @@ class _ChatPageState extends State<ChatPage> {
     if (text.isEmpty || _chatRoomId == null) return;
 
     final currentUserId = _authService.getCurrentUserId();
-    if (currentUserId.isEmpty) return;
+    if (currentUserId == null || currentUserId.isEmpty) return;
 
     final provider = Provider.of<ChatProvider>(context, listen: false);
 
@@ -273,49 +274,6 @@ class _ChatPageState extends State<ChatPage> {
         isTyping: false,
       );
       _sentTypingTrue = false;
-    }
-  }
-
-  /// WhatsApp-style multi-image picker + caption for DIRECT MESSAGES (DM)
-  Future<void> _openImagePickerSheetForDM() async {
-    final currentUserId = _authService.getCurrentUserId();
-    if (_chatRoomId == null || currentUserId == null) return;
-
-    // 1) Pick multiple images (or single)
-    final pickedFiles = await ChatMediaHelper.pickMultipleImages();
-    if (pickedFiles.isEmpty) return;
-
-    // 2) Let helper show selection + caption UI
-    final result = await ChatMediaHelper.showMultiImageCaptionSheet(
-      context: context,
-      pickedFiles: pickedFiles,
-    );
-
-    if (result == null || result.files.isEmpty) return;
-
-    // 3) All images in this batch share ONE timestamp
-    final batchTime = DateTime.now().toUtc();
-
-    for (final xfile in result.files) {
-      final file = File(xfile.path);
-
-      final imageUrl = await ChatMediaHelper.uploadImageFileAndGetUrl(
-        context: context,
-        file: file,
-        chatRoomId: _chatRoomId!,
-        currentUserId: currentUserId,
-      );
-
-      if (imageUrl == null) continue;
-
-      await _chatService.sendImageMessage(
-        chatRoomId: _chatRoomId!,
-        senderId: currentUserId,
-        receiverId: widget.friendId,
-        imageUrl: imageUrl,
-        message: result.caption,
-        createdAtOverride: batchTime,
-      );
     }
   }
 
@@ -388,12 +346,17 @@ class _ChatPageState extends State<ChatPage> {
 
       final sameSender = msg.senderId == base.senderId;
       final sameCaption = msg.message == base.message;
-      final bothHaveImage = (msg.imageUrl?.trim().isNotEmpty ?? false) &&
-          (base.imageUrl?.trim().isNotEmpty ?? false);
       final sameCreatedAt = msg.createdAt.isAtSameMomentAs(base.createdAt);
 
-      final canGroup =
-          sameSender && sameCaption && bothHaveImage && sameCreatedAt;
+      final baseHasMedia =
+          (base.imageUrl?.trim().isNotEmpty ?? false) ||
+              (base.videoUrl?.trim().isNotEmpty ?? false);
+      final msgHasMedia =
+          (msg.imageUrl?.trim().isNotEmpty ?? false) ||
+              (msg.videoUrl?.trim().isNotEmpty ?? false);
+      final bothHaveMedia = baseHasMedia && msgHasMedia;
+
+      final canGroup = sameSender && sameCaption && bothHaveMedia && sameCreatedAt;
 
       if (canGroup) {
         currentGroup.messages.add(msg);
@@ -555,220 +518,232 @@ class _ChatPageState extends State<ChatPage> {
           ],
         ),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: _chatRoomId == null
-                ? const Center(child: CircularProgressIndicator())
-                : Consumer<ChatProvider>(
-              builder: (context, provider, _) {
-                final rawMessages =
-                provider.getMessages(_chatRoomId!);
+      body: SafeArea(
+        top: false, // AppBar already handles top inset
+        child: Column(
+          children: [
+            Expanded(
+              child: _chatRoomId == null
+                  ? const Center(child: CircularProgressIndicator())
+                  : Consumer<ChatProvider>(
+                builder: (context, provider, _) {
+                  final rawMessages =
+                  provider.getMessages(_chatRoomId!);
 
-                if (rawMessages.isEmpty) {
-                  return const Center(
-                    child: Text("No messages yet"),
-                  );
-                }
+                  if (rawMessages.isEmpty) {
+                    return const Center(
+                      child: Text("No messages yet"),
+                    );
+                  }
 
-                final messages = rawMessages
-                    .map((m) => MessageModel.fromMap(m))
-                    .toList();
+                  final messages = rawMessages
+                      .map((m) => MessageModel.fromMap(m))
+                      .toList();
 
-                // Unread info (still based on flat messages)
-                int unreadCount = 0;
-                int? firstUnreadIndexFromStart;
-                if (currentUserId != null) {
-                  for (int i = 0; i < messages.length; i++) {
-                    final m = messages[i];
-                    final isMine = m.senderId == currentUserId;
-                    if (!m.isRead && !isMine) {
-                      unreadCount++;
-                      firstUnreadIndexFromStart ??= i;
+                  // Unread info (still based on flat messages)
+                  int unreadCount = 0;
+                  int? firstUnreadIndexFromStart;
+                  if (currentUserId != null) {
+                    for (int i = 0; i < messages.length; i++) {
+                      final m = messages[i];
+                      final isMine = m.senderId == currentUserId;
+                      if (!m.isRead && !isMine) {
+                        unreadCount++;
+                        firstUnreadIndexFromStart ??= i;
+                      }
                     }
                   }
-                }
 
-                // Group into logical bubbles
-                final groups = _buildMessageGroups(messages);
+                  // Group into logical bubbles
+                  final groups = _buildMessageGroups(messages);
 
-                // Map message index -> group index (for unread separator)
-                final messageIndexToGroupIndex =
-                List<int>.filled(messages.length, 0);
-                for (int gi = 0; gi < groups.length; gi++) {
-                  final g = groups[gi];
-                  for (final m in g.messages) {
-                    final idx = messages.indexOf(m);
-                    if (idx != -1) {
-                      messageIndexToGroupIndex[idx] = gi;
+                  // Map message index -> group index (for unread separator)
+                  final messageIndexToGroupIndex =
+                  List<int>.filled(messages.length, 0);
+                  for (int gi = 0; gi < groups.length; gi++) {
+                    final g = groups[gi];
+                    for (final m in g.messages) {
+                      final idx = messages.indexOf(m);
+                      if (idx != -1) {
+                        messageIndexToGroupIndex[idx] = gi;
+                      }
                     }
                   }
-                }
 
-                int? firstUnreadGroupIndex;
-                if (firstUnreadIndexFromStart != null) {
-                  firstUnreadGroupIndex =
-                  messageIndexToGroupIndex[firstUnreadIndexFromStart];
-                }
-
-                // Auto-scroll still based on message length
-                if (messages.length != _lastMessageCount) {
-                  if (_isNearBottom()) {
-                    _scrollDown();
+                  int? firstUnreadGroupIndex;
+                  if (firstUnreadIndexFromStart != null) {
+                    firstUnreadGroupIndex =
+                    messageIndexToGroupIndex[firstUnreadIndexFromStart];
                   }
-                  _lastMessageCount = messages.length;
-                }
 
-                return ListView.builder(
-                  controller: _scrollController,
-                  reverse: true,
-                  padding:
-                  const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: groups.length,
-                  itemBuilder: (context, index) {
-                    // Convert builder index → group index (reverse)
-                    final groupIndex =
-                        groups.length - 1 - index;
-                    final group = groups[groupIndex];
-
-                    final firstMsg = group.first;
-                    final lastMsg = group.last;
-
-                    final isCurrentUser =
-                        firstMsg.senderId == currentUserId;
-
-                    // Collect all image URLs for this group
-                    final imageUrls = group.messages
-                        .map((m) => m.imageUrl)
-                        .whereType<String>()
-                        .where(
-                            (u) => u.trim().isNotEmpty)
-                        .toList();
-
-                    // Use last message for ticks/likes
-                    final likedBy = lastMsg.likedBy;
-                    final isLikedByMe =
-                        currentUserId != null &&
-                            likedBy.contains(currentUserId);
-                    final likeCount = likedBy.length;
-
-                    // Day divider
-                    final msgDate = firstMsg.createdAt;
-                    DateTime? prevDate;
-                    if (groupIndex > 0) {
-                      prevDate = groups[groupIndex - 1]
-                          .first
-                          .createdAt;
+                  // Auto-scroll still based on message length
+                  if (messages.length != _lastMessageCount) {
+                    if (_isNearBottom()) {
+                      _scrollDown();
                     }
-                    final showDayDivider =
-                        prevDate == null ||
-                            !isSameDay(msgDate, prevDate);
+                    _lastMessageCount = messages.length;
+                  }
 
-                    // Unread separator
-                    final showUnreadSeparator =
-                        unreadCount > 0 &&
-                            firstUnreadGroupIndex != null &&
-                            groupIndex ==
-                                firstUnreadGroupIndex;
+                  return ListView.builder(
+                    controller: _scrollController,
+                    reverse: true,
+                    padding:
+                    const EdgeInsets.symmetric(vertical: 8),
+                    itemCount: groups.length,
+                    itemBuilder: (context, index) {
+                      // Convert builder index → group index (reverse)
+                      final groupIndex =
+                          groups.length - 1 - index;
+                      final group = groups[groupIndex];
 
-                    return Column(
-                      children: [
-                        if (showDayDivider)
-                          buildDayBubble(
-                            context: context,
-                            date: msgDate,
-                          ),
-                        if (showUnreadSeparator)
-                          buildUnreadBubble(
-                            context: context,
-                            unreadCount:
-                            unreadCount,
-                          ),
-                        Padding(
-                          padding:
-                          const EdgeInsets
-                              .symmetric(
-                            vertical: 2,
-                            horizontal: 8,
-                          ),
-                          child: Align(
-                            alignment: isCurrentUser
-                                ? Alignment
-                                .centerRight
-                                : Alignment
-                                .centerLeft,
-                            child: MyChatBubble(
-                              message:
-                              lastMsg.message,
-                              imageUrls:
-                              imageUrls,
-                              imageUrl:
-                              imageUrls
-                                  .isNotEmpty
-                                  ? imageUrls
-                                  .first
-                                  : null,
-                              isCurrentUser:
-                              isCurrentUser,
-                              createdAt:
-                              lastMsg.createdAt,
-                              isRead: lastMsg.isRead,
-                              isDelivered:
-                              lastMsg
-                                  .isDelivered,
-                              isLikedByMe:
-                              isLikedByMe,
-                              likeCount:
-                              likeCount,
-                              onDoubleTap: () async {
-                                final String uid = _authService.getCurrentUserId();
-                                if (uid.isEmpty) {
-                                  return;
-                                }
+                      final firstMsg = group.first;
+                      final lastMsg = group.last;
 
-                                await _chatService.toggleLikeMessage(
-                                  messageId: lastMsg.id,
-                                  userId: uid,
-                                );
-                              },
+                      final isCurrentUser =
+                          firstMsg.senderId == currentUserId;
 
+                      // Collect all image URLs for this group
+                      final imageUrls = group.messages
+                          .map((m) => m.imageUrl)
+                          .whereType<String>()
+                          .where((u) => u.trim().isNotEmpty)
+                          .toList();
 
-                              onLikeTap:
-                              likedBy.isEmpty
-                                  ? null
-                                  : () {
-                                final ids =
-                                likedBy
-                                    .map((e) => e.toString())
-                                    .toList();
-                                _showLikesBottomSheet(
-                                    ids);
-                              },
+                      // 🆕 first video in this group (if any)
+                      final String? groupVideoUrl = group.messages
+                          .map((m) => m.videoUrl)
+                          .whereType<String>()
+                          .firstWhere(
+                            (u) => u.trim().isNotEmpty,
+                        orElse: () => '',
+                      );
+                      final String? effectiveVideoUrl =
+                      (groupVideoUrl != null &&
+                          groupVideoUrl.trim().isNotEmpty)
+                          ? groupVideoUrl
+                          : null;
+
+                      // Use last message for ticks/likes
+                      final likedBy = lastMsg.likedBy;
+                      final isLikedByMe =
+                          currentUserId != null &&
+                              likedBy.contains(currentUserId);
+                      final likeCount = likedBy.length;
+
+                      // Day divider
+                      final msgDate = firstMsg.createdAt;
+                      DateTime? prevDate;
+                      if (groupIndex > 0) {
+                        prevDate = groups[groupIndex - 1]
+                            .first
+                            .createdAt;
+                      }
+                      final showDayDivider =
+                          prevDate == null ||
+                              !isSameDay(msgDate, prevDate);
+
+                      // Unread separator
+                      final showUnreadSeparator =
+                          unreadCount > 0 &&
+                              firstUnreadGroupIndex != null &&
+                              groupIndex ==
+                                  firstUnreadGroupIndex;
+
+                      return Column(
+                        children: [
+                          if (showDayDivider)
+                            buildDayBubble(
+                              context: context,
+                              date: msgDate,
+                            ),
+                          if (showUnreadSeparator)
+                            buildUnreadBubble(
+                              context: context,
+                              unreadCount: unreadCount,
+                            ),
+                          Padding(
+                            padding:
+                            const EdgeInsets.symmetric(
+                              vertical: 2,
+                              horizontal: 8,
+                            ),
+                            child: Align(
+                              alignment: isCurrentUser
+                                  ? Alignment.centerRight
+                                  : Alignment.centerLeft,
+                              child: MyChatBubble(
+                                message: lastMsg.message,
+                                imageUrls: imageUrls,
+                                imageUrl: imageUrls.isNotEmpty
+                                    ? imageUrls.first
+                                    : null,
+                                videoUrl: effectiveVideoUrl,
+                                isCurrentUser: isCurrentUser,
+                                createdAt: lastMsg.createdAt,
+                                isRead: lastMsg.isRead,
+                                isDelivered: lastMsg.isDelivered,
+                                isLikedByMe: isLikedByMe,
+                                likeCount: likeCount,
+                                isUploading: lastMsg.isUploading,
+                                senderName: isCurrentUser
+                                    ? 'You'
+                                    : widget.friendName,
+                                onDoubleTap: () async {
+                                  final String? uid =
+                                  _authService.getCurrentUserId();
+                                  if (uid == null || uid.isEmpty) {
+                                    return;
+                                  }
+
+                                  await _chatService.toggleLikeMessage(
+                                    messageId: lastMsg.id,
+                                    userId: uid,
+                                  );
+                                },
+                                onLikeTap: likedBy.isEmpty
+                                    ? null
+                                    : () {
+                                  final ids = likedBy
+                                      .map((e) => e.toString())
+                                      .toList();
+                                  _showLikesBottomSheet(ids);
+                                },
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                child: MyChatTextField(
+                  controller: _messageController,
+                  focusNode: _focusNode,
+                  onSendPressed: _sendMessage,
+                  onEmojiPressed: () => debugPrint("Emoji pressed"),
+                  onAttachmentPressed: () async {
+                    if (_chatRoomId == null) return;
+                    final currentUserId = _authService.getCurrentUserId();
+                    if (currentUserId == null || currentUserId.isEmpty) return;
+
+                    await ChatMediaHelper.openAttachmentSheetForDM(
+                      context: context,
+                      chatRoomId: _chatRoomId!,
+                      currentUserId: currentUserId,
+                      otherUserId: widget.friendId,
                     );
                   },
-                );
-              },
+                ),
+              ),
             ),
-          ),
-          Padding(
-            padding:
-            const EdgeInsets.fromLTRB(8, 4, 8, 16),
-            child: MyChatTextField(
-              controller: _messageController,
-              focusNode: _focusNode,
-              onSendPressed: _sendMessage,
-              onEmojiPressed: () =>
-                  debugPrint("Emoji pressed"),
-              onAttachmentPressed: () async {
-                await _openImagePickerSheetForDM();
-              },
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
