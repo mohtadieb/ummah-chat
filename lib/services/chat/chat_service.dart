@@ -1,3 +1,4 @@
+// lib/services/chat/chat_service.dart
 import 'dart:async';
 import 'package:flutter/foundation.dart'; // for debugPrint
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -45,14 +46,16 @@ class ChatService {
       String chatRoomId,
       String senderId,
       String receiverId,
-      String message,
-      ) async {
+      String message, {
+        String? replyToMessageId, // 🆕 named
+      }) async {
     await _supabase.from('messages').insert({
       'chat_room_id': chatRoomId,
       'sender_id': senderId,
       'receiver_id': receiverId,
       'message': message,
       'created_at': DateTime.now().toIso8601String(),
+      'reply_to_message_id': replyToMessageId, // 🆕
       // `is_delivered`, `is_read`, `liked_by` use DB defaults
     });
   }
@@ -160,12 +163,15 @@ class ChatService {
 
     if (room != null) return room['id'] as String;
 
-    final newRoom =
-    await _supabase.from('chat_rooms').insert({
+    final newRoom = await _supabase
+        .from('chat_rooms')
+        .insert({
       'user1_id': currentUserId,
       'user2_id': friendId,
       'is_group': false,
-    }).select().maybeSingle();
+    })
+        .select()
+        .maybeSingle();
 
     return newRoom!['id'] as String;
   }
@@ -240,8 +246,7 @@ class ChatService {
   Stream<List<Map<String, dynamic>>> getUserStream() {
     return _supabase
         .from('profiles')
-        .stream(primaryKey: ['id'])
-        .map(
+        .stream(primaryKey: ['id']).map(
           (rows) => rows.map((r) => r as Map<String, dynamic>).toList(),
     );
   }
@@ -569,14 +574,16 @@ class ChatService {
   Future<void> sendGroupMessage(
       String chatRoomId,
       String senderId,
-      String message,
-      ) async {
+      String message, {
+        String? replyToMessageId, // 🆕
+      }) async {
     await _supabase.from('messages').insert({
       'chat_room_id': chatRoomId,
       'sender_id': senderId,
       'receiver_id': null, // group message has no single receiver
       'message': message,
       'created_at': DateTime.now().toIso8601String(),
+      'reply_to_message_id': replyToMessageId,
       // other fields use DB defaults
     });
   }
@@ -828,7 +835,7 @@ class ChatService {
     final data = await _supabase
         .from('messages')
         .select(
-      'id, chat_room_id, sender_id, receiver_id, message, image_url, video_url, created_at, is_read, is_delivered, liked_by',
+      'id, chat_room_id, sender_id, receiver_id, message, image_url, video_url, reply_to_message_id, created_at, is_read, is_delivered, liked_by',
     )
         .filter('receiver_id', 'is', null)
         .order('created_at', ascending: false);
@@ -954,29 +961,25 @@ class ChatService {
       rethrow;
     }
   }
-// =======================================================================
-//                              DELETE MESSAGES
-// =======================================================================
+
+  // =======================================================================
+  //                              DELETE MESSAGES
+  // =======================================================================
 
   Future<void> deleteMessageForEveryone({
     required String messageId,
     required String userId,
   }) async {
     // Only allow sender to delete
-    await _supabase
-        .from('messages')
-        .update({
+    await _supabase.from('messages').update({
       'is_deleted': true,
       'deleted_at': DateTime.now().toUtc().toIso8601String(),
       'message': '',
       'image_url': null,
       'video_url': null,
-    })
-        .match({
+    }).match({
       'id': messageId,
       'sender_id': userId,
     });
   }
-
-
 }

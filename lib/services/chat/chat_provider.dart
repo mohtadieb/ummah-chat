@@ -1,6 +1,6 @@
+// lib/services/chat/chat_provider.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'chat_service.dart';
 
@@ -94,9 +94,16 @@ class ChatProvider with ChangeNotifier {
       String roomId,
       String senderId,
       String receiverId,
-      String text,
-      ) async {
-    await _chatService.sendMessage(roomId, senderId, receiverId, text);
+      String text, {
+        String? replyToMessageId,
+      }) async {
+    await _chatService.sendMessage(
+      roomId,
+      senderId,
+      receiverId,
+      text,
+      replyToMessageId: replyToMessageId,
+    );
   }
 
   /// Send a GROUP text message via ChatService
@@ -107,9 +114,15 @@ class ChatProvider with ChangeNotifier {
   Future<void> sendGroupMessage(
       String roomId,
       String senderId,
-      String text,
-      ) async {
-    await _chatService.sendGroupMessage(roomId, senderId, text);
+      String text, {
+        String? replyToMessageId,
+      }) async {
+    await _chatService.sendGroupMessage(
+      roomId,
+      senderId,
+      text,
+      replyToMessageId: replyToMessageId,
+    );
   }
 
   @override

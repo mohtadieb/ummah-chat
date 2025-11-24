@@ -1,6 +1,5 @@
 // lib/pages/group_chat_page.dart
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -27,7 +26,6 @@ class _MessageGroup {
   _MessageGroup({required this.messages, required this.firstIndex});
 
   MessageModel get first => messages.first;
-
   MessageModel get last => messages.last;
 }
 
@@ -67,6 +65,9 @@ class _GroupChatPageState extends State<GroupChatPage> {
   Timer? _presenceTimer;
 
   bool _isCurrentUserAdmin = false;
+
+  // 🆕 current reply target
+  MessageModel? _replyTo;
 
   @override
   void initState() {
@@ -213,11 +214,11 @@ class _GroupChatPageState extends State<GroupChatPage> {
                 ),
                 subtitle: user.username.isNotEmpty
                     ? Text(
-                        '@${user.username}',
-                        style: TextStyle(
-                          color: colorScheme.primary.withValues(alpha: 0.7),
-                        ),
-                      )
+                  '@${user.username}',
+                  style: TextStyle(
+                    color: colorScheme.primary.withValues(alpha: 0.7),
+                  ),
+                )
                     : null,
               );
             },
@@ -249,7 +250,10 @@ class _GroupChatPageState extends State<GroupChatPage> {
               onPressed: () => Navigator.of(context).pop(false),
             ),
             TextButton(
-              child: Text('Leave', style: TextStyle(color: Colors.red[600])),
+              child: Text(
+                'Leave',
+                style: TextStyle(color: Colors.red[600]),
+              ),
               onPressed: () => Navigator.of(context).pop(true),
             ),
           ],
@@ -292,7 +296,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
           title: const Text('Delete group?'),
           content: Text(
             'This will permanently delete "${widget.groupName}" '
-            'for all members, including all messages.',
+                'for all members, including all messages.',
           ),
           actions: [
             TextButton(
@@ -303,7 +307,10 @@ class _GroupChatPageState extends State<GroupChatPage> {
               onPressed: () => Navigator.of(context).pop(false),
             ),
             TextButton(
-              child: Text('Delete', style: TextStyle(color: Colors.red[600])),
+              child: Text(
+                'Delete',
+                style: TextStyle(color: Colors.red[600]),
+              ),
               onPressed: () => Navigator.of(context).pop(true),
             ),
           ],
@@ -373,6 +380,22 @@ class _GroupChatPageState extends State<GroupChatPage> {
     return (pos.pixels - pos.minScrollExtent).abs() <= threshold;
   }
 
+  // 🆕 start replying to a group message
+  void _startReplyToGroupMessage(MessageModel msg) {
+    setState(() {
+      _replyTo = msg;
+    });
+    _focusNode.requestFocus();
+  }
+
+  // 🆕 cancel reply
+  void _cancelReplyToGroupMessage() {
+    if (_replyTo == null) return;
+    setState(() {
+      _replyTo = null;
+    });
+  }
+
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
@@ -380,10 +403,21 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
     final provider = Provider.of<ChatProvider>(context, listen: false);
 
+    final replyId = _replyTo?.id;
+
     _messageController.clear();
     _scrollDown();
 
-    await provider.sendGroupMessage(widget.chatRoomId, _currentUserId, text);
+    await provider.sendGroupMessage(
+      widget.chatRoomId,
+      _currentUserId,
+      text,
+      replyToMessageId: replyId,
+    );
+
+    setState(() {
+      _replyTo = null;
+    });
 
     await _chatService.updateLastSeen(_currentUserId);
   }
@@ -391,19 +425,19 @@ class _GroupChatPageState extends State<GroupChatPage> {
   String _displayNameForSender(String senderId) {
     final profile =
         _userCache[senderId] ??
-        _members.firstWhere(
-          (u) => u.id == senderId,
-          orElse: () => UserProfile(
-            id: senderId,
-            name: '',
-            email: '',
-            username: '',
-            bio: '',
-            profilePhotoUrl: '',
-            createdAt: DateTime.now().toUtc(),
-            lastSeenAt: null,
-          ),
-        );
+            _members.firstWhere(
+                  (u) => u.id == senderId,
+              orElse: () => UserProfile(
+                id: senderId,
+                name: '',
+                email: '',
+                username: '',
+                bio: '',
+                profilePhotoUrl: '',
+                createdAt: DateTime.now().toUtc(),
+                lastSeenAt: null,
+              ),
+            );
 
     if (profile.name.isNotEmpty) return profile.name;
     if (profile.username.isNotEmpty) return profile.username;
@@ -460,10 +494,10 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
       final baseHasMedia =
           (base.imageUrl?.trim().isNotEmpty ?? false) ||
-          (base.videoUrl?.trim().isNotEmpty ?? false);
+              (base.videoUrl?.trim().isNotEmpty ?? false);
       final msgHasMedia =
           (msg.imageUrl?.trim().isNotEmpty ?? false) ||
-          (msg.videoUrl?.trim().isNotEmpty ?? false);
+              (msg.videoUrl?.trim().isNotEmpty ?? false);
       final bothHaveMedia = baseHasMedia && msgHasMedia;
 
       final canGroup =
@@ -492,7 +526,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
       for (final id in uniqueIds) {
         UserProfile? profile = _userCache[id];
         profile ??= _members.firstWhere(
-          (u) => u.id == id,
+              (u) => u.id == id,
           orElse: () => UserProfile(
             id: id,
             name: '',
@@ -572,7 +606,8 @@ class _GroupChatPageState extends State<GroupChatPage> {
                         '(You)',
                         style: TextStyle(
                           fontSize: 12,
-                          color: colorScheme.primary.withValues(alpha: 0.7),
+                          color:
+                          colorScheme.primary.withValues(alpha: 0.7),
                         ),
                       ),
                     ],
@@ -580,11 +615,11 @@ class _GroupChatPageState extends State<GroupChatPage> {
                 ),
                 subtitle: user.username.isNotEmpty
                     ? Text(
-                        '@${user.username}',
-                        style: TextStyle(
-                          color: colorScheme.primary.withValues(alpha: 0.7),
-                        ),
-                      )
+                  '@${user.username}',
+                  style: TextStyle(
+                    color: colorScheme.primary.withValues(alpha: 0.7),
+                  ),
+                )
                     : null,
               );
             },
@@ -617,7 +652,10 @@ class _GroupChatPageState extends State<GroupChatPage> {
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: Text('Delete', style: TextStyle(color: Colors.red)),
+              child: const Text(
+                'Delete',
+                style: TextStyle(color: Colors.red),
+              ),
             ),
           ],
         );
@@ -629,6 +667,126 @@ class _GroupChatPageState extends State<GroupChatPage> {
     await _chatService.deleteMessageForEveryone(
       messageId: messageId,
       userId: _currentUserId,
+    );
+  }
+
+  // 🆕 long-press menu: Reply / Delete
+  Future<void> _onGroupBubbleLongPress(
+      MessageModel msg,
+      bool isCurrentUser,
+      ) async {
+    if (msg.isDeleted) return;
+
+    final colorScheme = Theme.of(context).colorScheme;
+
+    await showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(
+                  Icons.reply,
+                  color: colorScheme.primary,
+                ),
+                title: const Text('Reply'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _startReplyToGroupMessage(msg);
+                },
+              ),
+              if (isCurrentUser) ...[
+                const Divider(height: 0),
+                ListTile(
+                  leading: const Icon(Icons.delete, color: Colors.red),
+                  title: const Text('Delete'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _confirmDeleteGroupMessage(msg.id);
+                  },
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // 🆕 reply preview bar above input
+  Widget _buildReplyPreviewBar(
+      MessageModel msg,
+      ColorScheme colorScheme,
+      ) {
+    final author = _displayNameForSender(msg.senderId);
+
+    String label;
+    if (msg.message.trim().isNotEmpty) {
+      label = msg.message.trim();
+    } else if ((msg.imageUrl ?? '').trim().isNotEmpty) {
+      label = 'Photo';
+    } else if ((msg.videoUrl ?? '').trim().isNotEmpty) {
+      label = 'Video';
+    } else {
+      label = 'Message';
+    }
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: colorScheme.tertiary,
+        borderRadius: BorderRadius.circular(12),
+        border: Border(
+          left: BorderSide(
+            color: const Color(0xFF128C7E),
+            width: 3,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  author,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF128C7E),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colorScheme.inversePrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 18),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            onPressed: _cancelReplyToGroupMessage,
+          ),
+        ],
+      ),
     );
   }
 
@@ -774,9 +932,8 @@ class _GroupChatPageState extends State<GroupChatPage> {
                     return const Center(child: Text("No messages yet"));
                   }
 
-                  final messages = rawMessages
-                      .map((m) => MessageModel.fromMap(m))
-                      .toList();
+                  final messages =
+                  rawMessages.map((m) => MessageModel.fromMap(m)).toList();
 
                   // unread counts still based on flat messages
                   int unreadCount = 0;
@@ -813,7 +970,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
                   int? firstUnreadGroupIndex;
                   if (firstUnreadIndexFromStart != null) {
                     firstUnreadGroupIndex =
-                        messageIndexToGroupIndex[firstUnreadIndexFromStart];
+                    messageIndexToGroupIndex[firstUnreadIndexFromStart];
                   }
 
                   // auto-scroll + mark as read
@@ -862,24 +1019,23 @@ class _GroupChatPageState extends State<GroupChatPage> {
                           .where((u) => u.trim().isNotEmpty)
                           .toList();
 
-                      // 🆕 first video in this group (if any)
                       final String? groupVideoUrl = group.messages
                           .map((m) => m.videoUrl)
                           .whereType<String>()
                           .firstWhere(
                             (u) => u.trim().isNotEmpty,
-                            orElse: () => '',
-                          );
+                        orElse: () => '',
+                      );
                       final String? effectiveVideoUrl =
-                          (groupVideoUrl != null &&
-                              groupVideoUrl.trim().isNotEmpty)
+                      (groupVideoUrl != null &&
+                          groupVideoUrl.trim().isNotEmpty)
                           ? groupVideoUrl
                           : null;
 
                       final List<String> likedBy = lastMsg.likedBy;
                       final bool isLikedByMe =
                           _currentUserId.isNotEmpty &&
-                          likedBy.contains(_currentUserId);
+                              likedBy.contains(_currentUserId);
                       final int likeCount = likedBy.length;
 
                       final msgDate = firstMsg.createdAt;
@@ -892,8 +1048,47 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
                       final showUnreadSeparator =
                           unreadCount > 0 &&
-                          firstUnreadGroupIndex != null &&
-                          groupIndex == firstUnreadGroupIndex;
+                              firstUnreadGroupIndex != null &&
+                              groupIndex == firstUnreadGroupIndex;
+
+                      // 🆕 resolve reply target
+                      MessageModel? repliedTo;
+                      if (lastMsg.replyToMessageId != null &&
+                          lastMsg.replyToMessageId!.trim().isNotEmpty) {
+                        try {
+                          repliedTo = messages.firstWhere(
+                                (m) => m.id == lastMsg.replyToMessageId,
+                          );
+                        } catch (_) {
+                          repliedTo = null;
+                        }
+                      }
+
+                      String? replyAuthorName;
+                      String? replySnippet;
+                      bool replyHasMedia = false;
+
+                      if (repliedTo != null) {
+                        replyAuthorName = _displayNameForSender(
+                          repliedTo.senderId,
+                        );
+
+                        if (repliedTo.message.trim().isNotEmpty) {
+                          replySnippet = repliedTo.message.trim();
+                        } else if ((repliedTo.imageUrl ?? '')
+                            .trim()
+                            .isNotEmpty) {
+                          replySnippet = 'Photo';
+                          replyHasMedia = true;
+                        } else if ((repliedTo.videoUrl ?? '')
+                            .trim()
+                            .isNotEmpty) {
+                          replySnippet = 'Video';
+                          replyHasMedia = true;
+                        } else {
+                          replySnippet = 'Message';
+                        }
+                      }
 
                       return Column(
                         children: [
@@ -916,10 +1111,9 @@ class _GroupChatPageState extends State<GroupChatPage> {
                               child: MyChatBubble(
                                 message: lastMsg.message,
                                 imageUrls: imageUrls,
-                                imageUrl: imageUrls.isNotEmpty
-                                    ? imageUrls.first
-                                    : null,
-                                videoUrl: lastMsg.videoUrl,
+                                imageUrl:
+                                imageUrls.isNotEmpty ? imageUrls.first : null,
+                                videoUrl: effectiveVideoUrl,
                                 isCurrentUser: isCurrentUser,
                                 createdAt: lastMsg.createdAt,
                                 isRead: lastMsg.isRead,
@@ -928,7 +1122,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
                                 likeCount: likeCount,
                                 isUploading: lastMsg.isUploading,
                                 isDeleted: lastMsg.isDeleted,
-                                // 🆕
                                 onDoubleTap: () async {
                                   if (_currentUserId.isEmpty) return;
 
@@ -937,16 +1130,21 @@ class _GroupChatPageState extends State<GroupChatPage> {
                                     userId: _currentUserId,
                                   );
                                 },
-                                onLongPress: isCurrentUser && !lastMsg.isDeleted
-                                    ? () =>
-                                          _confirmDeleteGroupMessage(lastMsg.id)
+                                onLongPress: !lastMsg.isDeleted
+                                    ? () => _onGroupBubbleLongPress(
+                                  lastMsg,
+                                  isCurrentUser,
+                                )
                                     : null,
-                                // 🆕
                                 onLikeTap: likedBy.isEmpty
                                     ? null
                                     : () => _showLikesBottomSheet(likedBy),
                                 senderName: isCurrentUser ? null : senderName,
-                                senderColor: isCurrentUser ? null : senderColor,
+                                senderColor:
+                                isCurrentUser ? null : senderColor,
+                                replyAuthorName: replyAuthorName,
+                                replySnippet: replySnippet,
+                                replyHasMedia: replyHasMedia,
                               ),
                             ),
                           ),
@@ -959,23 +1157,30 @@ class _GroupChatPageState extends State<GroupChatPage> {
             ),
             SafeArea(
               top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
-                child: MyChatTextField(
-                  controller: _messageController,
-                  focusNode: _focusNode,
-                  onSendPressed: _sendMessage,
-                  onEmojiPressed: () => debugPrint("Emoji pressed"),
-                  onAttachmentPressed: () async {
-                    if (_currentUserId.isEmpty) return;
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_replyTo != null)
+                    _buildReplyPreviewBar(_replyTo!, colorScheme),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                    child: MyChatTextField(
+                      controller: _messageController,
+                      focusNode: _focusNode,
+                      onSendPressed: _sendMessage,
+                      onEmojiPressed: () => debugPrint("Emoji pressed"),
+                      onAttachmentPressed: () async {
+                        if (_currentUserId.isEmpty) return;
 
-                    await ChatMediaHelper.openAttachmentSheetForGroup(
-                      context: context,
-                      chatRoomId: widget.chatRoomId,
-                      currentUserId: _currentUserId,
-                    );
-                  },
-                ),
+                        await ChatMediaHelper.openAttachmentSheetForGroup(
+                          context: context,
+                          chatRoomId: widget.chatRoomId,
+                          currentUserId: _currentUserId,
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

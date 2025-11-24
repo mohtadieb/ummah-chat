@@ -6,13 +6,16 @@ class MessageModel {
   final String message;
   final String? imageUrl;
   final String? videoUrl;
+
+  /// 🆕 ID of the message this one is replying to (nullable)
+  final String? replyToMessageId;
+
   final DateTime createdAt;
   final bool isRead;
   final bool isDelivered;
   final DateTime? deliveredAt;
   final List<String> likedBy;
   final bool isDeleted;
-
 
   // 🆕 NEW: whether this message is still uploading media
   final bool isUploading;
@@ -25,6 +28,7 @@ class MessageModel {
     required this.message,
     this.imageUrl,
     this.videoUrl,
+    this.replyToMessageId, // 🆕
     required this.createdAt,
     this.isRead = false,
     this.isDelivered = false,
@@ -73,12 +77,12 @@ class MessageModel {
       message: (map['message'] ?? '').toString(),
       imageUrl: map['image_url']?.toString(),
       videoUrl: map['video_url']?.toString(),
+      replyToMessageId: map['reply_to_message_id']?.toString(), // 🆕
       createdAt: parseDate(map['created_at']),
       isRead: map['is_read'] == true,
       isDelivered: map['is_delivered'] == true,
       deliveredAt: parseNullableDate(map['delivered_at']),
       likedBy: parseLikedBy(map['liked_by']),
-      // 🆕 map DB column → field
       isUploading: map['is_uploading'] == true,
       isDeleted: map['is_deleted'] == true,
     );
@@ -93,6 +97,7 @@ class MessageModel {
       'chat_room_id': chatRoomId,
       'image_url': imageUrl,
       'video_url': videoUrl,
+      'reply_to_message_id': replyToMessageId, // 🆕
       'is_read': isRead,
       'is_delivered': isDelivered,
       'delivered_at': deliveredAt?.toUtc().toIso8601String(),
@@ -117,6 +122,7 @@ class MessageModel {
     DateTime? createdAt,
     String? imageUrl,
     String? videoUrl,
+    String? replyToMessageId,
     bool? isRead,
     bool? isDelivered,
     DateTime? deliveredAt,
@@ -133,6 +139,7 @@ class MessageModel {
       createdAt: createdAt ?? this.createdAt,
       imageUrl: imageUrl ?? this.imageUrl,
       videoUrl: videoUrl ?? this.videoUrl,
+      replyToMessageId: replyToMessageId ?? this.replyToMessageId,
       isRead: isRead ?? this.isRead,
       isDelivered: isDelivered ?? this.isDelivered,
       deliveredAt: deliveredAt ?? this.deliveredAt,

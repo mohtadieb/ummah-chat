@@ -1,8 +1,14 @@
-// lib/components/my_chat_bubble.dart
 import 'package:flutter/material.dart';
 
 import '../pages/fullscreen_image_page.dart';
 import 'my_chat_video_bubble.dart';
+
+enum ChatBubbleShape {
+  single,
+  first,
+  middle,
+  last,
+}
 
 /// A simple chat bubble that adapts to the app's current theme.
 ///
@@ -13,12 +19,14 @@ import 'my_chat_video_bubble.dart';
 /// - Supports "like" with double-tap
 /// - Can optionally show sender name (for group chats) inside the bubble
 /// - 🖼 Can show one or multiple images above the text
-/// - 🎥 Uses [ChatVideoBubble] for video thumbnails
+/// - 🎥 Uses [MyChatVideoBubble] for video thumbnails
 /// - 🆕 Shows an uploading indicator for pending video messages
 /// - 🆕 Supports soft-delete ("This message was deleted")
+/// - 🆕 Supports reply preview (small quoted box)
 class MyChatBubble extends StatelessWidget {
   final String message;
   final bool isCurrentUser;
+  final ChatBubbleShape shape;
 
   /// Backwards-compatible single image URL (used when not using imageUrls).
   final String? imageUrl;
@@ -53,7 +61,7 @@ class MyChatBubble extends StatelessWidget {
   /// Optional double-tap handler (used to toggle like)
   final VoidCallback? onDoubleTap;
 
-  /// Optional long-press handler (used to delete message)
+  /// Optional long-press handler (used for reply/delete menu)
   final VoidCallback? onLongPress;
 
   /// Optional tap handler for the like badge (heart)
@@ -65,6 +73,11 @@ class MyChatBubble extends StatelessWidget {
   /// Optional: specific color for the sender name text.
   /// If null, a fallback color based on theme will be used.
   final Color? senderColor;
+
+  /// 🆕 Reply preview fields
+  final String? replyAuthorName;
+  final String? replySnippet;
+  final bool replyHasMedia;
 
   const MyChatBubble({
     super.key,
@@ -85,6 +98,10 @@ class MyChatBubble extends StatelessWidget {
     this.onLikeTap,
     this.senderName,
     this.senderColor,
+    this.shape = ChatBubbleShape.single, // 🆕 default
+    this.replyAuthorName,
+    this.replySnippet,
+    this.replyHasMedia = false,
   });
 
   String _formatTime(DateTime time) {
@@ -106,8 +123,10 @@ class MyChatBubble extends StatelessWidget {
         : <String>[]);
 
     // If deleted: never show images / videos / text content.
-    final bool hasImages = !isDeleted && effectiveImageUrls.isNotEmpty;
-    final bool hasVideo = !isDeleted && videoUrl != null && videoUrl!.trim().isNotEmpty;
+    final bool hasImages =
+        !isDeleted && effectiveImageUrls.isNotEmpty;
+    final bool hasVideo =
+        !isDeleted && videoUrl != null && videoUrl!.trim().isNotEmpty;
     final bool hasText = !isDeleted && message.trim().isNotEmpty;
 
     // 🟢 Sender (current user) bubble style
@@ -177,7 +196,8 @@ class MyChatBubble extends StatelessWidget {
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOutBack,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            padding:
+            const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20), // pill shape
@@ -210,7 +230,9 @@ class MyChatBubble extends StatelessWidget {
     }
 
     final showSenderName =
-        !isCurrentUser && senderName != null && senderName!.trim().isNotEmpty;
+        !isCurrentUser &&
+            senderName != null &&
+            senderName!.trim().isNotEmpty;
 
     // ---------- IMAGE HELPERS ----------
 
@@ -278,7 +300,8 @@ class MyChatBubble extends StatelessWidget {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: effectiveImageUrls.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          gridDelegate:
+          const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
             mainAxisSpacing: 2,
             crossAxisSpacing: 2,
@@ -302,7 +325,8 @@ class MyChatBubble extends StatelessWidget {
                 loadingBuilder: (context, child, progress) {
                   if (progress == null) return child;
                   return const Center(
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child:
+                    CircularProgressIndicator(strokeWidth: 2),
                   );
                 },
                 errorBuilder: (context, error, stack) {
@@ -325,21 +349,100 @@ class MyChatBubble extends StatelessWidget {
 
     // ---------- FULL BUBBLE ----------
 
+    // Less vertical spacing when messages are merged in a chain
+    final double verticalMargin =
+    (shape == ChatBubbleShape.single ||
+        shape == ChatBubbleShape.first)
+        ? 6
+        : 2;
+
+    Radius r18 = const Radius.circular(18);
+    Radius r10 = const Radius.circular(10);
+    Radius r4 = const Radius.circular(4);
+
+    // Tail is on the side of the sender (current user = right, others = left)
+    Radius topLeft;
+    Radius topRight;
+    Radius bottomLeft;
+    Radius bottomRight;
+
+    if (isCurrentUser) {
+      // Right side tail (bottomRight = 4)
+      switch (shape) {
+        case ChatBubbleShape.single:
+          topLeft = r18;
+          topRight = r18;
+          bottomLeft = r18;
+          bottomRight = r4;
+          break;
+        case ChatBubbleShape.first:
+          topLeft = r18;
+          topRight = r18;
+          bottomLeft = r10;
+          bottomRight = r4;
+          break;
+        case ChatBubbleShape.middle:
+          topLeft = r10;
+          topRight = r10;
+          bottomLeft = r10;
+          bottomRight = r4;
+          break;
+        case ChatBubbleShape.last:
+          topLeft = r10;
+          topRight = r10;
+          bottomLeft = r18;
+          bottomRight = r4;
+          break;
+      }
+    } else {
+      // Left side tail (bottomLeft = 4)
+      switch (shape) {
+        case ChatBubbleShape.single:
+          topLeft = r18;
+          topRight = r18;
+          bottomLeft = r4;
+          bottomRight = r18;
+          break;
+        case ChatBubbleShape.first:
+          topLeft = r18;
+          topRight = r18;
+          bottomLeft = r4;
+          bottomRight = r10;
+          break;
+        case ChatBubbleShape.middle:
+          topLeft = r10;
+          topRight = r10;
+          bottomLeft = r4;
+          bottomRight = r10;
+          break;
+        case ChatBubbleShape.last:
+          topLeft = r10;
+          topRight = r10;
+          bottomLeft = r4;
+          bottomRight = r18;
+          break;
+      }
+    }
+
     final bubble = Container(
-      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      margin: EdgeInsets.symmetric(
+        vertical: verticalMargin,
+        horizontal: 8,
+      ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 6,
+      ),
       constraints: BoxConstraints(
         maxWidth: MediaQuery.of(context).size.width * 0.75,
       ),
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(18),
-          topRight: const Radius.circular(18),
-          bottomLeft:
-          isCurrentUser ? const Radius.circular(18) : const Radius.circular(4),
-          bottomRight:
-          isCurrentUser ? const Radius.circular(4) : const Radius.circular(18),
+          topLeft: topLeft,
+          topRight: topRight,
+          bottomLeft: bottomLeft,
+          bottomRight: bottomRight,
         ),
         boxShadow: [
           BoxShadow(
@@ -350,8 +453,9 @@ class MyChatBubble extends StatelessWidget {
         ],
       ),
       child: Column(
-        crossAxisAlignment:
-        isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: isCurrentUser
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           if (showSenderName && !isDeleted) ...[
@@ -360,10 +464,69 @@ class MyChatBubble extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: senderColor ?? colors.primary.withValues(alpha: 0.95),
+                color: senderColor ??
+                    colors.primary.withValues(alpha: 0.95),
               ),
             ),
             const SizedBox(height: 2),
+          ],
+
+          // 🆕 Reply preview (quote box)
+          if (!isDeleted &&
+              (replyAuthorName != null &&
+                  replyAuthorName!.trim().isNotEmpty ||
+                  (replySnippet != null &&
+                      replySnippet!.trim().isNotEmpty))) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                color: isCurrentUser
+                    ? Colors.black.withValues(alpha: 0.10)
+                    : Colors.black.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(8),
+                border: Border(
+                  left: BorderSide(
+                    color: const Color(0xFF128C7E),
+                    width: 3,
+                  ),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (replyAuthorName != null &&
+                      replyAuthorName!.trim().isNotEmpty)
+                    Text(
+                      replyAuthorName!,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF128C7E),
+                      ),
+                    ),
+                  if (replySnippet != null &&
+                      replySnippet!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      replySnippet!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontStyle:
+                        replyHasMedia ? FontStyle.italic : null,
+                        color: textColor.withValues(alpha: 0.9),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ],
 
           if (isDeleted) ...[
@@ -435,7 +598,8 @@ class MyChatBubble extends StatelessWidget {
     );
 
     return Align(
-      alignment: isCurrentUser ? Alignment.centerRight : Alignment.centerLeft,
+      alignment:
+      isCurrentUser ? Alignment.centerRight : Alignment.centerLeft,
       child: GestureDetector(
         onDoubleTap: onDoubleTap,
         onLongPress: onLongPress,
