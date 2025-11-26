@@ -20,6 +20,10 @@ class MessageModel {
   // 🆕 NEW: whether this message is still uploading media
   final bool isUploading;
 
+  // 🆕 Voice message fields
+  final String? audioUrl;
+  final int? audioDurationSeconds;
+
   MessageModel({
     required this.id,
     required this.chatRoomId,
@@ -36,6 +40,8 @@ class MessageModel {
     this.likedBy = const [],
     this.isUploading = false, // NEW default
     this.isDeleted = false,
+    this.audioUrl,
+    this.audioDurationSeconds,
   });
 
   /// Safely parse DateTime from various possible types.
@@ -68,7 +74,21 @@ class MessageModel {
     return <String>[];
   }
 
+  // 🆕 helper: treat this message as a "pure" audio message
+  bool get isAudio =>
+      (audioUrl != null && audioUrl!.trim().isNotEmpty) &&
+          (imageUrl == null || imageUrl!.trim().isEmpty) &&
+          (videoUrl == null || videoUrl!.trim().isEmpty);
+
   factory MessageModel.fromMap(Map<String, dynamic> map) {
+    // Normalize the audio URL to null if it's an empty string
+    final rawAudioUrl = map['audio_url'];
+    final String? normalizedAudioUrl = (rawAudioUrl == null)
+        ? null
+        : rawAudioUrl.toString().trim().isEmpty
+        ? null
+        : rawAudioUrl.toString();
+
     return MessageModel(
       id: map['id'].toString(),
       chatRoomId: map['chat_room_id']?.toString(),
@@ -85,6 +105,11 @@ class MessageModel {
       likedBy: parseLikedBy(map['liked_by']),
       isUploading: map['is_uploading'] == true,
       isDeleted: map['is_deleted'] == true,
+
+      // 🆕 Voice fields
+      audioUrl: normalizedAudioUrl,
+      audioDurationSeconds:
+      (map['audio_duration_seconds'] as num?)?.toInt(), // safe for double/int
     );
   }
 
@@ -104,6 +129,10 @@ class MessageModel {
       'liked_by': likedBy,
       'is_uploading': isUploading,
       'is_deleted': isDeleted,
+
+      // 🆕 Voice fields
+      'audio_url': audioUrl,
+      'audio_duration_seconds': audioDurationSeconds,
     };
 
     if (id.isNotEmpty) {
@@ -129,6 +158,10 @@ class MessageModel {
     List<String>? likedBy,
     bool? isUploading,
     bool? isDeleted,
+
+    // 🆕 Voice fields in copyWith
+    String? audioUrl,
+    int? audioDurationSeconds,
   }) {
     return MessageModel(
       id: id ?? this.id,
@@ -146,6 +179,11 @@ class MessageModel {
       likedBy: likedBy ?? this.likedBy,
       isUploading: isUploading ?? this.isUploading,
       isDeleted: isDeleted ?? this.isDeleted,
+
+      // 🆕 carry over / override audio fields
+      audioUrl: audioUrl ?? this.audioUrl,
+      audioDurationSeconds:
+      audioDurationSeconds ?? this.audioDurationSeconds,
     );
   }
 }

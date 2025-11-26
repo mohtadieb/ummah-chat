@@ -1,7 +1,9 @@
 // lib/services/chat/chat_service.dart
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart'; // for debugPrint
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../models/message.dart';
 
@@ -54,7 +56,7 @@ class ChatService {
       'sender_id': senderId,
       'receiver_id': receiverId,
       'message': message,
-      'created_at': DateTime.now().toIso8601String(),
+      'created_at': DateTime.now().toUtc().toIso8601String(),
       'reply_to_message_id': replyToMessageId, // 🆕
       // `is_delivered`, `is_read`, `liked_by` use DB defaults
     });
@@ -582,7 +584,7 @@ class ChatService {
       'sender_id': senderId,
       'receiver_id': null, // group message has no single receiver
       'message': message,
-      'created_at': DateTime.now().toIso8601String(),
+      'created_at': DateTime.now().toUtc().toIso8601String(),
       'reply_to_message_id': replyToMessageId,
       // other fields use DB defaults
     });
@@ -835,7 +837,9 @@ class ChatService {
     final data = await _supabase
         .from('messages')
         .select(
-      'id, chat_room_id, sender_id, receiver_id, message, image_url, video_url, reply_to_message_id, created_at, is_read, is_delivered, liked_by',
+      'id, chat_room_id, sender_id, receiver_id, message, '
+          'image_url, video_url, audio_url, audio_duration_seconds, '
+          'reply_to_message_id, created_at, is_read, is_delivered, liked_by',
     )
         .filter('receiver_id', 'is', null)
         .order('created_at', ascending: false);
@@ -977,9 +981,77 @@ class ChatService {
       'message': '',
       'image_url': null,
       'video_url': null,
+      'audio_url': null,                 // 🆕
+      'audio_duration_seconds': null,
     }).match({
       'id': messageId,
       'sender_id': userId,
     });
   }
+
+  // ---------------------------------------------------------------------------
+  // 🎙 VOICE MESSAGES (DM + GROUP)
+  // ---------------------------------------------------------------------------
+
+  /// 🆕 Upload raw audio file to 'voice_messages' bucket in Supabase Storage
+  Future<String> uploadVoiceFile({
+    required String chatRoomId,
+    required String messageId,
+    required String filePath,
+  }) async {
+    final fileBytes = await File(filePath).readAsBytes();
+    final storagePath =
+        '$chatRoomId/voice_${DateTime.now().microsecondsSinceEpoch}_${const Uuid().v4()}.m4a';
+
+    await _supabase.storage
+        .from('chat-voice')
+        .uploadBinary(storagePath, fileBytes);
+
+    final publicUrl =
+    _supabase.storage.from('chat-voice').getPublicUrl(storagePath);
+
+    return publicUrl;
+  }
+
+  /// 🆕 Send a voice message in a 1-on-1 DM
+  Future<void> sendVoiceMessageDM({
+    required String chatRoomId,
+    required String senderId,
+    required String receiverId,
+    required String audioUrl,
+    required int durationSeconds,
+    String? replyToMessageId,
+  }) async {
+    await _supabase.from('messages').insert({
+      'chat_room_id': chatRoomId,
+      'sender_id': senderId,
+      'receiver_id': receiverId,
+      'message': '', // no text (optional)
+      'audio_url': audioUrl,
+      'audio_duration_seconds': durationSeconds,
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+      'reply_to_message_id': replyToMessageId,
+    });
+  }
+
+  /// 🆕 Send a voice message in a GROUP chat (receiver_id = NULL)
+  Future<void> sendVoiceMessageGroup({
+    required String chatRoomId,
+    required String senderId,
+    required String audioUrl,
+    required int durationSeconds,
+    String? replyToMessageId,
+  }) async {
+    await _supabase.from('messages').insert({
+      'chat_room_id': chatRoomId,
+      'sender_id': senderId,
+      'receiver_id': null,
+      'message': '',
+      'audio_url': audioUrl,
+      'audio_duration_seconds': durationSeconds,
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+      'reply_to_message_id': replyToMessageId,
+    });
+  }
+
 }
