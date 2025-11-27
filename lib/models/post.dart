@@ -4,7 +4,8 @@ class Post {
   final String name;
   final String username;
   final String message;
-  final String? imageUrl; // optional image
+  final String? imageUrl;      // optional image
+  final String? communityId;   // ✅ NEW: optional community
   final DateTime createdAt;
   final int likeCount;
 
@@ -15,6 +16,7 @@ class Post {
     required this.username,
     required this.message,
     this.imageUrl,
+    this.communityId,
     required this.createdAt,
     required this.likeCount,
   });
@@ -27,9 +29,9 @@ class Post {
       username: map['username'] ?? '',
       message: map['message'] ?? '',
       imageUrl: map['image_url'],
+      communityId: map['community_id']?.toString(),          // ✅ NEW
       createdAt: DateTime.parse(map['created_at']).toLocal(),
       likeCount: map['like_count'] ?? 0,
-
     );
   }
 
@@ -40,6 +42,7 @@ class Post {
       'username': username,
       'message': message,
       'image_url': imageUrl,
+      'community_id': communityId,                           // ✅ NEW
       'created_at': createdAt.toIso8601String(),
       'like_count': likeCount,
     };
@@ -52,6 +55,7 @@ class Post {
     String? id,
     String? message,
     String? imageUrl,
+    String? communityId,                                     // ✅ NEW
     int? likeCount,
   }) {
     return Post(
@@ -61,6 +65,7 @@ class Post {
       username: username,
       message: message ?? this.message,
       imageUrl: imageUrl ?? this.imageUrl,
+      communityId: communityId ?? this.communityId,          // ✅ NEW
       createdAt: createdAt,
       likeCount: likeCount ?? this.likeCount,
     );

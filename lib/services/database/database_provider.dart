@@ -28,7 +28,6 @@ import '../auth/auth_service.dart';
 import 'database_service.dart';
 
 class DatabaseProvider extends ChangeNotifier {
-
   // Get db & auth service
   final AuthService _auth = AuthService();
   final DatabaseService _db = DatabaseService();
@@ -36,14 +35,15 @@ class DatabaseProvider extends ChangeNotifier {
   /* ==================== USER PROFILE ==================== */
 
   /// Get user profile given userId
-  Future<UserProfile?> getUserProfile(String userId) => _db.getUserFromDatabase(userId);
+  Future<UserProfile?> getUserProfile(String userId) =>
+      _db.getUserFromDatabase(userId);
 
   /// Update user bio
   Future<void> updateBio(String bio) => _db.updateUserBioInDatabase(bio);
 
   /* ==================== POSTS ==================== */
 
-  //local list of posts
+  // local list of posts
   List<Post> _allPosts = [];
   List<Post> _followingPosts = [];
 
@@ -51,11 +51,22 @@ class DatabaseProvider extends ChangeNotifier {
   List<Post> get allPosts => _allPosts;
   List<Post> get followingPosts => _followingPosts;
 
-
   /// post message
-  Future<void> postMessage(String message, {File? imageFile}) async {
-    // Forward message and optional image to database service
-    await _db.postMessageInDatabase(message, imageFile: imageFile);
+  ///
+  /// `communityId` is:
+  /// - null  → normal global/home feed post
+  /// - uuid → post that belongs to a specific community
+  Future<void> postMessage(
+      String message, {
+        File? imageFile,
+        String? communityId, // ✅ NEW
+      }) async {
+    // Forward message, optional image + optional community to database service
+    await _db.postMessageInDatabase(
+      message,
+      imageFile: imageFile,
+      communityId: communityId,
+    );
 
     // Reload all posts after posting
     await loadAllPosts();
@@ -101,7 +112,6 @@ class DatabaseProvider extends ChangeNotifier {
     }
   }
 
-
   /// filter and return posts for given UserId
   List<Post> getUserPosts(String userId) {
     return _allPosts.where((post) => post.userId == userId).toList();
@@ -112,7 +122,6 @@ class DatabaseProvider extends ChangeNotifier {
   List<Post> getPostsLikedByCurrentUser(List<Post> allPosts) {
     return allPosts.where((post) => _likedPosts.contains(post.id)).toList();
   }
-
 
   /// load following posts
   Future<void> loadFollowingPosts() async {
@@ -125,8 +134,9 @@ class DatabaseProvider extends ChangeNotifier {
       final followingUserIds = await _db.getFollowingFromDatabase(currentUserId);
 
       // filter all the posts to be the ones for the following tab
-      _followingPosts =
-          _allPosts.where((post) => followingUserIds.contains(post.userId)).toList();
+      _followingPosts = _allPosts
+          .where((post) => followingUserIds.contains(post.userId))
+          .toList();
 
       // update UI
       notifyListeners();
@@ -153,7 +163,6 @@ class DatabaseProvider extends ChangeNotifier {
 
       // 3️⃣ Reload posts from database to notify listeners
       await loadAllPosts();
-
     } catch (e) {
       debugPrint('Error deleting post: $e');
     }
@@ -164,6 +173,7 @@ class DatabaseProvider extends ChangeNotifier {
   }
 
   /* ==================== LIKES ==================== */
+
   // Local map to track like counts for each post
   Map<String, int> _likeCounts = {
     // for each postId: like count
@@ -186,8 +196,8 @@ class DatabaseProvider extends ChangeNotifier {
 
     // initialize like counts from posts
     for (var post in _allPosts) {
-      if (post.id != null) {
-        _likeCounts[post.id!] = post.likeCount;
+      if (post.id.isNotEmpty) {
+        _likeCounts[post.id] = post.likeCount;
       }
     }
   }
@@ -195,24 +205,17 @@ class DatabaseProvider extends ChangeNotifier {
   /// Toggle like for a post
   Future<void> toggleLike(String postId) async {
     /*
-
     The first part will update local values first so that the UI feels
     immediate and responsive. We will update the UI optimistically, and revert
     back if anything goes wrong while writing to the database.
-
-    Optimistically updating the local values like this is important because:
-    reading and writing from the database takes some time (1-2 seconds, depending
-    on the internet connection). So we don't want to give the user a slow lagged
-    experience.
-
      */
 
     // store original values
-    final likedPostsOriginal = _likedPosts;
-    final likeCountsOriginal = _likeCounts;
+    final likedPostsOriginal = List<String>.from(_likedPosts);
+    final likeCountsOriginal = Map<String, int>.from(_likeCounts);
 
     // perform like / unlike
-    if(_likedPosts.contains(postId)) {
+    if (_likedPosts.contains(postId)) {
       _likedPosts.remove(postId);
       _likeCounts[postId] = (_likeCounts[postId] ?? 0) - 1;
     } else {
@@ -222,12 +225,6 @@ class DatabaseProvider extends ChangeNotifier {
 
     // update UI locally
     notifyListeners();
-
-    /*
-
-    now let's try to update it in our database
-
-     */
 
     // Attempt like in database
     try {
@@ -243,8 +240,7 @@ class DatabaseProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-
-/* ==================== COMMENTS ==================== */
+  /* ==================== COMMENTS ==================== */
 
   // Local list of comments
   final Map<String, List<Comment>> _comments = {};
@@ -275,7 +271,6 @@ class DatabaseProvider extends ChangeNotifier {
 
       // reload comments
       await loadComments(postId);
-
     } catch (e) {
       debugPrint('Error adding comment: $e');
     }
@@ -289,7 +284,6 @@ class DatabaseProvider extends ChangeNotifier {
 
       // reload comments
       await loadComments(postId);
-
     } catch (e) {
       debugPrint('Error deleting comment: $e');
     }
@@ -308,8 +302,8 @@ class DatabaseProvider extends ChangeNotifier {
     final blockedIds = await _db.getBlockedUserIdsFromDatabase();
 
     // get full user details using userId
-    final profiles = await Future.wait(
-        blockedIds.map((id) => _db.getUserFromDatabase(id)));
+    final profiles =
+    await Future.wait(blockedIds.map((id) => _db.getUserFromDatabase(id)));
 
     // return as a list
     _blockedUsers = profiles.whereType<UserProfile>().toList();
@@ -326,35 +320,6 @@ class DatabaseProvider extends ChangeNotifier {
       // ✅ 1. Block the user in the database
       await _db.blockUserInDatabase(userId);
 
-      // // ✅ 2. Unfollow each other in the database
-      // await _db.unfollowUser(userId);
-      // await _db.removeFollower(userId);
-      //
-      // // ✅ 3. Remove likes between the two users in the database
-      // await _db.removeLikesBetweenUsers(currentUserId, userId);
-      //
-      // // ✅ 4. Update local state instantly (no hot restart needed)
-      // _allPosts.removeWhere((post) => post.userId == userId);
-      // _followingPosts.removeWhere((post) => post.userId == userId);
-      //
-      // // Remove from following/follower maps in memory
-      // _following[currentUserId]?.remove(userId);
-      // _followers[userId]?.remove(currentUserId);
-      //
-      // // Clean up local like maps
-      // _likedByMap.forEach((postId, likedBy) {
-      //   likedBy.remove(userId);
-      // });
-      // _likeCounts.removeWhere((postId, _) {
-      //   final likedBy = _likedByMap[postId];
-      //   return likedBy != null && likedBy.contains(userId);
-      // });
-      //
-      // // ✅ 5. Reload data from database for consistency
-      // await loadBlockedUsers();
-      // await loadUserFollowing(currentUserId);
-      // await loadUserFollowers(currentUserId);
-
       // reload blocked users
       await loadBlockedUsers();
 
@@ -363,18 +328,14 @@ class DatabaseProvider extends ChangeNotifier {
 
       // update UI
       notifyListeners();
-
     } catch (e) {
       debugPrint('Error blocking user: $e');
     }
   }
 
   Future<void> unblockUser(String userId) async {
-
     // perform unblock in database
     await _db.unblockUserInDatabase(userId);
-
-    // _blockedUsers.removeWhere((user) => user.id == userId);
 
     // reload blocked users
     await loadBlockedUsers();
@@ -387,21 +348,11 @@ class DatabaseProvider extends ChangeNotifier {
   }
 
   Future<void> reportUser(String postId, String userId) async {
-
     // report user in Database
     await _db.reportUserInDatabase(postId, userId);
   }
 
-  // Future<void> deleteUser(String userId) async {
-  //   await _db.deleteUser(userId);
-  //   if (_currentUser?.id == userId) {
-  //     _currentUser = null;
-  //   }
-  //   notifyListeners();
-  // }
-
   /* ==================== FRIENDS ==================== */
-
 
   /// Get friendship status between current user and [otherUserId]
   ///
@@ -434,7 +385,6 @@ class DatabaseProvider extends ChangeNotifier {
   Stream<List<UserProfile>> friendsStream() {
     return _db.friendsStreamFromDatabase();
   }
-
 
   /* ==================== FOLLOWERS / FOLLOWING ==================== */
 
@@ -478,6 +428,7 @@ class DatabaseProvider extends ChangeNotifier {
   // get list of follower profiles for a given user
   List<UserProfile> getListOfFollowerProfiles(String userId) =>
       _followerProfiles[userId] ?? [];
+
   // get a list of following profiles for a given user
   List<UserProfile> getListOfFollowingProfiles(String userId) =>
       _followingProfiles[userId] ?? [];
@@ -493,7 +444,8 @@ class DatabaseProvider extends ChangeNotifier {
       // go through each follower id
       for (String followerId in followerIds) {
         // get user profile from database with this userId
-        UserProfile? followerProfile = await _db.getUserFromDatabase(followerId);
+        UserProfile? followerProfile =
+        await _db.getUserFromDatabase(followerId);
 
         // add to follower profile
         if (followerProfile != null) {
@@ -524,7 +476,8 @@ class DatabaseProvider extends ChangeNotifier {
       // go through each following id
       for (String followingId in followingIds) {
         // get user profile from database with this userId
-        UserProfile? followingProfile = await _db.getUserFromDatabase(followingId);
+        UserProfile? followingProfile =
+        await _db.getUserFromDatabase(followingId);
 
         // add to following profile
         if (followingProfile != null) {
@@ -547,7 +500,7 @@ class DatabaseProvider extends ChangeNotifier {
   Future<void> followUser(String targetUserId) async {
     // get current user Id
     final currentUserId = _auth.getCurrentUserId();
-    
+
     // initialize with empty list
     _following.putIfAbsent(currentUserId, () => []);
     _followers.putIfAbsent(targetUserId, () => []);
@@ -559,19 +512,21 @@ class DatabaseProvider extends ChangeNotifier {
       _followers[targetUserId]?.add(currentUserId);
 
       // update follower count
-      _followerCount[targetUserId] = ((_followerCount[targetUserId] ?? 0) + 1);
+      _followerCount[targetUserId] =
+      ((_followerCount[targetUserId] ?? 0) + 1);
 
       // then add target user to current user following
       _following[currentUserId]?.add(targetUserId);
 
       // update following count
-      _followingCount[currentUserId] = ((_followingCount[currentUserId] ?? 0) + 1);
+      _followingCount[currentUserId] =
+      ((_followingCount[currentUserId] ?? 0) + 1);
     }
 
     // Update UI
     notifyListeners();
 
-    try{
+    try {
       // follow user in firebase
       await _db.followUserInDatabase(targetUserId);
 
@@ -587,22 +542,22 @@ class DatabaseProvider extends ChangeNotifier {
       _followers[targetUserId]?.remove(currentUserId);
 
       // update follower count
-      _followerCount[targetUserId] = (_followerCount[targetUserId] ?? 0) - 1;
+      _followerCount[targetUserId] =
+          (_followerCount[targetUserId] ?? 0) - 1;
 
       // remove from current user's following
       _following[currentUserId]?.remove(targetUserId);
 
       // update following count
-      _followingCount[currentUserId] = (_followingCount[currentUserId] ?? 0) - 1;
+      _followingCount[currentUserId] =
+          (_followingCount[currentUserId] ?? 0) - 1;
 
       // update UI
       notifyListeners();
     }
-
   }
 
   Future<void> unfollowUser(String targetUserId) async {
-
     // get current userId
     final currentUserId = _auth.getCurrentUserId();
 
@@ -611,25 +566,26 @@ class DatabaseProvider extends ChangeNotifier {
     _followers.putIfAbsent(targetUserId, () => []);
 
     // unfollow if current user is one of the target user's following
-    if(_followers[targetUserId]!.contains(currentUserId)) {
+    if (_followers[targetUserId]!.contains(currentUserId)) {
       // remove current user from target user's following
       _followers[targetUserId]?.remove(currentUserId);
-      
+
       // update follower count
-      _followerCount[targetUserId] = (_followerCount[targetUserId] ?? 1) - 1;
+      _followerCount[targetUserId] =
+          (_followerCount[targetUserId] ?? 1) - 1;
 
       // remove target user from current user's following list
       _following[currentUserId]?.remove(targetUserId);
 
       // update following count
-      _followingCount[currentUserId] = (_followingCount[currentUserId] ?? 1) - 1;
+      _followingCount[currentUserId] =
+          (_followingCount[currentUserId] ?? 1) - 1;
     }
 
     // update UI
     notifyListeners();
 
     try {
-
       // unfollow target user in firebase
       await _db.unfollowUserInDatabase(targetUserId);
 
@@ -646,18 +602,19 @@ class DatabaseProvider extends ChangeNotifier {
       _followers[targetUserId]?.add(currentUserId);
 
       // update follower count
-      _followerCount[targetUserId] = (_followerCount[targetUserId] ?? 0) + 1;
+      _followerCount[targetUserId] =
+          (_followerCount[targetUserId] ?? 0) + 1;
 
       // add target user back into current user's following list
       _following[currentUserId]?.add(targetUserId);
 
       // update following count
-      _followingCount[currentUserId] = (_followingCount[currentUserId] ?? 0) + 1;
+      _followingCount[currentUserId] =
+          (_followingCount[currentUserId] ?? 0) + 1;
 
       // update UI
       notifyListeners();
     }
-
   }
 
   // is current user following target user?
@@ -670,8 +627,8 @@ class DatabaseProvider extends ChangeNotifier {
     return _followers[userId]?.contains(currentUserId) ?? false;
   }
 
-
   /* ==================== SEARCH USERS ==================== */
+
   List<UserProfile> _searchResults = [];
   List<UserProfile> get searchResults => _searchResults;
 
@@ -683,7 +640,8 @@ class DatabaseProvider extends ChangeNotifier {
     }
 
     try {
-      final results = await _db.searchUsersInDatabase(searchTerm); // call service
+      final results =
+      await _db.searchUsersInDatabase(searchTerm); // call service
       final currentUserId = _auth.getCurrentUserId();
 
       // Filter out current user
@@ -701,11 +659,13 @@ class DatabaseProvider extends ChangeNotifier {
   }
 
   /* ==================== COMMUNITIES ==================== */
+
   List<Map<String, dynamic>> _allCommunities = [];
   List<Map<String, dynamic>> get allCommunities => _allCommunities;
 
   List<Map<String, dynamic>> _communitySearchResults = [];
-  List<Map<String, dynamic>> get communitySearchResults => _communitySearchResults;
+  List<Map<String, dynamic>> get communitySearchResults =>
+      _communitySearchResults;
 
   String get currentUserId => _auth.getCurrentUserId();
 
@@ -716,7 +676,8 @@ class DatabaseProvider extends ChangeNotifier {
     if (includeMembership) {
       final userId = _auth.getCurrentUserId();
       for (var community in _allCommunities) {
-        final members = await _db.getCommunityMembersFromDatabase(community['id']);
+        final members =
+        await _db.getCommunityMembersFromDatabase(community['id']);
         community['is_joined'] =
             members.any((m) => m['user_id'] == userId);
       }
@@ -724,7 +685,6 @@ class DatabaseProvider extends ChangeNotifier {
 
     notifyListeners();
   }
-
 
   /// Optimistically add community locally
   void addCommunityLocally(Map<String, dynamic> community) {
@@ -779,17 +739,100 @@ class DatabaseProvider extends ChangeNotifier {
   }
 
   /// get community member's profiles
-  Future<List<Map<String, dynamic>>> getCommunityMemberProfiles(String communityId) async {
+  Future<List<Map<String, dynamic>>> getCommunityMemberProfiles(
+      String communityId) async {
     return await _db.getCommunityMemberProfilesFromDatabase(communityId);
+  }
+
+  /* ==================== STORY PROGRESS ==================== */
+
+  // Local cache of completed story IDs for the *current* user
+  final Set<String> _completedStoryIds = {};
+  Set<String> get completedStoryIds => _completedStoryIds;
+
+  /// Load completed stories for a specific user from the database
+  Future<void> loadCompletedStories(String userId) async {
+    try {
+      final ids = await _db.getCompletedStoryIdsFromDatabase(userId);
+      _completedStoryIds
+        ..clear()
+        ..addAll(ids);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading completed stories: $e');
+    }
+  }
+
+  /// Mark a story as completed for the *current* user
+  Future<void> markStoryCompleted(String storyId) async {
+    final currentUserId = _auth.getCurrentUserId();
+    if (currentUserId.isEmpty) return;
+
+    try {
+      await _db.markStoryCompletedInDatabase(storyId);
+      _completedStoryIds.add(storyId);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error marking story completed: $e');
+    }
+  }
+
+  /// Save answers for a story (per current user).
+  ///
+  /// [selectedIndices] is a list where index = questionIndex,
+  /// value = selectedOptionIndex or null if unanswered.
+  Future<void> saveStoryAnswers(String storyId, List<int?> selectedIndices) async {
+    final currentUserId = _auth.getCurrentUserId();
+    if (currentUserId.isEmpty) return;
+
+    try {
+      // Build compact map of answered questions only
+      final Map<int, int> answers = {};
+      for (int i = 0; i < selectedIndices.length; i++) {
+        final selected = selectedIndices[i];
+        if (selected != null) {
+          answers[i] = selected;
+        }
+      }
+
+      await _db.saveStoryAnswersInDatabase(
+        storyId,
+        answers,
+      );
+
+      // ❌ still do NOT touch _completedStoryIds here
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error saving story answers: $e');
+    }
   }
 
 
 
+  /// Fetch completed story IDs for any user (used for profile pages)
+  Future<List<String>> getCompletedStoriesForUser(String userId) async {
+    try {
+      return await _db.getCompletedStoryIdsFromDatabase(userId);
+    } catch (e) {
+      debugPrint('Error fetching completed stories for user $userId: $e');
+      return [];
+    }
+  }
+
+  /// Load saved answers for the *current* user and a given story
+  Future<Map<int, int>> getStoryAnswers(String storyId) async {
+    try {
+      return await _db.getStoryAnswersFromDatabase(storyId);
+    } catch (e) {
+      debugPrint('Error getting story answers for $storyId: $e');
+      return {};
+    }
+  }
 
 
 
+  /* ==================== LOG OUT ==================== */
 
-/* ==================== LOG OUT ==================== */
   void clearAllCachedData() {
     // Posts
     _allPosts.clear();
@@ -815,6 +858,9 @@ class DatabaseProvider extends ChangeNotifier {
 
     // Blocked users
     _blockedUsers.clear();
+
+    // Story progress
+    _completedStoryIds.clear();
 
     // Time
     _serverNow = null;

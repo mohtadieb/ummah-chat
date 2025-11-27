@@ -7,17 +7,12 @@ import '../components/my_friend_tile.dart';
 import '../components/my_search_bar.dart';
 import '../services/chat/chat_service.dart';
 import '../services/database/database_provider.dart';
+import '../helper/last_message_time_formatter.dart';
 import 'chat_page.dart';
 import 'profile_page.dart';
 
 class FriendsPage extends StatefulWidget {
-  /// Callback provided by MainLayout to switch to the Search tab
-  final VoidCallback onGoToSearch;
-
-  const FriendsPage({
-    super.key,
-    required this.onGoToSearch,
-  });
+  const FriendsPage({super.key});
 
   @override
   State<FriendsPage> createState() => _FriendsPageState();
@@ -39,35 +34,8 @@ class _FriendsPageState extends State<FriendsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Scaffold(
-      backgroundColor: colorScheme.surface,
-      appBar: AppBar(
-        backgroundColor: colorScheme.surface,
-        elevation: 0,
-        centerTitle: true,
-        title: Text(
-          "Friends",
-          style: TextStyle(
-            color: colorScheme.primary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-
-      // Main content: list of friends (with local search)
-      body: _buildFriendsList(context),
-
-      // FAB → switch to Search tab in MainLayout (via callback)
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: widget.onGoToSearch,
-        icon: const Icon(Icons.person_search),
-        label: const Text('Find people'),
-        backgroundColor: const Color(0xFF0D6746),
-        foregroundColor: colorScheme.onPrimary,
-      ),
-    );
+    // ⬇️ No Scaffold here; this is content-only inside ChatTabsPage.
+    return _buildFriendsList(context);
   }
 
   /// Live-updating list of friends for the current logged-in user
@@ -281,9 +249,10 @@ class _FriendsPageState extends State<FriendsPage> {
                       )
                           : ListView.builder(
                         padding: EdgeInsets.only(
-                          bottom:
-                          MediaQuery.of(context).padding.bottom +
-                              96, // avoid FAB overlap
+                          bottom: MediaQuery.of(context)
+                              .padding
+                              .bottom +
+                              96, // avoid FAB overlap in Chats screen
                         ),
                         itemCount: filteredFriends.length,
                         itemBuilder: (context, index) {
@@ -303,10 +272,11 @@ class _FriendsPageState extends State<FriendsPage> {
                           final lastTime = lastInfo?.createdAt;
 
                           final lastTimeLabel =
-                          _formatLastMessageTime(lastTime);
+                          formatLastMessageTime(lastTime);
 
                           // Optional: prefix "You: " when last sender is current user
-                          final preview = (lastText == null ||
+                          final preview =
+                          (lastText == null ||
                               lastText.trim().isEmpty)
                               ? null
                               : (lastInfo!.sentByCurrentUser
@@ -363,32 +333,5 @@ class _FriendsPageState extends State<FriendsPage> {
         );
       },
     );
-  }
-
-  /// 💬 Format last message time similar-ish to WhatsApp/IG
-  String? _formatLastMessageTime(DateTime? time) {
-    if (time == null) return null;
-
-    final now = DateTime.now();
-    final local = time.toLocal();
-    final difference = now.difference(local);
-
-    // Same day → show HH:mm
-    if (difference.inDays == 0 && local.day == now.day) {
-      final h = local.hour.toString().padLeft(2, '0');
-      final m = local.minute.toString().padLeft(2, '0');
-      return '$h:$m';
-    }
-
-    // Within last 7 days → show weekday (Mon, Tue...)
-    if (difference.inDays < 7) {
-      const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      return weekdays[local.weekday - 1];
-    }
-
-    // Else → show dd/MM
-    final d = local.day.toString().padLeft(2, '0');
-    final mo = local.month.toString().padLeft(2, '0');
-    return '$d/$mo';
   }
 }

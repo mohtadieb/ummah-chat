@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:ummah_chat/pages/groups_page.dart';
 
 // Pages
-import '../pages/community/communities_page.dart';
-import '../pages/friends_page.dart';
+import 'package:ummah_chat/pages/chat_tabs_page.dart';
 import '../pages/home_page.dart';
 import '../pages/notification_page.dart';
 import '../pages/profile_page.dart';
-import '../pages/search_page.dart';
 import '../pages/settings_page.dart';
 
 // Services
@@ -18,6 +15,7 @@ import '../services/notification_service.dart';
 // Providers (not used here directly, but ok to keep if used elsewhere)
 import 'package:provider/provider.dart';
 import '../services/database/database_provider.dart';
+import '../stories/select_stories_page.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -29,6 +27,9 @@ class MainLayout extends StatefulWidget {
 class _MainLayoutState extends State<MainLayout> {
   // Which bottom nav item is active
   int _selectedIndex = 0;
+
+  // index of the Chats tab in bottom navigation (still 1)
+  static const int _chatsIndex = 1;
 
   // Auth service to get current user id for ProfilePage
   final _auth = AuthService();
@@ -48,17 +49,10 @@ class _MainLayoutState extends State<MainLayout> {
 
     // Order must match BottomNavigationBar items
     _pages = [
-      const HomePage(),
-      CommunitiesPage(),
-      const SearchPage(),
-      // 👇 Pass a callback into FriendsPage so it can switch to Search tab
-      FriendsPage(
-        onGoToSearch: () {
-          _onItemTapped(2); // index 2 = Search
-        },
-      ),
-      const GroupsPage(),
-      ProfilePage(userId: _auth.getCurrentUserId()),
+      const HomePage(), // 0
+      const ChatTabsPage(), // 1
+      SelectStoriesPage(), // 2 👈 New Story selection hub
+      ProfilePage(userId: _auth.getCurrentUserId()), // 3
     ];
   }
 
@@ -108,8 +102,6 @@ class _MainLayoutState extends State<MainLayout> {
                       );
                     },
                   ),
-
-                  // Small red dot when there are unread notifications
                   if (unread > 0)
                     Positioned(
                       right: 10,
@@ -145,7 +137,6 @@ class _MainLayoutState extends State<MainLayout> {
         ],
       ),
 
-      // Keep all pages alive and just switch index
       body: IndexedStack(
         index: _selectedIndex,
         children: _pages,
@@ -157,10 +148,11 @@ class _MainLayoutState extends State<MainLayout> {
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.public), label: 'Community'),
-          BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Search'),
-          BottomNavigationBarItem(icon: Icon(Icons.group), label: 'Friends'),
-          BottomNavigationBarItem(icon: Icon(Icons.groups_2), label: 'Groups'),
+          BottomNavigationBarItem(icon: Icon(Icons.groups), label: 'Social'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.menu_book_rounded),
+            label: 'Stories', // 👈 Now opens SelectStoriesPage
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),

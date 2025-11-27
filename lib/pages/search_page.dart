@@ -76,7 +76,7 @@ class _SearchPageState extends State<SearchPage> {
         title: Column(
           children: [
             Text(
-              "Search",
+              "Find people",
               style: TextStyle(
                 color: colorScheme.primary,
                 fontWeight: FontWeight.w600,

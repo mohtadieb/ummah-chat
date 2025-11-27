@@ -15,6 +15,8 @@ import '../services/database/database_provider.dart';
 import 'follow_list_page.dart';
 import 'package:flutter/cupertino.dart';
 
+// 🆕 Story registry (id -> StoryData with chipLabel/title/icon)
+import '../models/story_registry.dart';
 
 /*
 PROFILE PAGE (Supabase Ready)
@@ -51,6 +53,20 @@ class _ProfilePageState extends State<ProfilePage> {
   // 🆕 FRIENDS state
   // "none", "pending_sent", "pending_received", "accepted", "blocked"
   String _friendStatus = 'none';
+
+  // 🆕 Completed stories (for this profile – from DB for *other* users)
+  List<String> _completedStoryIds = [];
+
+  bool get _isOwnProfile => widget.userId == currentUserId;
+
+  /// For own profile → always use provider’s live set
+  /// For other users → use the list loaded from DB in loadUser()
+  List<String> get _effectiveCompletedStoryIds {
+    if (_isOwnProfile) {
+      return listeningProvider.completedStoryIds.toList();
+    }
+    return _completedStoryIds;
+  }
 
   // on startup,
   @override
@@ -98,13 +114,18 @@ class _ProfilePageState extends State<ProfilePage> {
     // Friends status
     _friendStatus = await databaseProvider.getFriendStatus(widget.userId);
 
+    // 🆕 Completed stories for this profile (from Supabase)
+    // For *other* profiles this is what we show.
+    // For own profile the live provider set will override this in the UI.
+    _completedStoryIds =
+    await databaseProvider.getCompletedStoriesForUser(widget.userId);
+
     if (mounted) {
       setState(() {
         _isLoading = false;
       });
     }
   }
-
 
   void _showEditBioBox() {
     bioTextController.text = user?.bio ?? '';
@@ -244,6 +265,10 @@ class _ProfilePageState extends State<ProfilePage> {
     // listen to is following
     _isFollowing = listeningProvider.isFollowing(widget.userId);
 
+    // ✅ Stories progress values
+    final totalStories = allStoriesById.length;
+    final effectiveCompletedIds = _effectiveCompletedStoryIds;
+
     // Decide what the body should show (3 states: loading / no user / normal)
     Widget bodyChild;
     if (_isLoading) {
@@ -286,10 +311,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   '@${user!.username}',
                   style: TextStyle(
                     fontSize: 13,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .primary
-                        ,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
               ],
@@ -363,24 +385,28 @@ class _ProfilePageState extends State<ProfilePage> {
                         setState(() => _friendStatus = 'pending_sent');
                       },
                       onCancelRequest: () async {
-                        await databaseProvider.cancelFriendRequest(widget.userId);
+                        await databaseProvider
+                            .cancelFriendRequest(widget.userId);
                         setState(() => _friendStatus = 'none');
                       },
                       onAcceptRequest: () async {
-                        await databaseProvider.acceptFriendRequest(widget.userId);
+                        await databaseProvider
+                            .acceptFriendRequest(widget.userId);
 
-                        final updated = await databaseProvider.getFriendStatus(widget.userId);
+                        final updated = await databaseProvider
+                            .getFriendStatus(widget.userId);
                         setState(() => _friendStatus = updated);
                       },
                       onDeclineRequest: () async {
-                        await databaseProvider.declineFriendRequest(widget.userId);
+                        await databaseProvider
+                            .declineFriendRequest(widget.userId);
 
-                        final updated = await databaseProvider.getFriendStatus(widget.userId);
+                        final updated = await databaseProvider
+                            .getFriendStatus(widget.userId);
                         setState(() => _friendStatus = updated);
                       },
                     ),
                   ),
-
                 ],
               ),
             ),
@@ -416,6 +442,156 @@ class _ProfilePageState extends State<ProfilePage> {
 
           // Bio Box
           MyBioBox(text: user!.bio),
+
+          // 🆕 Stories progress + medals + completed list (just above Posts)
+          if (totalStories > 0) ...[
+            const SizedBox(height: 24),
+
+            // Progress text → always show, even if 0 completed
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 28.0),
+              child: Text(
+                "Stories completed: ${effectiveCompletedIds.length} / $totalStories",
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+
+            // Only show medals / chips if there is at least 1 completed
+            if (effectiveCompletedIds.isNotEmpty) ...[
+              const SizedBox(height: 12),
+
+              // Medals row
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: effectiveCompletedIds.map((id) {
+                    final story = allStoriesById[id];
+                    if (story == null) {
+                      return const SizedBox.shrink();
+                    }
+
+                    return Container(
+                      width: 70,
+                      height: 70,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFF0F8254),
+                            Color(0xFF0B6841),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black26.withOpacity(0.12),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Icon(
+                          story.icon,
+                          color: Colors.white,
+                          size: 30,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+
+              // Optional overall badge if all are done
+              if (effectiveCompletedIds.length == totalStories) ...[
+                const SizedBox(height: 12),
+                Padding(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 28.0),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F8254).withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color:
+                        const Color(0xFF0F8254).withOpacity(0.4),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.emoji_events_rounded,
+                          size: 18,
+                          color: Color(0xFF0F8254),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          "Prophets Stories Level 1 completed",
+                          style: TextStyle(
+                            color: Color(0xFF0F8254),
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 18),
+
+              // Completed stories list (chips)
+              Padding(
+                padding:
+                const EdgeInsets.symmetric(horizontal: 28.0),
+                child: Text(
+                  "Completed stories",
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Padding(
+                padding:
+                const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: effectiveCompletedIds.map((id) {
+                    final story = allStoriesById[id];
+                    if (story == null) {
+                      // Just in case a story_id exists in DB but not in app anymore
+                      return const SizedBox.shrink();
+                    }
+                    return Chip(
+                      avatar: const Icon(
+                        Icons.check_circle,
+                        size: 18,
+                        color: Colors.green,
+                      ),
+                      label: Text(story.chipLabel),
+                      backgroundColor: Theme.of(context)
+                          .colorScheme
+                          .surfaceVariant,
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ],
 
           Padding(
             padding: const EdgeInsets.only(left: 28.0, top: 28.0),
@@ -469,7 +645,8 @@ class _ProfilePageState extends State<ProfilePage> {
       // ✅ Show AppBar ONLY when viewing another user's profile
       appBar: widget.userId != currentUserId
           ? AppBar(
-        foregroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor:
+        Theme.of(context).colorScheme.primary,
       )
           : null,
 

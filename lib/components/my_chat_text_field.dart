@@ -300,7 +300,7 @@ class _MyChatTextFieldState extends State<MyChatTextField>
               },
               child: CircleAvatar(
                 radius: 22,
-                backgroundColor: const Color(0xFF128C7E), // WhatsApp green
+                backgroundColor: const Color(0xFF467E55), // WhatsApp green
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 250),
                   transitionBuilder: (child, animation) =>

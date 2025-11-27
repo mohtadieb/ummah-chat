@@ -17,9 +17,9 @@ Defines the dark color scheme for the app.
 ThemeData darkMode = ThemeData(
   colorScheme: ColorScheme.dark(
     surface: Colors.grey.shade900,
-    primary: Colors.grey.shade600,
+    primary: Colors.grey.shade300,
     secondary: Colors.grey.shade700,
     tertiary: Colors.grey.shade800,
-    inversePrimary: Colors.grey.shade300,
+    inversePrimary: Colors.grey.shade100,
   ),
 );

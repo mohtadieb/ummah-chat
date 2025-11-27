@@ -24,7 +24,6 @@ class MyUserTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    /// Navigate to profile
     void goToProfile() {
       Navigator.push(
         context,
@@ -38,24 +37,21 @@ class MyUserTile extends StatelessWidget {
       onTap: goToProfile,
       child: Row(
         children: [
-          // 👤 Avatar — same as friend tile
-          GestureDetector(
-            onTap: goToProfile,
-            child: user.profilePhotoUrl.isNotEmpty
-                ? CircleAvatar(
-              radius: 22,
-              backgroundImage: NetworkImage(user.profilePhotoUrl),
-            )
-                : CircleAvatar(
-              radius: 22,
-              backgroundColor:
-              colorScheme.primary.withValues(alpha: 0.12),
-              child: Text(
-                _getInitials(),
-                style: TextStyle(
-                  color: colorScheme.primary,
-                  fontWeight: FontWeight.w600,
-                ),
+          // 👤 Avatar — tap handled by MyCardTile.onTap
+          user.profilePhotoUrl.isNotEmpty
+              ? CircleAvatar(
+            radius: 22,
+            backgroundImage: NetworkImage(user.profilePhotoUrl),
+          )
+              : CircleAvatar(
+            radius: 22,
+            backgroundColor:
+            colorScheme.primary.withValues(alpha: 0.12),
+            child: Text(
+              _getInitials(),
+              style: TextStyle(
+                color: colorScheme.primary,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -64,39 +60,35 @@ class MyUserTile extends StatelessWidget {
 
           // 📝 Name + username
           Expanded(
-            child: GestureDetector(
-              onTap: goToProfile,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    customTitle ?? user.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: colorScheme.primary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  customTitle ?? user.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    '@${user.username}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: colorScheme.primary.withValues(alpha: 0.7),
-                    ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '@${user.username}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colorScheme.primary.withValues(alpha: 0.7),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
 
           const SizedBox(width: 8),
 
-          // Optional trailing icon (same feeling as friend tile but simple)
           Icon(
             Icons.arrow_forward_ios_rounded,
             size: 16,

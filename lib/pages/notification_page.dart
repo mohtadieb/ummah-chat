@@ -183,7 +183,10 @@ class _NotificationPageState extends State<NotificationPage> {
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final n = _notifications[index];
-        final body = n.body ?? '';
+
+        // 🔧 Use trimmed body for routing, keep raw for legacy display
+        final rawBody = n.body ?? '';
+        final body = rawBody.trim();
         final isUnread = !n.isRead;
 
         // ----- TYPE DETECTION -----
@@ -203,12 +206,18 @@ class _NotificationPageState extends State<NotificationPage> {
 
         // 🧑‍🤝‍🧑 Friend request → sender
         if (isFriendRequest) {
-          friendRequesterId = body.split(':')[1].trim();
+          final parts = body.split(':');
+          if (parts.length > 1) {
+            friendRequesterId = parts[1].trim();
+          }
         }
 
         // 🧑‍🤝‍🧑 Friend accepted → the one who accepted
         if (isFriendAccepted) {
-          friendAcceptedUserId = body.split(':')[1].trim();
+          final parts = body.split(':');
+          if (parts.length > 1) {
+            friendAcceptedUserId = parts[1].trim();
+          }
         }
 
         // 👍 Like
@@ -227,9 +236,12 @@ class _NotificationPageState extends State<NotificationPage> {
           if (parts.length > 1) commentPreview = parts[1];
         }
 
-        // 👤 Follow
+        // 👤 Follow (new-style with encoded userId in body)
         if (isFollow) {
-          followUserId = body.split(':')[1].trim();
+          final parts = body.split(':');
+          if (parts.length > 1) {
+            followUserId = parts[1].trim();
+          }
         }
 
         // ----- SUBTITLE (preview) -----
@@ -240,9 +252,11 @@ class _NotificationPageState extends State<NotificationPage> {
           subtitleText = commentPreview;
         } else if (!isFriendRequest &&
             !isFriendAccepted &&
-            body.isNotEmpty) {
-          // legacy / generic text-only notifications
-          subtitleText = body;
+            !isFollow && // 👈 no subtitle for follow; body stays hidden
+            rawBody.isNotEmpty &&
+            !rawBody.contains(':')) {
+          // legacy / generic text-only notifications (no routing codes)
+          subtitleText = rawBody;
         }
 
         // ----- LEADING ICON (per type) -----
@@ -259,7 +273,7 @@ class _NotificationPageState extends State<NotificationPage> {
           height: 40,
           decoration: BoxDecoration(
             color: isUnread
-                ? Theme.of(context).colorScheme.primary
+                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.15)
                 : Theme.of(context).colorScheme.secondary,
             shape: BoxShape.circle,
           ),
@@ -355,7 +369,7 @@ class _NotificationPageState extends State<NotificationPage> {
 
               // 🔗 NAVIGATION BEHAVIOR
 
-              // 1) Friend request → go to sender profile (optional)
+              // 1) Friend request → go to sender profile
               if (isFriendRequest && friendRequesterId != null) {
                 if (!mounted) return;
 
@@ -411,7 +425,7 @@ class _NotificationPageState extends State<NotificationPage> {
                 }
               }
 
-              // 4) Follow → go to follower profile
+              // 4) Follow → go to follower profile (only for new-style FOLLOW_USER:... bodies)
               else if (isFollow && followUserId != null) {
                 if (!mounted) return;
                 Navigator.push(

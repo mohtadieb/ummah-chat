@@ -17,8 +17,8 @@ Defines the light color scheme for the app.
 ThemeData lightMode = ThemeData(
   colorScheme: ColorScheme.light(
     surface: const Color(0xFFF8F5F0),
-    primary: Colors.grey.shade800,
-    secondary: Colors.grey.shade300,
+    primary: Color(0xFF467E55),
+    secondary: Color(0xFF467E55).withValues(alpha: 0.15),
     tertiary: Colors.white,
     inversePrimary: Colors.grey.shade900,
   ),

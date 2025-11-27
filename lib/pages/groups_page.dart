@@ -4,17 +4,17 @@ import 'package:flutter/material.dart';
 import '../services/auth/auth_service.dart';
 import '../services/chat/chat_service.dart';
 import '../pages/group_chat_page.dart';
-import 'create_group_page.dart';
 import '../models/message.dart';
-import '../helper/time_ago_text.dart'; // <-- make sure this import exists!
-import '../components/my_card_tile.dart'; // 🆕 use MyCardTile
+import '../helper/last_message_time_formatter.dart';
+import '../components/my_search_bar.dart';
+import '../components/my_group_tile.dart';
 
-/// GROUPS PAGE
+/// GROUPS PAGE (content-only version)
 ///
 /// - Shows all group chats where the current user is a member
 /// - Data comes from ChatService.groupRoomsForUserPollingStream(...)
-/// - Tapping a tile opens GroupChatPage
-/// - Shows last message + time ago + unread badge per group
+//  - Tapping a tile opens GroupChatPage
+/// - Shows last message + time + unread badge per group
 class GroupsPage extends StatefulWidget {
   const GroupsPage({super.key});
 
@@ -34,6 +34,10 @@ class _GroupsPageState extends State<GroupsPage> {
 
   StreamSubscription<Map<String, MessageModel>>? _lastMsgSub;
   StreamSubscription<Map<String, int>>? _unreadSub;
+
+  // 🔍 Local search within groups list
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -70,6 +74,7 @@ class _GroupsPageState extends State<GroupsPage> {
   void dispose() {
     _lastMsgSub?.cancel();
     _unreadSub?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -79,246 +84,216 @@ class _GroupsPageState extends State<GroupsPage> {
     final currentUserId = _authService.getCurrentUserId();
 
     if (currentUserId == null || currentUserId.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Groups'),
-          backgroundColor: colorScheme.surface,
-          elevation: 0,
-          centerTitle: true,
-        ),
-        body: Center(
-          child: Text(
-            'You must be logged in to view your groups',
-            style: TextStyle(color: colorScheme.primary),
-          ),
+      return Center(
+        child: Text(
+          'You must be logged in to view your groups',
+          style: TextStyle(color: colorScheme.primary),
         ),
       );
     }
 
-    return Scaffold(
-      backgroundColor: colorScheme.surface,
-      appBar: AppBar(
-        backgroundColor: colorScheme.surface,
-        elevation: 0,
-        centerTitle: true,
-        title: Text(
-          'Groups',
-          style: TextStyle(
-            color: colorScheme.primary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-      body: StreamBuilder<List<Map<String, dynamic>>>(
-        stream: _chatService.groupRoomsForUserPollingStream(currentUserId),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                'Error loading groups',
-                style: TextStyle(color: colorScheme.primary),
-              ),
-            );
-          }
+    // ⬇️ No Scaffold here; this is content-only inside ChatTabsPage.
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _chatService.groupRoomsForUserPollingStream(currentUserId),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              'Error loading groups',
+              style: TextStyle(color: colorScheme.primary),
+            ),
+          );
+        }
 
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-          final groups = snapshot.data ?? [];
+        final groups = snapshot.data ?? [];
 
-          if (groups.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.group_outlined,
-                      size: 52,
-                      color: colorScheme.primary.withValues(alpha: 0.6),
+        // If there are literally no groups at all, show the empty state
+        if (groups.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.group_outlined,
+                    size: 52,
+                    color: colorScheme.primary.withValues(alpha: 0.6),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No groups yet',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.primary,
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'No groups yet',
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Create a group to start chatting with multiple friends at once.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: colorScheme.primary.withValues(alpha: 0.75),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // 🎯 Apply local search filter on group name
+        List<Map<String, dynamic>> filteredGroups = groups;
+        if (_searchQuery.trim().isNotEmpty) {
+          final q = _searchQuery.toLowerCase();
+          filteredGroups = groups.where((g) {
+            final name = (g['name'] as String? ?? '').toLowerCase();
+            return name.contains(q);
+          }).toList();
+        }
+
+        final noMatches =
+            _searchQuery.trim().isNotEmpty && filteredGroups.isEmpty;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 🔍 Local search bar for groups (same style as FriendsPage)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 4.0),
+              child: MySearchBar(
+                controller: _searchController,
+                hintText: 'Search groups',
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                  });
+                },
+                onClear: () {
+                  setState(() {
+                    _searchQuery = '';
+                  });
+                },
+              ),
+            ),
+
+            const SizedBox(height: 4),
+
+            // Header with total groups count
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 4,
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    "Your groups",
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colorScheme.secondary.withValues(alpha: 0.7),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '${groups.length}',
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: 11,
                         fontWeight: FontWeight.w600,
                         color: colorScheme.primary,
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Create a group to start chatting with multiple friends at once.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: colorScheme.primary.withValues(alpha: 0.75),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            );
-          }
+            ),
 
-          return ListView.builder(
-            itemCount: groups.length,
-            itemBuilder: (context, index) {
-              final group = groups[index];
-              final groupId = group['id']?.toString() ?? '';
-              final groupName =
-              (group['name'] as String?)?.trim().isNotEmpty == true
-                  ? group['name'] as String
-                  : 'Group';
-              final avatarUrl = group['avatar_url'] as String?;
+            const SizedBox(height: 4),
 
-              final MessageModel? lastMsg = _lastGroupMessages[groupId];
-              final int unread = _groupUnreadCounts[groupId] ?? 0;
-
-              final String subtitle = lastMsg != null
-                  ? _buildLastMessagePreview(
-                msg: lastMsg,
-                currentUserId: currentUserId,
+            // Groups list or "no matches" message
+            Expanded(
+              child: noMatches
+                  ? Center(
+                child: Text(
+                  'No groups match your search',
+                  style: TextStyle(
+                    color: colorScheme.primary.withValues(alpha: 0.8),
+                  ),
+                ),
               )
-                  : 'No messages yet';
+                  : ListView.builder(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).padding.bottom +
+                      96, // match FriendsPage padding / avoid FAB overlap
+                ),
+                itemCount: filteredGroups.length,
+                itemBuilder: (context, index) {
+                  final group = filteredGroups[index];
+                  final groupId = group['id']?.toString() ?? '';
+                  final groupName =
+                  (group['name'] as String?)?.trim().isNotEmpty ==
+                      true
+                      ? group['name'] as String
+                      : 'Group';
+                  final avatarUrl = group['avatar_url'] as String?;
 
-              return MyCardTile(
-                onTap: groupId.isEmpty
-                    ? null
-                    : () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => GroupChatPage(
-                        chatRoomId: groupId,
-                        groupName: groupName,
-                      ),
-                    ),
+                  final MessageModel? lastMsg =
+                  _lastGroupMessages[groupId];
+                  final int unread = _groupUnreadCounts[groupId] ?? 0;
+
+                  final String subtitle = lastMsg != null
+                      ? _buildLastMessagePreview(
+                    msg: lastMsg,
+                    currentUserId: currentUserId,
+                  )
+                      : 'No messages yet';
+
+                  final String? lastTimeLabel = lastMsg != null
+                      ? formatLastMessageTime(lastMsg.createdAt)
+                      : null;
+
+                  return MyGroupTile(
+                    groupName: groupName,
+                    avatarUrl: avatarUrl,
+                    lastMessagePreview: subtitle,
+                    lastMessageTimeLabel: lastTimeLabel,
+                    unreadCount: unread,
+                    onTap: groupId.isEmpty
+                        ? null
+                        : () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => GroupChatPage(
+                            chatRoomId: groupId,
+                            groupName: groupName,
+                          ),
+                        ),
+                      );
+                    },
                   );
                 },
-                child: Row(
-                  children: [
-                    // Avatar
-                    _buildGroupAvatar(
-                      colorScheme: colorScheme,
-                      name: groupName,
-                      avatarUrl: avatarUrl,
-                    ),
-
-                    const SizedBox(width: 12),
-
-                    // Title + subtitle
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            groupName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: colorScheme.primary,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 15,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            subtitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: unread > 0
-                                  ? colorScheme.primary
-                                  : colorScheme.primary
-                                  .withValues(alpha: 0.7),
-                              fontSize: 12,
-                              fontWeight: unread > 0
-                                  ? FontWeight.w600
-                                  : FontWeight.normal,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(width: 8),
-
-                    // Time + unread badge
-                    Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (lastMsg != null)
-                          TimeAgoText(
-                            createdAt: lastMsg.createdAt,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: colorScheme.primary
-                                  .withValues(alpha: 0.7),
-                            ),
-                          ),
-                        const SizedBox(height: 4),
-                        if (unread > 0)
-                          _UnreadBadge(
-                            count: unread,
-                            colorScheme: colorScheme,
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            },
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const CreateGroupPage(),
+              ),
             ),
-          );
-        },
-        icon: const Icon(Icons.group_add),
-        label: const Text('New group'),
-        backgroundColor: const Color(0xFF0D6746),
-        foregroundColor: colorScheme.onPrimary,
-      ),
-    );
-  }
-
-  /// Simple avatar for group
-  Widget _buildGroupAvatar({
-    required ColorScheme colorScheme,
-    required String name,
-    String? avatarUrl,
-  }) {
-    final radius = 22.0;
-
-    if (avatarUrl != null && avatarUrl.trim().isNotEmpty) {
-      return CircleAvatar(
-        radius: radius,
-        backgroundImage: NetworkImage(avatarUrl),
-      );
-    }
-
-    final initial =
-    name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : 'G';
-
-    return CircleAvatar(
-      radius: radius,
-      backgroundColor: colorScheme.primary.withValues(alpha: 0.12),
-      child: Text(
-        initial,
-        style: TextStyle(
-          color: colorScheme.primary,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
+          ],
+        );
+      },
     );
   }
 
@@ -337,36 +312,5 @@ class _GroupsPageState extends State<GroupsPage> {
     const maxLen = 40;
     if (base.length <= maxLen) return base;
     return '${base.substring(0, maxLen)}…';
-  }
-}
-
-class _UnreadBadge extends StatelessWidget {
-  final int count;
-  final ColorScheme colorScheme;
-
-  const _UnreadBadge({
-    required this.count,
-    required this.colorScheme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final String label = count > 99 ? '99+' : count.toString();
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: colorScheme.primary,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: colorScheme.onPrimary,
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
   }
 }

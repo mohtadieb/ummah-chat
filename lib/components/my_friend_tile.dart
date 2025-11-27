@@ -6,7 +6,7 @@ class MyFriendTile extends StatelessWidget {
   final UserProfile user;
   final String? customTitle;
 
-  /// 👉 Tap on the *row / avatar / name* → go to profile
+  /// 👉 Tap on the *row* → go to profile
   final VoidCallback onProfileTap;
 
   /// 👉 Tap on the *Chat* pill → go to chat
@@ -51,127 +51,119 @@ class MyFriendTile extends StatelessWidget {
       onTap: onProfileTap,
       child: Row(
         children: [
-          // 👤 Avatar + online dot
-          GestureDetector(
-            onTap: onProfileTap,
-            child: Stack(
-              children: [
-                user.profilePhotoUrl.isNotEmpty
-                    ? CircleAvatar(
-                  radius: 22,
-                  backgroundImage: NetworkImage(user.profilePhotoUrl),
-                )
-                    : CircleAvatar(
-                  radius: 22,
-                  backgroundColor:
-                  colorScheme.primary.withValues(alpha: 0.12),
-                  child: Text(
-                    _getInitials(),
-                    style: TextStyle(
-                      color: colorScheme.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
+          // 👤 Avatar + online dot (tap handled by MyCardTile.onTap)
+          Stack(
+            children: [
+              user.profilePhotoUrl.isNotEmpty
+                  ? CircleAvatar(
+                radius: 22,
+                backgroundImage: NetworkImage(user.profilePhotoUrl),
+              )
+                  : CircleAvatar(
+                radius: 22,
+                backgroundColor:
+                colorScheme.primary.withValues(alpha: 0.12),
+                child: Text(
+                  _getInitials(),
+                  style: TextStyle(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
+              ),
 
-                // 🟢 Online indicator (bottom-right)
-                if (isOnline)
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      width: 11,
-                      height: 11,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF12B981), // soft green
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: colorScheme.surface,
-                          width: 2,
-                        ),
+              // 🟢 Online indicator (bottom-right)
+              if (isOnline)
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 11,
+                    height: 11,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF12B981), // soft green
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: colorScheme.surface,
+                        width: 2,
                       ),
                     ),
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
 
           const SizedBox(width: 12),
 
-          // 📝 Name + username + last message (also profile tap)
+          // 📝 Name + username + last message (tap handled by MyCardTile.onTap)
           Expanded(
-            child: GestureDetector(
-              onTap: onProfileTap,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  customTitle ?? user.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 3),
+
+                // Username + inline "Online"
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        '@${user.username}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colorScheme.primary.withValues(alpha: 0.7),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    if (isOnline) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        width: 4,
+                        height: 4,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF12B981),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Text(
+                        'Online',
+                        style: TextStyle(
+                          color: Color(0xFF12B981),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+
+                // Last message preview (if available)
+                if (lastMessagePreview != null &&
+                    lastMessagePreview!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 3),
                   Text(
-                    customTitle ?? user.name,
+                    lastMessagePreview!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: colorScheme.primary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                      color: colorScheme.primary.withValues(alpha: 0.7),
+                      fontSize: 12,
                     ),
                   ),
-                  const SizedBox(height: 3),
-
-                  // Username + inline "Online"
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          '@${user.username}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: colorScheme.primary
-                                .withValues(alpha: 0.7),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                      if (isOnline) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          width: 4,
-                          height: 4,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF12B981),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        const Text(
-                          'Online',
-                          style: TextStyle(
-                            color: Color(0xFF12B981),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-
-                  // Last message preview (if available)
-                  if (lastMessagePreview != null &&
-                      lastMessagePreview!.trim().isNotEmpty) ...[
-                    const SizedBox(height: 3),
-                    Text(
-                      lastMessagePreview!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: colorScheme.primary
-                            .withValues(alpha: 0.7),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
                 ],
-              ),
+              ],
             ),
           ),
 
@@ -188,8 +180,7 @@ class MyFriendTile extends StatelessWidget {
                     lastMessageTimeLabel!,
                     style: TextStyle(
                       fontSize: 11,
-                      color: colorScheme.primary
-                          .withValues(alpha: 0.6),
+                      color: colorScheme.primary.withValues(alpha: 0.6),
                     ),
                   ),
                 ),

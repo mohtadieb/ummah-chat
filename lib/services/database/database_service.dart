@@ -106,8 +106,15 @@ class DatabaseService {
 
   /* ==================== POSTS ==================== */
 
-  /// Create a new post and return the inserted Post object
-  Future<void> postMessageInDatabase(String message, {File? imageFile}) async {
+  /// Create a new post (global or community) and insert into database
+  ///
+  /// - `communityId == null` → normal homepage / global post
+  /// - `communityId != null` → post belongs to that community
+  Future<void> postMessageInDatabase(
+      String message, {
+        File? imageFile,
+        String? communityId, // ✅ NEW
+      }) async {
     try {
       final currentUserId = _auth.currentUser!.id;
 
@@ -116,7 +123,7 @@ class DatabaseService {
 
       String? imageUrl;
 
-      // 🆕 If an image was picked, upload it to Supabase Storage
+      // If an image was picked, upload it to Supabase Storage
       if (imageFile != null) {
         final fileName =
             '${DateTime.now().millisecondsSinceEpoch}_${currentUserId}.jpg';
@@ -140,6 +147,7 @@ class DatabaseService {
         username: user.username,
         message: message,
         imageUrl: imageUrl,
+        communityId: communityId, // ✅ store the community link (can be null)
         createdAt: DateTime.now().toUtc(),
         likeCount:
         0, // initial value; DB trigger will keep this in sync with post_likes
@@ -188,6 +196,11 @@ class DatabaseService {
   }
 
   /// Get all posts
+  ///
+  /// This returns both:
+  /// - global posts (`community_id IS NULL`)
+  /// - community posts (`community_id IS NOT NULL`)
+  /// and your UI decides how to filter them.
   Future<List<Post>> getAllPostsFromDatabase() async {
     try {
       final List data = await _db
@@ -205,9 +218,6 @@ class DatabaseService {
       return [];
     }
   }
-
-  /// Get individual post
-  // (implemented below as getPostByIdFromDatabase)
 
   /// Toggle like for a post
   ///
@@ -297,7 +307,6 @@ class DatabaseService {
       print("❌ Error toggling like: $e");
     }
   }
-
 
   /// EXTRA /// for when I use post_likes
   Future<List<String>> getLikedPostIdsFromDatabase(
@@ -814,7 +823,6 @@ class DatabaseService {
         await _notifications.createNotificationForUser(
           targetUserId: targetUserId,
           title: '$displayName started following you',
-          // who followed me
           body: 'FOLLOW_USER:$currentUserId',
         );
       } catch (e) {
@@ -1046,7 +1054,6 @@ class DatabaseService {
   }
 
   // Fetch full profiles of all community members
-  /// DatabaseService.dart
   Future<List<Map<String, dynamic>>> getCommunityMemberProfilesFromDatabase(
       String communityId) async {
     try {
@@ -1074,6 +1081,121 @@ class DatabaseService {
     } catch (e) {
       print("❌ Error fetching community member profiles: $e");
       return [];
+    }
+  }
+
+  /* ==================== STORY PROGRESS ==================== */
+
+  /// Save answers for a story (per user).
+  ///
+  /// [answers] is a map: questionIndex -> selectedOptionIndex
+  Future<void> saveStoryAnswersInDatabase(
+      String storyId,
+      Map<int, int> answers,
+      ) async {
+    final currentUserId = _auth.currentUser?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return;
+
+    try {
+      // Convert int keys to strings for JSONB
+      final Map<String, dynamic> answersJson = {};
+      answers.forEach((key, value) {
+        answersJson[key.toString()] = value;
+      });
+
+      final data = <String, dynamic>{
+        'user_id': currentUserId,
+        'story_id': storyId,
+        'answers': answersJson,
+        // ❌ DO NOT set completed_at here
+      };
+
+      await _db.from('story_progress').upsert(
+        data,
+        onConflict: 'user_id,story_id',
+      );
+    } catch (e) {
+      print('❌ Error saving story answers: $e');
+    }
+  }
+
+  /// Mark a story as completed for the current user.
+  ///
+  /// ✅ Only place where `completed_at` is written.
+  Future<void> markStoryCompletedInDatabase(String storyId) async {
+    final currentUserId = _auth.currentUser?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return;
+
+    try {
+      await _db.from('story_progress').upsert(
+        {
+          'user_id': currentUserId,
+          'story_id': storyId,
+          'completed_at': DateTime.now().toUtc().toIso8601String(),
+          // answers will stay as-is if row already exists
+        },
+        onConflict: 'user_id,story_id',
+      );
+    } catch (e) {
+      print('❌ Error marking story completed: $e');
+    }
+  }
+
+  /// Get all completed story_ids for a given user
+  ///
+  /// ✅ Only rows with completed_at NOT NULL are considered "completed".
+  Future<List<String>> getCompletedStoryIdsFromDatabase(String userId) async {
+    try {
+      final res = await _db
+          .from('public_story_completions') // 👈 use the view
+          .select('story_id')
+          .eq('user_id', userId);
+
+      if (res is! List) return [];
+
+      return res
+          .map((row) => row['story_id']?.toString())
+          .whereType<String>()
+          .toList();
+    } catch (e) {
+      print('❌ Error fetching completed stories for $userId: $e');
+      return [];
+    }
+  }
+
+
+  /// Load saved answers for the current user & story.
+  ///
+  /// Returns a map: questionIndex -> selectedOptionIndex
+  Future<Map<int, int>> getStoryAnswersFromDatabase(String storyId) async {
+    final currentUserId = _auth.currentUser?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return {};
+
+    try {
+      final row = await _db
+          .from('story_progress')
+          .select('answers')
+          .eq('user_id', currentUserId)
+          .eq('story_id', storyId)
+          .maybeSingle();
+
+      if (row == null || row['answers'] == null) return {};
+
+      final answersJson = row['answers'] as Map<String, dynamic>;
+      final Map<int, int> result = {};
+
+      answersJson.forEach((key, value) {
+        final index = int.tryParse(key);
+        final selected = (value as num?)?.toInt();
+        if (index != null && selected != null) {
+          result[index] = selected;
+        }
+      });
+
+      return result;
+    } catch (e) {
+      print('❌ Error loading story answers for $storyId: $e');
+      return {};
     }
   }
 
