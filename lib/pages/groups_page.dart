@@ -208,7 +208,7 @@ class _GroupsPageState extends State<GroupsPage> {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: colorScheme.secondary.withValues(alpha: 0.7),
+                      color: colorScheme.secondary,
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
@@ -233,62 +233,71 @@ class _GroupsPageState extends State<GroupsPage> {
                 child: Text(
                   'No groups match your search',
                   style: TextStyle(
-                    color: colorScheme.primary.withValues(alpha: 0.8),
+                    color: colorScheme.primary
+                        .withValues(alpha: 0.8),
                   ),
                 ),
               )
-                  : ListView.builder(
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(context).padding.bottom +
-                      96, // match FriendsPage padding / avoid FAB overlap
-                ),
-                itemCount: filteredGroups.length,
-                itemBuilder: (context, index) {
-                  final group = filteredGroups[index];
-                  final groupId = group['id']?.toString() ?? '';
-                  final groupName =
-                  (group['name'] as String?)?.trim().isNotEmpty ==
-                      true
-                      ? group['name'] as String
-                      : 'Group';
-                  final avatarUrl = group['avatar_url'] as String?;
+                  : ScrollConfiguration(
+                // ✅ Disable stretch / weird independent text movement
+                behavior: ScrollConfiguration.of(context)
+                    .copyWith(overscroll: false),
+                child: ListView.builder(
+                  physics: const ClampingScrollPhysics(),
+                  padding: EdgeInsets.only(
+                    bottom:
+                    MediaQuery.of(context).padding.bottom +
+                        96, // match FriendsPage padding / avoid FAB overlap
+                  ),
+                  itemCount: filteredGroups.length,
+                  itemBuilder: (context, index) {
+                    final group = filteredGroups[index];
+                    final groupId = group['id']?.toString() ?? '';
+                    final groupName =
+                    (group['name'] as String?)?.trim().isNotEmpty ==
+                        true
+                        ? group['name'] as String
+                        : 'Group';
+                    final avatarUrl = group['avatar_url'] as String?;
 
-                  final MessageModel? lastMsg =
-                  _lastGroupMessages[groupId];
-                  final int unread = _groupUnreadCounts[groupId] ?? 0;
+                    final MessageModel? lastMsg =
+                    _lastGroupMessages[groupId];
+                    final int unread =
+                        _groupUnreadCounts[groupId] ?? 0;
 
-                  final String subtitle = lastMsg != null
-                      ? _buildLastMessagePreview(
-                    msg: lastMsg,
-                    currentUserId: currentUserId,
-                  )
-                      : 'No messages yet';
+                    final String subtitle = lastMsg != null
+                        ? _buildLastMessagePreview(
+                      msg: lastMsg,
+                      currentUserId: currentUserId,
+                    )
+                        : 'No messages yet';
 
-                  final String? lastTimeLabel = lastMsg != null
-                      ? formatLastMessageTime(lastMsg.createdAt)
-                      : null;
+                    final String? lastTimeLabel = lastMsg != null
+                        ? formatLastMessageTime(lastMsg.createdAt)
+                        : null;
 
-                  return MyGroupTile(
-                    groupName: groupName,
-                    avatarUrl: avatarUrl,
-                    lastMessagePreview: subtitle,
-                    lastMessageTimeLabel: lastTimeLabel,
-                    unreadCount: unread,
-                    onTap: groupId.isEmpty
-                        ? null
-                        : () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => GroupChatPage(
-                            chatRoomId: groupId,
-                            groupName: groupName,
+                    return MyGroupTile(
+                      groupName: groupName,
+                      avatarUrl: avatarUrl,
+                      lastMessagePreview: subtitle,
+                      lastMessageTimeLabel: lastTimeLabel,
+                      unreadCount: unread,
+                      onTap: groupId.isEmpty
+                          ? null
+                          : () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => GroupChatPage(
+                              chatRoomId: groupId,
+                              groupName: groupName,
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                  );
-                },
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
             ),
           ],

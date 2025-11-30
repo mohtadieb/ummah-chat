@@ -216,8 +216,7 @@ class _FriendsPageState extends State<FriendsPage> {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: colorScheme.secondary
-                                  .withValues(alpha: 0.7),
+                              color: colorScheme.secondary,
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
@@ -247,82 +246,88 @@ class _FriendsPageState extends State<FriendsPage> {
                           ),
                         ),
                       )
-                          : ListView.builder(
-                        padding: EdgeInsets.only(
-                          bottom: MediaQuery.of(context)
-                              .padding
-                              .bottom +
-                              96, // avoid FAB overlap in Chats screen
+                          : ScrollConfiguration(
+                        // 🚫 Disable stretch / weird independent text movement
+                        behavior: ScrollConfiguration.of(context)
+                            .copyWith(overscroll: false),
+                        child: ListView.builder(
+                          physics:
+                          const ClampingScrollPhysics(), // ⛔ no bounce
+                          padding: EdgeInsets.only(
+                            bottom:
+                            MediaQuery.of(context).padding.bottom +
+                                96, // avoid FAB overlap in Chats screen
+                          ),
+                          itemCount: filteredFriends.length,
+                          itemBuilder: (context, index) {
+                            final user = filteredFriends[index];
+
+                            // 🟢 Online based on last_seen_at from UserProfile
+                            final isOnline = user.isOnline;
+
+                            // 🔴 Unread messages from this friend
+                            final unreadCount =
+                                unreadByFriend[user.id] ?? 0;
+
+                            // 🕒 Last message meta
+                            final lastInfo =
+                            lastMessageByFriend[user.id];
+                            final lastText = lastInfo?.text;
+                            final lastTime = lastInfo?.createdAt;
+
+                            final lastTimeLabel =
+                            formatLastMessageTime(lastTime);
+
+                            // Optional: prefix "You: " when last sender is current user
+                            final preview =
+                            (lastText == null ||
+                                lastText.trim().isEmpty)
+                                ? null
+                                : (lastInfo!.sentByCurrentUser
+                                ? 'You: $lastText'
+                                : lastText);
+
+                            return MyFriendTile(
+                              key: ValueKey(user.id),
+                              user: user,
+                              customTitle: user.name,
+                              isOnline: isOnline,
+                              unreadCount: unreadCount,
+                              lastMessagePreview: preview,
+                              lastMessageTimeLabel: lastTimeLabel,
+
+                              // 👤 tap avatar/name/row → profile page
+                              onProfileTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ProfilePage(
+                                      userId: user.id,
+                                    ),
+                                  ),
+                                );
+                              },
+
+                              // 💬 tap "Chat" pill → open chat
+                              onChatTap: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ChatPage(
+                                      friendId: user.id,
+                                      friendName: user.name,
+                                    ),
+                                  ),
+                                );
+
+                                // 🔄 when returning from ChatPage, rebuild to refresh unread counts
+                                if (mounted) {
+                                  setState(() {});
+                                }
+                              },
+                            );
+                          },
                         ),
-                        itemCount: filteredFriends.length,
-                        itemBuilder: (context, index) {
-                          final user = filteredFriends[index];
-
-                          // 🟢 Online based on last_seen_at from UserProfile
-                          final isOnline = user.isOnline;
-
-                          // 🔴 Unread messages from this friend
-                          final unreadCount =
-                              unreadByFriend[user.id] ?? 0;
-
-                          // 🕒 Last message meta
-                          final lastInfo =
-                          lastMessageByFriend[user.id];
-                          final lastText = lastInfo?.text;
-                          final lastTime = lastInfo?.createdAt;
-
-                          final lastTimeLabel =
-                          formatLastMessageTime(lastTime);
-
-                          // Optional: prefix "You: " when last sender is current user
-                          final preview =
-                          (lastText == null ||
-                              lastText.trim().isEmpty)
-                              ? null
-                              : (lastInfo!.sentByCurrentUser
-                              ? 'You: $lastText'
-                              : lastText);
-
-                          return MyFriendTile(
-                            key: ValueKey(user.id),
-                            user: user,
-                            customTitle: user.name,
-                            isOnline: isOnline,
-                            unreadCount: unreadCount,
-                            lastMessagePreview: preview,
-                            lastMessageTimeLabel: lastTimeLabel,
-
-                            // 👤 tap avatar/name/row → profile page
-                            onProfileTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ProfilePage(
-                                    userId: user.id,
-                                  ),
-                                ),
-                              );
-                            },
-
-                            // 💬 tap "Chat" pill → open chat
-                            onChatTap: () async {
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => ChatPage(
-                                    friendId: user.id,
-                                    friendName: user.name,
-                                  ),
-                                ),
-                              );
-
-                              // 🔄 when returning from ChatPage, rebuild to refresh unread counts
-                              if (mounted) {
-                                setState(() {});
-                              }
-                            },
-                          );
-                        },
                       ),
                     ),
                   ],

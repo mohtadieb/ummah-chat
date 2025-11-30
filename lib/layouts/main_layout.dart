@@ -72,13 +72,13 @@ class _MainLayoutState extends State<MainLayout> {
         centerTitle: true,
         foregroundColor: colorScheme.primary,
         toolbarHeight: kToolbarHeight / 1.3,
-
-        // 🚫 Prevent grey-out on scroll
         scrolledUnderElevation: 0,
         backgroundColor: colorScheme.surface,
         surfaceTintColor: Colors.transparent,
 
-        actions: [
+        // 🔥 Only show actions on Profile tab
+        actions: _selectedIndex == 3
+            ? [
           // 🔔 Notification bell with unread badge
           StreamBuilder<int>(
             stream: _notificationService.unreadCountStream(),
@@ -134,8 +134,10 @@ class _MainLayoutState extends State<MainLayout> {
           ),
 
           const SizedBox(width: 7),
-        ],
+        ]
+            : [],
       ),
+
 
       body: IndexedStack(
         index: _selectedIndex,

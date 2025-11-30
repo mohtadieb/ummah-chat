@@ -50,11 +50,13 @@ class _SearchPageState extends State<SearchPage> {
 
         await databaseProvider.searchUsers(query);
 
+        if (!mounted) return;
         setState(() {
           _isSearching = false;
         });
       } else {
         listeningProvider.clearSearchResults();
+        if (!mounted) return;
         setState(() {
           _isSearching = false;
           _hasSearched = false;
@@ -72,6 +74,8 @@ class _SearchPageState extends State<SearchPage> {
       appBar: AppBar(
         backgroundColor: colorScheme.surface,
         elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         centerTitle: true,
         title: Column(
           children: [
@@ -91,21 +95,18 @@ class _SearchPageState extends State<SearchPage> {
             ),
           ],
         ),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-        child: Column(
-          children: [
-            // 🔍 Rounded search bar (shared MySearchBar component)
-            MySearchBar(
+        // 🔽 Put the search bar *inside* the AppBar so results never scroll under it
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(64),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: MySearchBar(
               controller: _searchController,
               hintText: 'Search users',
               onChanged: (value) {
-                // Use debounced search logic from _onSearchChanged
                 _onSearchChanged(value);
               },
               onClear: () {
-                // Clear search results + reset state when user taps the clear icon
                 listeningProvider.clearSearchResults();
                 setState(() {
                   _hasSearched = false;
@@ -113,15 +114,12 @@ class _SearchPageState extends State<SearchPage> {
                 });
               },
             ),
-
-            const SizedBox(height: 12),
-
-            // 🔽 Results / empty states
-            Expanded(
-              child: _buildBodyContent(colorScheme),
-            ),
-          ],
+          ),
         ),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+        child: _buildBodyContent(colorScheme),
       ),
     );
   }
@@ -164,15 +162,39 @@ class _SearchPageState extends State<SearchPage> {
       );
     }
 
-    return ListView.builder(
-      itemCount: results.length,
-      itemBuilder: (context, index) {
-        final UserProfile user = results[index];
-        return MyUserTile(
-          user: user,
-          customTitle: user.name,
-        );
-      },
+    // ✅ Same anti-stretch behavior as stories/friends pages
+    return ScrollConfiguration(
+      behavior: const _NoStretchScrollBehavior(),
+      child: ListView.builder(
+        physics: const ClampingScrollPhysics(),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        itemCount: results.length,
+        itemBuilder: (context, index) {
+          final UserProfile user = results[index];
+          return MyUserTile(
+            user: user,
+            customTitle: user.name,
+          );
+        },
+      ),
     );
+  }
+}
+
+/// ✅ Custom behavior: no stretch, no glow, tight scrolling with cards/text locked together
+class _NoStretchScrollBehavior extends ScrollBehavior {
+  const _NoStretchScrollBehavior();
+
+  @override
+  Widget buildOverscrollIndicator(
+      BuildContext context, Widget child, ScrollableDetails details) {
+    // Remove the overscroll glow / stretch
+    return child;
+  }
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) {
+    // Use Android-style clamping (no bounce)
+    return const ClampingScrollPhysics();
   }
 }

@@ -25,6 +25,13 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage>
     with SingleTickerProviderStateMixin {
+  // Extra safety to avoid setState after dispose
+  @override
+  void setState(VoidCallback fn) {
+    if (!mounted) return;
+    super.setState(fn);
+  }
+
   // Providers
   late final DatabaseProvider databaseProvider =
   Provider.of<DatabaseProvider>(context, listen: false);
@@ -75,70 +82,84 @@ class _HomePageState extends State<HomePage>
 
   // Show "create post" dialog
   void _openPostMessageBox() {
+    final messenger = ScaffoldMessenger.maybeOf(context);
     final TextEditingController messageController = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => MyInputAlertBox(
-          textController: messageController,
-          hintText: "What's on your mind?",
-          onPressedText: "Post",
-          onPressed: () async {
-            final message = messageController.text.trim();
-            if (message.replaceAll(RegExp(r'\s+'), '').length < 2) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    "Your message must have at least 2 characters",
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (innerContext, setInnerState) => MyInputAlertBox(
+            textController: messageController,
+            hintText: "What's on your mind?",
+            onPressedText: "Post",
+            onPressed: () async {
+              final message = messageController.text.trim();
+              if (message.replaceAll(RegExp(r'\s+'), '').length < 2) {
+                messenger?.showSnackBar(
+                  const SnackBar(
+                    content: Text("Your message must have at least 2 characters"),
                   ),
+                );
+
+                setInnerState(() {
+                  _selectedImage = null;
+                });
+                return;
+              }
+
+              try {
+                // Try posting
+                await _postMessage(message, imageFile: _selectedImage);
+                messageController.clear();
+
+                // ✅ SUCCESS SNACKBAR
+                messenger?.showSnackBar(
+                  const SnackBar(
+                    content: Text("Post uploaded successfully!"),
+                  ),
+                );
+
+                // ❌ Do NOT Navigator.pop here — MyInputAlertBox closes itself
+              } catch (e) {
+                debugPrint('Error posting home message: $e');
+                messenger?.showSnackBar(
+                  const SnackBar(
+                    content: Text("Failed to post. Please try again."),
+                  ),
+                );
+              }
+            },
+            extraWidget: Column(
+              children: [
+                if (_selectedImage != null)
+                  Image.file(
+                    _selectedImage!,
+                    height: 150,
+                    fit: BoxFit.cover,
+                  ),
+                TextButton.icon(
+                  icon: const Icon(Icons.image),
+                  label: const Text("Add Image"),
+                  onPressed: () async {
+                    final picker = ImagePicker();
+                    final picked =
+                    await picker.pickImage(source: ImageSource.gallery);
+                    if (picked != null) {
+                      setInnerState(() {
+                        _selectedImage = File(picked.path);
+                      });
+                    }
+                  },
                 ),
-              );
-
-              // Clear selected image after invalid post
-              setState(() {
-                _selectedImage = null;
-              });
-              return;
-            }
-
-            // Post the message (with optional image)
-            await _postMessage(message, imageFile: _selectedImage);
-
-            if (!mounted) return;
-            Navigator.pop(context);
-          },
-          extraWidget: Column(
-            children: [
-              // Selected image preview
-              if (_selectedImage != null)
-                Image.file(
-                  _selectedImage!,
-                  height: 150,
-                  fit: BoxFit.cover,
-                ),
-
-              // Button to pick an image
-              TextButton.icon(
-                icon: const Icon(Icons.image),
-                label: const Text("Add Image"),
-                onPressed: () async {
-                  final picker = ImagePicker();
-                  final picked =
-                  await picker.pickImage(source: ImageSource.gallery);
-                  if (picked != null) {
-                    setState(() {
-                      _selectedImage = File(picked.path);
-                    });
-                  }
-                },
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
+
 
   // User posts a message (normal/global post, not community)
   Future<void> _postMessage(String message, {File? imageFile}) async {
@@ -147,6 +168,8 @@ class _HomePageState extends State<HomePage>
       message,
       imageFile: imageFile,
     );
+
+    if (!mounted) return;
 
     // Clear the selected image after posting
     setState(() {
@@ -160,9 +183,8 @@ class _HomePageState extends State<HomePage>
     final colorScheme = Theme.of(context).colorScheme;
 
     // 🔎 Global posts (no communityId)
-    final List<Post> forYouPosts = listeningProvider.allPosts
-        .where((p) => p.communityId == null)
-        .toList();
+    final List<Post> forYouPosts =
+    listeningProvider.allPosts.where((p) => p.communityId == null).toList();
 
     final List<Post> followingGlobalPosts = listeningProvider.followingPosts
         .where((p) => p.communityId == null)
@@ -177,8 +199,7 @@ class _HomePageState extends State<HomePage>
     final List<Post> communityPosts = listeningProvider.allPosts
         .where(
           (p) =>
-      p.communityId != null &&
-          joinedCommunityIds.contains(p.communityId),
+      p.communityId != null && joinedCommunityIds.contains(p.communityId),
     )
         .toList();
 

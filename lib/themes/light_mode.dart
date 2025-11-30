@@ -13,6 +13,7 @@ Defines the light color scheme for the app.
 - inversePrimary: used for text/icons on primary surfaces
 
 */
+const Color kAccent = Color(0xFF467E55);
 
 ThemeData lightMode = ThemeData(
   colorScheme: ColorScheme.light(
@@ -21,5 +22,12 @@ ThemeData lightMode = ThemeData(
     secondary: Color(0xFF467E55).withValues(alpha: 0.15),
     tertiary: Colors.white,
     inversePrimary: Colors.grey.shade900,
+  ),
+  bottomNavigationBarTheme: BottomNavigationBarThemeData(
+    backgroundColor: const Color(0xFFF8F5F0),
+    selectedItemColor: kAccent,
+    unselectedItemColor: Colors.grey[500],
+    showUnselectedLabels: true,
+    type: BottomNavigationBarType.fixed,
   ),
 );

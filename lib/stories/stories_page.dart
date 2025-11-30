@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../models/story_models.dart';
+import '../models/storyData.dart';
 import '../services/database/database_provider.dart';
 
 class StoriesPage extends StatefulWidget {

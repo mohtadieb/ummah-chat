@@ -1,6 +1,6 @@
 // lib/pages/yusuf_story.dart
 import 'package:flutter/material.dart';
-import '../models/story_models.dart';
+import '../models/storyData.dart';
 import 'stories_page.dart';
 
 const StoryData yusufStory = StoryData(
@@ -10,6 +10,7 @@ const StoryData yusufStory = StoryData(
   title: 'The Story of Prophet Yusuf (as)',
   subtitle: 'A journey of patience, dreams and forgiveness',
   icon: Icons.star_rounded,
+  cardPreview: 'The prophet known for his patience, a dream, and a journey from a well to a throne.',
   body:
   'Prophet Yusuf (peace be upon him) was the son of Prophet Ya’qub (Jacob, as). '
       'As a young boy, Yusuf (as) had a beautiful and pure character. One night he saw a special dream. '

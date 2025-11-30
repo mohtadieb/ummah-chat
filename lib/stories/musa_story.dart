@@ -1,6 +1,6 @@
 // lib/pages/musa_story.dart  (or lib/stories/musa_story.dart if you prefer)
 import 'package:flutter/material.dart';
-import '../models/story_models.dart';
+import '../models/storyData.dart';
 import 'stories_page.dart';
 
 const StoryData musaStory = StoryData(
@@ -10,6 +10,7 @@ const StoryData musaStory = StoryData(
   title: 'The Story of Prophet Musa (as)',
   subtitle: 'Trust in Allah, courage and steadfastness',
   icon: Icons.landscape_rounded, // 🆕 DIFFERENT BADGE ICON
+  cardPreview: 'The prophet who faced Pharaoh, parted the sea, and led his people with courage.',
   body:
   'Prophet Musa (peace be upon him) was born in Egypt at a time when Pharaoh was a cruel ruler. '
       'Pharaoh feared that a boy from the Children of Israel would one day challenge his power, so he ordered '

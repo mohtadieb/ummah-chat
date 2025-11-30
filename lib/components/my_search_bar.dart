@@ -74,7 +74,7 @@ class _MySearchBarState extends State<MySearchBar> {
           color: colorScheme.primary,),
         filled: true,
         // Light tint using secondary color, consistent across pages
-        fillColor: colorScheme.secondary.withValues(alpha: 0.15),
+        fillColor: colorScheme.surface,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 12,

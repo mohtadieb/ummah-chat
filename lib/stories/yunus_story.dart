@@ -1,6 +1,6 @@
 // lib/pages/yunus_story.dart
 import 'package:flutter/material.dart';
-import '../models/story_models.dart';
+import '../models/storyData.dart';
 import 'stories_page.dart';
 
 const StoryData yunusStory = StoryData(
@@ -10,6 +10,7 @@ const StoryData yunusStory = StoryData(
   title: 'The Story of Prophet Yunus (as)',
   subtitle: 'Patience, repentance and Allah’s mercy',
   icon: Icons.water_rounded,
+  cardPreview: 'The prophet who called his people by the sea and was swallowed by the great fish.',
   body:
   'Prophet Yunus (peace be upon him) was sent by Allah to a large town near the sea. '
       'The people of this town worshipped idols and refused to obey Allah. Yunus (as) called them '

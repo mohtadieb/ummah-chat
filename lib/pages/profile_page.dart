@@ -1,5 +1,5 @@
+// lib/pages/profile_page.dart
 import 'package:flutter/material.dart';
-import 'package:ummah_chat/pages/settings_page.dart';
 import 'package:provider/provider.dart';
 
 import '../components/my_bio_box.dart';
@@ -13,7 +13,6 @@ import '../models/user.dart';
 import '../services/auth/auth_service.dart';
 import '../services/database/database_provider.dart';
 import 'follow_list_page.dart';
-import 'package:flutter/cupertino.dart';
 
 // 🆕 Story registry (id -> StoryData with chipLabel/title/icon)
 import '../models/story_registry.dart';
@@ -57,6 +56,12 @@ class _ProfilePageState extends State<ProfilePage> {
   // 🆕 Completed stories (for this profile – from DB for *other* users)
   List<String> _completedStoryIds = [];
 
+  // 🆕 Posts dropdown state
+  bool _showPosts = false;
+
+  // Scroll controller for the profile list
+  final ScrollController _scrollController = ScrollController();
+
   bool get _isOwnProfile => widget.userId == currentUserId;
 
   /// For own profile → always use provider’s live set
@@ -68,13 +73,17 @@ class _ProfilePageState extends State<ProfilePage> {
     return _completedStoryIds;
   }
 
-  // on startup,
   @override
   void initState() {
     super.initState();
-
-    // let's load user info
     loadUser();
+  }
+
+  @override
+  void dispose() {
+    bioTextController.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> loadUser() async {
@@ -82,7 +91,6 @@ class _ProfilePageState extends State<ProfilePage> {
       _isLoading = true;
     });
 
-    // Try up to 8 times (≈1.5 seconds)
     const int maxAttempts = 8;
 
     for (int attempt = 0; attempt < maxAttempts; attempt++) {
@@ -92,11 +100,9 @@ class _ProfilePageState extends State<ProfilePage> {
         break;
       }
 
-      // Wait 200 ms then retry
       await Future.delayed(const Duration(milliseconds: 200));
     }
 
-    // Still null after retries → show user-friendly message
     if (user == null) {
       setState(() {
         _isLoading = false;
@@ -104,19 +110,13 @@ class _ProfilePageState extends State<ProfilePage> {
       return;
     }
 
-    // Now fetch followers / following
     await databaseProvider.loadUserFollowers(widget.userId);
     await databaseProvider.loadUserFollowing(widget.userId);
 
-    // Follow status
     _isFollowing = databaseProvider.isFollowing(widget.userId);
 
-    // Friends status
     _friendStatus = await databaseProvider.getFriendStatus(widget.userId);
 
-    // 🆕 Completed stories for this profile (from Supabase)
-    // For *other* profiles this is what we show.
-    // For own profile the live provider set will override this in the UI.
     _completedStoryIds =
     await databaseProvider.getCompletedStoriesForUser(widget.userId);
 
@@ -140,23 +140,14 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // Save updated bio
   Future<void> _saveBio() async {
-    // start loading...
     setState(() => _isLoading = true);
-
-    // update bio
     await databaseProvider.updateBio(bioTextController.text);
-
-    // reload user
     await loadUser();
-
-    // finished loading
     setState(() => _isLoading = false);
   }
 
   Future<void> _toggleFollow() async {
-    // unfollow
     if (_isFollowing) {
       final confirm = await showDialog<bool>(
         context: context,
@@ -164,14 +155,14 @@ class _ProfilePageState extends State<ProfilePage> {
           title: const Text("Unfollow"),
           content: const Text("Are you sure you want to unfollow?"),
           actions: [
-            // cancel button
             TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text("Cancel")),
-            // yes button
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Cancel"),
+            ),
             TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text("Yes")),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text("Yes"),
+            ),
           ],
         ),
       );
@@ -185,55 +176,6 @@ class _ProfilePageState extends State<ProfilePage> {
       databaseProvider.loadFollowingPosts();
       setState(() => _isFollowing = true);
     }
-  }
-
-  /// 🆕 Get friend button label based on current friend status
-  String _friendButtonText() {
-    switch (_friendStatus) {
-      case 'pending_sent':
-        return 'Cancel request';
-      case 'pending_received':
-        return 'Accept request';
-      case 'accepted':
-        return 'Friends';
-      case 'blocked':
-        return 'Blocked';
-      case 'none':
-      default:
-        return 'Add friend';
-    }
-  }
-
-  /// 🆕 Should the friend button be enabled (clickable)?
-  bool _isFriendButtonEnabled() {
-    // Disable if already friends or blocked
-    if (_friendStatus == 'accepted' || _friendStatus == 'blocked') {
-      return false;
-    }
-    // You can keep 'pending_sent' enabled if you later want to allow "cancel"
-    return true;
-  }
-
-  /// 🆕 Handle friend button tap
-  Future<void> _onFriendButtonPressed() async {
-    // If I'm receiving a request, accept it
-    if (_friendStatus == 'pending_received') {
-      await databaseProvider.acceptFriendRequest(widget.userId);
-    }
-    // If there's no relation, send a new request
-    else if (_friendStatus == 'none') {
-      await databaseProvider.sendFriendRequest(widget.userId);
-    }
-    // Optional: allow cancel when 'pending_sent'
-    else if (_friendStatus == 'pending_sent') {
-      await databaseProvider.cancelFriendRequest(widget.userId);
-    }
-
-    // Reload status from database
-    final updated = await databaseProvider.getFriendStatus(widget.userId);
-    setState(() {
-      _friendStatus = updated;
-    });
   }
 
   Future<void> _acceptFriendFromProfile() async {
@@ -252,30 +194,24 @@ class _ProfilePageState extends State<ProfilePage> {
     });
   }
 
-  // BUILD UI
   @override
   Widget build(BuildContext context) {
-    // get user posts
     final allUserPosts = listeningProvider.getUserPosts(widget.userId);
+    final postCount = allUserPosts.length;
 
-    // listen to followers & following count
     final followerCount = listeningProvider.getFollowerCount(widget.userId);
     final followingCount = listeningProvider.getFollowingCount(widget.userId);
 
-    // listen to is following
     _isFollowing = listeningProvider.isFollowing(widget.userId);
 
     // ✅ Stories progress values
     final totalStories = allStoriesById.length;
     final effectiveCompletedIds = _effectiveCompletedStoryIds;
 
-    // Decide what the body should show (3 states: loading / no user / normal)
     Widget bodyChild;
     if (_isLoading) {
-      // still fetching profile
       bodyChild = const Center(child: CircularProgressIndicator());
     } else if (user == null) {
-      // profile row not found (e.g. just registered & profile not yet created)
       bodyChild = Center(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -289,12 +225,12 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
       );
     } else {
-      // ✅ Safe to use user! here because we've checked user != null above
       bodyChild = ListView(
+        controller: _scrollController,
         children: [
           const SizedBox(height: 18),
 
-          // NAME + USERNAME at top (instead of AppBar)
+          // NAME + USERNAME
           Center(
             child: Column(
               children: [
@@ -343,7 +279,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
           const SizedBox(height: 28),
 
-          // Profile stats
+          // Stats
           MyProfileStats(
             postCount: allUserPosts.length,
             followerCount: followerCount,
@@ -358,25 +294,20 @@ class _ProfilePageState extends State<ProfilePage> {
 
           const SizedBox(height: 28),
 
-          // Follow / Unfollow + Friend button
-          // only show if the user is viewing someone else's profile
+          // Follow / Friend buttons
           if (user!.id != currentUserId)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // 🧍 FOLLOW BUTTON (let MyFollowButton handle color & height)
                   Expanded(
                     child: MyFollowButton(
                       onPressed: _toggleFollow,
                       isFollowing: _isFollowing,
                     ),
                   ),
-
                   const SizedBox(width: 10),
-
-                  // 🧑‍🤝‍🧑 FRIEND BUTTON AREA
                   Expanded(
                     child: MyFriendButton(
                       friendStatus: _friendStatus,
@@ -392,7 +323,6 @@ class _ProfilePageState extends State<ProfilePage> {
                       onAcceptRequest: () async {
                         await databaseProvider
                             .acceptFriendRequest(widget.userId);
-
                         final updated = await databaseProvider
                             .getFriendStatus(widget.userId);
                         setState(() => _friendStatus = updated);
@@ -400,7 +330,6 @@ class _ProfilePageState extends State<ProfilePage> {
                       onDeclineRequest: () async {
                         await databaseProvider
                             .declineFriendRequest(widget.userId);
-
                         final updated = await databaseProvider
                             .getFriendStatus(widget.userId);
                         setState(() => _friendStatus = updated);
@@ -411,7 +340,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
 
-          // BIO Text
+          // Bio header
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 28.0),
             child: Row(
@@ -423,9 +352,6 @@ class _ProfilePageState extends State<ProfilePage> {
                     color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
-
-                // EDIT BIO BUTTON
-                // only show edit button when you're looking at your own profile
                 if (user!.id == currentUserId)
                   GestureDetector(
                     onTap: _showEditBioBox,
@@ -440,14 +366,13 @@ class _ProfilePageState extends State<ProfilePage> {
 
           const SizedBox(height: 7),
 
-          // Bio Box
           MyBioBox(text: user!.bio),
 
-          // 🆕 Stories progress + medals + completed list (just above Posts)
+          // 🆕 Stories progress + medals with names
           if (totalStories > 0) ...[
             const SizedBox(height: 24),
 
-            // Progress text → always show, even if 0 completed
+            // Progress text
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28.0),
               child: Text(
@@ -460,61 +385,90 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
 
-            // Only show medals / chips if there is at least 1 completed
             if (effectiveCompletedIds.isNotEmpty) ...[
               const SizedBox(height: 12),
 
-              // Medals row
+              // Medals + prophet names under them in a 4-column grid
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: effectiveCompletedIds.map((id) {
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: effectiveCompletedIds.length,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 4, // 4 per row
+                    mainAxisSpacing: 16,
+                    crossAxisSpacing: 16,
+                    childAspectRatio: 0.75, // space for circle + text
+                  ),
+                  itemBuilder: (context, index) {
+                    final id = effectiveCompletedIds[index];
                     final story = allStoriesById[id];
                     if (story == null) {
                       return const SizedBox.shrink();
                     }
 
-                    return Container(
-                      width: 70,
-                      height: 70,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: const LinearGradient(
-                          colors: [
-                            Color(0xFF0F8254),
-                            Color(0xFF0B6841),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black26.withOpacity(0.12),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
+                    // chipLabel e.g. "Prophet Musa (AS)" → we want "Musa (AS)"
+                    final rawLabel = story.chipLabel;
+                    final lower = rawLabel.toLowerCase();
+                    final displayName = lower.startsWith('prophet ')
+                        ? rawLabel.substring('Prophet '.length)
+                        : rawLabel;
+
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const LinearGradient(
+                                colors: [
+                                  Color(0xFF0F8254),
+                                  Color(0xFF0B6841),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black26.withOpacity(0.12),
+                                blurRadius: 6,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      child: Center(
-                        child: Icon(
-                          story.icon,
-                          color: Colors.white,
-                          size: 30,
+                          child: Center(
+                            child: Icon(
+                              story.icon,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 6),
+                        Text(
+                          displayName,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     );
-                  }).toList(),
+                  },
                 ),
               ),
 
-              // Optional overall badge if all are done
+              // Overall badge if all are done
               if (effectiveCompletedIds.length == totalStories) ...[
                 const SizedBox(height: 12),
                 Padding(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 28.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 28.0),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 8),
@@ -522,20 +476,19 @@ class _ProfilePageState extends State<ProfilePage> {
                       color: const Color(0xFF0F8254).withOpacity(0.06),
                       borderRadius: BorderRadius.circular(999),
                       border: Border.all(
-                        color:
-                        const Color(0xFF0F8254).withOpacity(0.4),
+                        color: const Color(0xFF0F8254).withOpacity(0.4),
                       ),
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.emoji_events_rounded,
                           size: 18,
                           color: Color(0xFF0F8254),
                         ),
-                        const SizedBox(width: 8),
-                        const Text(
+                        SizedBox(width: 8),
+                        Text(
                           "Prophets Stories Level 1 completed",
                           style: TextStyle(
                             color: Color(0xFF0F8254),
@@ -548,109 +501,176 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
               ],
-
-              const SizedBox(height: 18),
-
-              // Completed stories list (chips)
-              Padding(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 28.0),
-                child: Text(
-                  "Completed stories",
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Padding(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 24.0),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: effectiveCompletedIds.map((id) {
-                    final story = allStoriesById[id];
-                    if (story == null) {
-                      // Just in case a story_id exists in DB but not in app anymore
-                      return const SizedBox.shrink();
-                    }
-                    return Chip(
-                      avatar: const Icon(
-                        Icons.check_circle,
-                        size: 18,
-                        color: Colors.green,
-                      ),
-                      label: Text(story.chipLabel),
-                      backgroundColor: Theme.of(context)
-                          .colorScheme
-                          .surfaceVariant,
-                    );
-                  }).toList(),
-                ),
-              ),
             ],
           ],
 
+          const SizedBox(height: 12),
+
+          // 🆕 Posts section header (more prominent, card-like)
           Padding(
-            padding: const EdgeInsets.only(left: 28.0, top: 28.0),
-            child: Text(
-              "Posts",
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.primary,
+            padding: const EdgeInsets.symmetric(horizontal: 20.0),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: () {
+                final willShow = !_showPosts;
+
+                setState(() {
+                  _showPosts = willShow;
+                });
+
+                // When opening posts → scroll a bit so they come into view
+                if (willShow) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!_scrollController.hasClients) return;
+                    final current = _scrollController.offset;
+                    _scrollController.animateTo(
+                      current + 140, // tweak this value if needed
+                      duration: const Duration(milliseconds: 260),
+                      curve: Curves.easeOut,
+                    );
+                  });
+                }
+              },
+              child: Container(
+                padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .surfaceVariant
+                      .withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  children: [
+                    // Icon to suggest expandability
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0.12),
+                      ),
+                      child: Icon(
+                        Icons.article_outlined,
+                        size: 18,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+
+                    // Texts
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Posts",
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            postCount == 0
+                                ? "Tap to view posts"
+                                : "$postCount post${postCount == 1 ? '' : 's'} • tap to view",
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primary
+                                  .withValues(alpha: 0.75),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(width: 8),
+
+                    // Arrow in a pill to make it look like a control
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(999),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0.08),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _showPosts ? "Hide" : "Show",
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            _showPosts
+                                ? Icons.keyboard_arrow_up_rounded
+                                : Icons.keyboard_arrow_down_rounded,
+                            size: 18,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
 
-          // list of posts from user
-          allUserPosts.isEmpty
-              ?
-          // user posts is empty
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.all(14.0),
-              child: Text(
-                "No posts yet..",
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.primary,
+          const SizedBox(height: 8),
+
+          // 🆕 Posts dropdown content
+          if (_showPosts)
+            (allUserPosts.isEmpty
+                ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(14.0),
+                child: Text(
+                  "No posts yet..",
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
                 ),
               ),
-            ),
-          )
-              :
-          // user posts is NOT empty
-          ListView.builder(
-            itemCount: allUserPosts.length,
-            physics: const NeverScrollableScrollPhysics(),
-            shrinkWrap: true,
-            itemBuilder: (context, index) {
-              // get individual post
-              final post = allUserPosts[index];
-              return MyPostTile(
-                post: post,
-                onPostTap: () => goPostPage(context, post),
-                scaffoldContext: context,
-              );
-            },
-          ),
+            )
+                : ListView.builder(
+              itemCount: allUserPosts.length,
+              physics: const NeverScrollableScrollPhysics(),
+              shrinkWrap: true,
+              itemBuilder: (context, index) {
+                final post = allUserPosts[index];
+                return MyPostTile(
+                  post: post,
+                  onPostTap: () => goPostPage(context, post),
+                  scaffoldContext: context,
+                );
+              },
+            )),
         ],
       );
     }
 
-    //SCAFFOLD
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-
-      // ✅ Show AppBar ONLY when viewing another user's profile
       appBar: widget.userId != currentUserId
           ? AppBar(
-        foregroundColor:
-        Theme.of(context).colorScheme.primary,
+        foregroundColor: Theme.of(context).colorScheme.primary,
       )
           : null,
-
-      // Body (one of: loading / not-found / full profile)
       body: bodyChild,
     );
   }

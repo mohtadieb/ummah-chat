@@ -226,34 +226,40 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
                 ),
               ),
             )
-                : ListView.separated(
-              keyboardDismissBehavior:
-              ScrollViewKeyboardDismissBehavior.onDrag,
-              itemCount: joinedCommunities.length,
-              separatorBuilder: (_, __) =>
-              const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                final community = joinedCommunities[index];
+                : ScrollConfiguration(
+              // ✅ Disable stretch / weird independent text movement
+              behavior: ScrollConfiguration.of(context)
+                  .copyWith(overscroll: false),
+              child: ListView.separated(
+                physics: const ClampingScrollPhysics(),
+                keyboardDismissBehavior:
+                ScrollViewKeyboardDismissBehavior.onDrag,
+                itemCount: joinedCommunities.length,
+                separatorBuilder: (_, __) =>
+                const SizedBox(height: 10),
+                itemBuilder: (context, index) {
+                  final community = joinedCommunities[index];
 
-                return MyCommunityTile(
-                  name: community['name'] ?? '',
-                  description: community['description'],
-                  country: community['country'],
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => CommunityPostsPage(
-                          communityId: community['id'],
-                          communityName: community['name'] ?? '',
-                          communityDescription:
-                          community['description'],
+                  return MyCommunityTile(
+                    name: community['name'] ?? '',
+                    description: community['description'],
+                    country: community['country'],
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => CommunityPostsPage(
+                            communityId: community['id'],
+                            communityName: community['name'] ?? '',
+                            communityDescription:
+                            community['description'],
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                );
-              },
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ),
         ],

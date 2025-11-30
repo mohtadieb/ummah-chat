@@ -3,36 +3,28 @@ COMMENT TILE
 
 This is the comment tile widget which belongs below a post. It's similar to the
 post tile widget, but styled more like Instagram comments.
-
---------------------------------------------------------------------------------
-
-To use this widget, you need:
-
-- the comment
-- a function (for when the user taps and wants to go to the user profile of this
-  comment)
-
-Displays a single comment with options to delete, report, or block depending on ownership.
 */
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../helper/time_ago_text.dart';
 import '../models/comment.dart';
 import '../services/auth/auth_service.dart';
 import '../services/database/database_provider.dart';
 import 'my_confirmation_box.dart';
+import '../components/my_input_alert_box.dart'; // 👈 NEW
 
 class MyCommentTile extends StatefulWidget {
   final Comment comment;
   final void Function()? onUserTap;
-  final BuildContext scaffoldContext; // add this
+  final BuildContext scaffoldContext; // context with ScaffoldMessenger
 
   const MyCommentTile({
     super.key,
     required this.comment,
     required this.onUserTap,
-    required this.scaffoldContext, // add required
+    required this.scaffoldContext,
   });
 
   @override
@@ -42,61 +34,68 @@ class MyCommentTile extends StatefulWidget {
 class _MyCommentTileState extends State<MyCommentTile> {
   // providers
   late final listeningProvider = Provider.of<DatabaseProvider>(context);
-  late final databaseProvider = Provider.of<DatabaseProvider>(
-    context,
-    listen: false,
-  );
+  late final databaseProvider =
+  Provider.of<DatabaseProvider>(context, listen: false);
 
-  /// Show options for this comment: delete (own), report/block (others)
+  // reply text controller
+  final TextEditingController _replyController = TextEditingController();
+
+  @override
+  void dispose() {
+    _replyController.dispose();
+    super.dispose();
+  }
+
+  /// Show options for this comment: reply, delete (own), report/block (others)
   void _showOptions(BuildContext context) {
-    // check if this comment is owned by the user or not
     final currentUserId = AuthService().getCurrentUserId();
     final isOwnComment = widget.comment.userId == currentUserId;
 
-    // show options
     showModalBottomSheet(
       context: context,
-      builder: (context) {
+      builder: (sheetContext) {
         return SafeArea(
           child: Wrap(
             children: [
-              // THIS COMMENT BELONGS TO USER
+              // REPLY (for everyone)
+              ListTile(
+                leading: const Icon(Icons.reply_outlined),
+                title: const Text("Reply"),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _openReplyBox();
+                },
+              ),
+
               if (isOwnComment) ...[
-                // delete comment button
+                // OWN COMMENT: delete
                 ListTile(
                   leading: const Icon(Icons.delete),
                   title: const Text("Delete"),
                   onTap: () async {
-                    // pop option box
-                    Navigator.pop(context);
+                    Navigator.pop(sheetContext);
 
-                    // handle delete action
                     await databaseProvider.deleteComment(
                       widget.comment.id,
                       widget.comment.postId,
                     );
                   },
                 ),
-                // THIS COMMENT DOES NOT BELONG TO USER
               ] else ...[
-                // report comment button
+                // NOT OWN COMMENT: report / block
                 ListTile(
                   leading: const Icon(Icons.report),
                   title: const Text("Report"),
                   onTap: () {
-                    // pop option box
-                    Navigator.pop(context);
+                    Navigator.pop(sheetContext);
                     _reportPostConfirmationBox();
                   },
                 ),
-
-                // block user button
                 ListTile(
                   leading: const Icon(Icons.block),
                   title: const Text("Block"),
                   onTap: () {
-                    // pop option box
-                    Navigator.pop(context);
+                    Navigator.pop(sheetContext);
                     _blockUserConfirmationBox();
                   },
                 ),
@@ -106,13 +105,71 @@ class _MyCommentTileState extends State<MyCommentTile> {
               ListTile(
                 leading: const Icon(Icons.cancel),
                 title: const Text("Cancel"),
-                onTap: () => Navigator.pop(context),
+                onTap: () => Navigator.pop(sheetContext),
               ),
             ],
           ),
         );
       },
     );
+  }
+
+  /// Open reply input dialog with @username prefilled
+  void _openReplyBox() {
+    final messenger = ScaffoldMessenger.maybeOf(widget.scaffoldContext);
+
+    // prefill with @username
+    _replyController.text = '@${widget.comment.username} ';
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => MyInputAlertBox(
+        textController: _replyController,
+        hintText: "Write a reply",
+        onPressedText: "Reply",
+        onPressed: () async {
+          final text = _replyController.text.trim();
+
+          if (text.replaceAll(RegExp(r'\s+'), '').length < 2) {
+            messenger?.showSnackBar(
+              const SnackBar(
+                content: Text("Reply must be at least 2 characters"),
+              ),
+            );
+            return;
+          }
+
+          await _sendReply();
+        },
+      ),
+    );
+  }
+
+  Future<void> _sendReply() async {
+    final text = _replyController.text.trim();
+    if (text.isEmpty) return;
+
+    try {
+      // Save as a normal comment on the same post, but with @username at start
+      await databaseProvider.addComment(
+        widget.comment.postId,
+        text,
+      );
+
+      // OPTIONAL: if addComment returns the created comment id, you can:
+      // final newCommentId = await databaseProvider.addComment(...);
+      // await databaseProvider.notifyCommentReply(
+      //   repliedToUserId: widget.comment.userId,
+      //   postId: widget.comment.postId,
+      //   parentCommentId: widget.comment.id,
+      //   newCommentId: newCommentId,
+      // );
+
+    } catch (e) {
+      debugPrint('Error sending reply: $e');
+    } finally {
+      _replyController.clear();
+    }
   }
 
   void _reportPostConfirmationBox() {
@@ -157,9 +214,8 @@ class _MyCommentTileState extends State<MyCommentTile> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
-      // Similar spacing to IG comments
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      color: colorScheme.surface, // keep consistent with post background
+      color: colorScheme.surface,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -184,7 +240,7 @@ class _MyCommentTileState extends State<MyCommentTile> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // username + comment in one line (Instagram style)
+                // username + comment
                 GestureDetector(
                   onTap: widget.onUserTap,
                   child: RichText(
@@ -212,7 +268,7 @@ class _MyCommentTileState extends State<MyCommentTile> {
 
                 const SizedBox(height: 2),
 
-                // time ago (small & subtle)
+                // time ago
                 TimeAgoText(
                   createdAt: widget.comment.createdAt,
                   style: TextStyle(

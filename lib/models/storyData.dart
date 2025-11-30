@@ -1,4 +1,4 @@
-// lib/models/story_models.dart
+// lib/models/storyData.dart
 import 'package:flutter/material.dart';
 
 class StoryData {
@@ -10,6 +10,8 @@ class StoryData {
   final String body;
   final IconData icon;
   final List<QuizQuestion> questions;
+  final String? cardPreview;
+
 
   const StoryData({
     required this.id,
@@ -20,6 +22,7 @@ class StoryData {
     required this.body,
     required this.icon,
     required this.questions,
+    this.cardPreview, // 🆕
   });
 }
 

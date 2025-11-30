@@ -31,6 +31,13 @@ class CommunityPostsPage extends StatefulWidget {
 }
 
 class _CommunityPostsPageState extends State<CommunityPostsPage> {
+  // Extra safety to avoid setState after dispose
+  @override
+  void setState(VoidCallback fn) {
+    if (!mounted) return;
+    super.setState(fn);
+  }
+
   // Provider (non-listening)
   late final DatabaseProvider databaseProvider = Provider.of<DatabaseProvider>(
     context,
@@ -76,7 +83,7 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
       final members = rawMembers.map((member) {
         final createdAt = member['created_at'] != null
             ? DateTime.tryParse(member['created_at'].toString()) ??
-                  DateTime.now()
+            DateTime.now()
             : DateTime.now();
 
         return UserProfile(
@@ -90,14 +97,12 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
         );
       }).toList();
 
-      if (!mounted) return;
       setState(() {
         _members = members;
         _isLoadingMembers = false;
       });
     } catch (e) {
       debugPrint('Error loading community members: $e');
-      if (!mounted) return;
       setState(() {
         _isLoadingMembers = false;
       });
@@ -105,7 +110,7 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
   }
 
   Future<void> _openMembersBottomSheet() async {
-    // Ensure we have up to date data before showing
+    // Ensure we have up-to-date data before showing
     await _loadMembers();
     if (!mounted) return;
 
@@ -159,7 +164,6 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
   Future<void> _loadMembershipState() async {
     try {
       final isJoined = await databaseProvider.isMember(widget.communityId);
-      if (!mounted) return;
       setState(() {
         _isJoined = isJoined;
       });
@@ -263,78 +267,106 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
       return;
     }
 
+    final messenger = ScaffoldMessenger.maybeOf(context);
     final TextEditingController messageController = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => MyInputAlertBox(
-          textController: messageController,
-          hintText: "Share something with ${widget.communityName}…",
-          onPressedText: "Post",
-          onPressed: () async {
-            final message = messageController.text.trim();
-            if (message.replaceAll(RegExp(r'\s+'), '').length < 2) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text("Your message must have at least 2 characters"),
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (innerContext, setInnerState) => MyInputAlertBox(
+            textController: messageController,
+            hintText: "Share something with ${widget.communityName}…",
+            onPressedText: "Post",
+            onPressed: () async {
+              final message = messageController.text.trim();
+              if (message.replaceAll(RegExp(r'\s+'), '').length < 2) {
+                messenger?.showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      "Your message must have at least 2 characters",
+                    ),
+                  ),
+                );
+
+                // Clear selected image after invalid post
+                setInnerState(() {
+                  _selectedImage = null;
+                });
+                return;
+              }
+
+              try {
+                // Post the message to this community (with optional image)
+                await _postMessage(
+                  message,
+                  communityId: widget.communityId,
+                  imageFile: _selectedImage,
+                );
+
+                messageController.clear();
+
+                // ✅ SUCCESS SNACKBAR
+                messenger?.showSnackBar(
+                  const SnackBar(
+                    content: Text("Post uploaded successfully!"),
+                  ),
+                );
+
+                // ❌ No Navigator.pop here – let MyInputAlertBox handle closing
+              } catch (e) {
+                debugPrint('Error posting community message: $e');
+                messenger?.showSnackBar(
+                  const SnackBar(
+                    content: Text('Failed to post. Please try again.'),
+                  ),
+                );
+              }
+            },
+            extraWidget: Column(
+              children: [
+                if (_selectedImage != null)
+                  Image.file(
+                    _selectedImage!,
+                    height: 150,
+                    fit: BoxFit.cover,
+                  ),
+                TextButton.icon(
+                  icon: const Icon(Icons.image),
+                  label: const Text("Add Image"),
+                  onPressed: () async {
+                    final picker = ImagePicker();
+                    final picked = await picker.pickImage(
+                      source: ImageSource.gallery,
+                    );
+                    if (picked != null) {
+                      setInnerState(() {
+                        _selectedImage = File(picked.path);
+                      });
+                    }
+                  },
                 ),
-              );
-
-              // Clear selected image after invalid post
-              setState(() {
-                _selectedImage = null;
-              });
-              return;
-            }
-
-            // Post the message to this community (with optional image)
-            await _postMessage(
-              message,
-              communityId: widget.communityId,
-              imageFile: _selectedImage,
-            );
-
-            if (!mounted) return;
-            Navigator.pop(context);
-          },
-          extraWidget: Column(
-            children: [
-              if (_selectedImage != null)
-                Image.file(_selectedImage!, height: 150, fit: BoxFit.cover),
-              TextButton.icon(
-                icon: const Icon(Icons.image),
-                label: const Text("Add Image"),
-                onPressed: () async {
-                  final picker = ImagePicker();
-                  final picked = await picker.pickImage(
-                    source: ImageSource.gallery,
-                  );
-                  if (picked != null) {
-                    setState(() {
-                      _selectedImage = File(picked.path);
-                    });
-                  }
-                },
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
   Future<void> _postMessage(
-    String message, {
-    required String communityId,
-    File? imageFile,
-  }) async {
+      String message, {
+        required String communityId,
+        File? imageFile,
+      }) async {
     // Uses updated DatabaseProvider.postMessage with optional communityId
     await databaseProvider.postMessage(
       message,
       imageFile: imageFile,
       communityId: communityId,
     );
+
+    if (!mounted) return;
 
     setState(() {
       _selectedImage = null;
@@ -482,10 +514,10 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
       // FAB to create a new community post — only for members
       floatingActionButton: _isJoined
           ? FloatingActionButton(
-              onPressed: _openPostMessageBox,
-              backgroundColor: colorScheme.primary,
-              child: const Icon(Icons.add),
-            )
+        onPressed: _openPostMessageBox,
+        backgroundColor: colorScheme.primary,
+        child: const Icon(Icons.add),
+      )
           : null,
 
       body: Column(
