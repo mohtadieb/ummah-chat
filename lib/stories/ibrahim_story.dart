@@ -1,6 +1,6 @@
 // lib/pages/ibrahim_story.dart  (or lib/stories/ibrahim_story.dart)
 import 'package:flutter/material.dart';
-import '../models/storyData.dart';
+import '../models/story_data.dart';
 import 'stories_page.dart';
 
 const StoryData ibrahimStory = StoryData(

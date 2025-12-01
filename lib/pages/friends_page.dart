@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:ummah_chat/models/user.dart';
+import 'package:ummah_chat/models/user_profile.dart';
 import 'package:ummah_chat/services/auth/auth_service.dart';
 import 'package:provider/provider.dart';
 

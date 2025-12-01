@@ -1,7 +1,7 @@
 // lib/helper/likes_bottom_sheet_helper.dart
 import 'package:flutter/material.dart';
 
-import '../models/user.dart';
+import '../models/user_profile.dart';
 
 /// Helper for showing a unified "Liked by" bottom sheet in
 /// both DMs and group chats.

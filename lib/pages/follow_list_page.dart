@@ -10,7 +10,7 @@ This page displays a tab bar for a given uid:
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../components/my_user_tile.dart';
-import '../models/user.dart';
+import '../models/user_profile.dart';
 import '../services/database/database_provider.dart';
 
 class FollowListPage extends StatefulWidget {

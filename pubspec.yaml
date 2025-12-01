@@ -36,6 +36,8 @@ dependencies:
   video_player: ^2.10.1   # or latest
   video_thumbnail: ^0.5.3
   video_compress: ^3.1.2
+  image_cropper: ^7.0.0      # or latest compatible version
+
 
   # Voice recording
   flutter_sound: ^9.2.13
@@ -51,6 +53,8 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   shared_preferences: ^2.2.0
+  url_launcher: ^6.3.0
+
 
 
 dev_dependencies:
@@ -78,6 +82,13 @@ flutter_icons:
 flutter:
   assets:
     - assets/login_page_image_green.png
+    - assets/audio/profile_song_1.wav
+    - assets/audio/profile_song_2.mp3
+    - assets/audio/profile_song_3.mp3
+    - assets/audio/profile_song_4.mp3
+    - assets/audio/profile_song_5.mp3
+    - assets/audio/profile_song_6.mp3
+    - assets/audio/profile_song_7.mp3
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

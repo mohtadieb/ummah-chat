@@ -10,11 +10,11 @@ import 'pages/settings_page.dart';
 import 'services/auth/auth_gate.dart';
 import 'services/database/database_provider.dart';
 import 'themes/theme_provider.dart';
+import 'services/navigation/bottom_nav_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Supabase
   await Supabase.initialize(
     url: 'https://njotewktazwhoprvhsvj.supabase.co',
     anonKey:
@@ -27,6 +27,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => DatabaseProvider()),
         ChangeNotifierProvider(create: (_) => ChatProvider()),
+        ChangeNotifierProvider(create: (_) => BottomNavProvider()),
       ],
       child: const MyApp(),
     ),
@@ -39,8 +40,6 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final _auth = Supabase.instance.client.auth;
-
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -49,9 +48,8 @@ class MyApp extends StatelessWidget {
       routes: {
         '/': (context) => const AuthGate(),
         '/home': (context) => const HomePage(),
-        '/profile': (context) => ProfilePage(userId: _auth.currentUser!.id,),
         '/search': (context) => const SearchPage(),
-        '/settings': (context) => SettingsPage(),
+        '/settings': (context) => const SettingsPage(),
       },
     );
   }

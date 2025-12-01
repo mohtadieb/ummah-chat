@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:ummah_chat/components/my_loading_circle.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart'; // 👈 NEW
 
 import '../components/my_dialogs.dart';
 import '../components/my_settings_tile.dart';
@@ -72,7 +73,6 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
 
-
   TextStyle _sectionTitleStyle(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return TextStyle(
@@ -82,6 +82,35 @@ class _SettingsPageState extends State<SettingsPage> {
       color: colorScheme.primary.withValues(alpha: 0.7),
     );
   }
+
+  Future<void> _openDonateLink() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Support Ummah Chat'),
+        content: const Text('You’ll be redirected to PayPal to make a donation.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final uri = Uri.parse(
+      'https://www.paypal.com/donate/?hosted_button_id=USB86WSASURYG',
+    );
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -170,6 +199,29 @@ class _SettingsPageState extends State<SettingsPage> {
                 onPressed: () => goAccountSettingsPage(context),
               ),
             ),
+
+            const SizedBox(height: 24),
+
+            // SUPPORT SECTION 🇵🇸🤍
+            Text(
+              'Support',
+              style: _sectionTitleStyle(context),
+            ),
+            const SizedBox(height: 10),
+
+            MySettingsTile(
+              title: "Donate",
+              leadingIcon: Icons.favorite_outline,
+              onTap: IconButton(
+                icon: Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 18,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                onPressed: _openDonateLink,
+              ),
+            ),
+
 
             const SizedBox(height: 32),
 

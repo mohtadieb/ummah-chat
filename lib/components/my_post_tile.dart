@@ -7,6 +7,9 @@ import '../services/database/database_provider.dart';
 import '../components/my_input_alert_box.dart';
 import '../services/auth/auth_service.dart';
 import 'my_confirmation_box.dart';
+import '../pages/profile_page.dart'; // 👈 NEW
+import '../services/navigation/bottom_nav_provider.dart'; // 👈 ADD
+
 
 class MyPostTile extends StatefulWidget {
   final Post post;
@@ -232,6 +235,28 @@ class _MyPostTileState extends State<MyPostTile> {
     );
   }
 
+  /// Handle tapping on avatar/name
+  void _handleUserTap() {
+    final currentUserId = AuthService().getCurrentUserId();
+
+    // If it's someone else → use parent-provided navigation
+    if (widget.post.userId != currentUserId) {
+      if (widget.onUserTap != null) {
+        widget.onUserTap!();
+      }
+      return;
+    }
+
+    // 👉 If it's your own post → switch bottom nav to Profile tab
+    final bottomNav =
+    Provider.of<BottomNavProvider>(context, listen: false);
+
+    // 3 = index of Profile tab in MainLayout's BottomNavigationBar
+    bottomNav.setIndex(3);
+    // No push, no new ProfilePage → it will reuse the existing tab instance
+  }
+
+
   Widget _buildHeader(BuildContext context) {
     final theme = Theme.of(context);
 
@@ -240,7 +265,7 @@ class _MyPostTileState extends State<MyPostTile> {
       child: Row(
         children: [
           GestureDetector(
-            onTap: widget.onUserTap,
+            onTap: _handleUserTap, // 👈 changed
             child: Row(
               children: [
                 CircleAvatar(
@@ -401,8 +426,8 @@ class _MyPostTileState extends State<MyPostTile> {
         onTap: widget.onPostTap,
         child: Card(
           elevation: theme.brightness == Brightness.dark ? 0.5 : 1.5,
-          shadowColor:
-          theme.colorScheme.shadow.withOpacity(theme.brightness == Brightness.dark ? 0.25 : 0.18),
+          shadowColor: theme.colorScheme.shadow
+              .withOpacity(theme.brightness == Brightness.dark ? 0.25 : 0.18),
           color: theme.colorScheme.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(22),
@@ -445,9 +470,10 @@ class _MyPostTileState extends State<MyPostTile> {
                 const SizedBox(height: 4),
 
                 // caption
-// Only show caption if there is an image;
-// for pure text posts it's already shown inside _buildImageOrText
-                if (widget.post.imageUrl != null && widget.post.message.isNotEmpty)
+                // Only show caption if there is an image;
+                // for pure text posts it's already shown inside _buildImageOrText
+                if (widget.post.imageUrl != null &&
+                    widget.post.message.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     child: RichText(
@@ -498,7 +524,8 @@ class _MyPostTileState extends State<MyPostTile> {
                   child: TimeAgoText(
                     createdAt: widget.post.createdAt,
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.primary.withOpacity(0.8),
+                      color:
+                      theme.colorScheme.primary.withOpacity(0.8),
                       letterSpacing: 0.2,
                     ),
                   ),

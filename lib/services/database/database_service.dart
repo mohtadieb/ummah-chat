@@ -1,3 +1,5 @@
+// lib/services/database/database_service.dart
+
 /*
 
 DATABASE SERVICE
@@ -23,8 +25,10 @@ import 'package:ummah_chat/services/auth/auth_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/comment.dart';
 import '../../models/post.dart';
-import '../../models/user.dart';
+import '../../models/user_profile.dart';
 import '../notification_service.dart';
+import 'dart:typed_data';
+
 
 // 🆕 Notifications
 
@@ -92,6 +96,49 @@ class DatabaseService {
     }
   }
 
+
+  Future<String?> uploadProfilePhotoToDatabase(Uint8List bytes, String userId) async {
+    try {
+      // 🔹 only the *path inside the bucket*, no bucket name here
+      final filePath = '$userId-${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+      final response = await _db.storage
+          .from('profile_photos') // 👈 bucket name
+          .uploadBinary(
+        filePath,
+        bytes,
+        fileOptions: const FileOptions(
+          upsert: true,
+          contentType: 'image/jpeg',
+        ),
+      );
+
+      if (response != null) {
+        final url = _db.storage.from('profile_photos').getPublicUrl(filePath);
+        print('✅ Profile photo URL: $url');
+        return url;
+      }
+    } catch (e) {
+      print("Error uploading profile picture: $e");
+    }
+    return null;
+  }
+
+
+
+  Future<void> updateUserProfilePhotoInDatabase(String url) async {
+    final userId = _auth.currentUser?.id;
+    if (userId == null) return;
+
+    try {
+      await _db.from('profiles').update({
+        'profile_photo_url': url,
+      }).eq('id', userId);
+    } catch (e) {
+      print("Error updating profile picture in DB: $e");
+    }
+  }
+
   /// Update user bio
   Future<void> updateUserBioInDatabase(String bio) async {
     // Get current user Id
@@ -103,6 +150,42 @@ class DatabaseService {
       print("Error updating bio: $e");
     }
   }
+
+  /// Update the selected profile song for the current user
+  Future<void> updateUserProfileSong(String songId) async {
+    final currentUserId = _auth.currentUser?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return;
+
+    try {
+      await _db
+          .from('profiles')
+          .update({'profile_song_id': songId})
+          .eq('id', currentUserId);
+    } catch (e) {
+      print('Error updating profile song: $e');
+    }
+  }
+
+  /// Update the About Me section
+  Future<void> updateUserAboutMeInDatabase({
+    required String? fromLocation,
+    required List<String> languages,
+    required List<String> interests,
+  }) async {
+    final currentUserId = _auth.currentUser?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return;
+
+    try {
+      await _db.from('profiles').update({
+        'from_location': fromLocation,
+        'languages': languages,
+        'interests': interests,
+      }).eq('id', currentUserId);
+    } catch (e) {
+      print("Error updating About Me: $e");
+    }
+  }
+
 
   /* ==================== POSTS ==================== */
 
@@ -161,8 +244,7 @@ class DatabaseService {
   }
 
   /// Delete a post
-  Future<void> deletePostFromDatabase(String postId,
-      {String? imagePath}) async {
+  Future<void> deletePostFromDatabase(String postId, {String? imagePath}) async {
     try {
       // 1️⃣ Delete image from Supabase Storage if provided
       if (imagePath != null && imagePath.isNotEmpty) {
@@ -772,8 +854,7 @@ class DatabaseService {
 
       // ✅ Filter to only rows involving the current user
       final filtered = rows.where((row) {
-        return row['requester_id'] == userId ||
-            row['addressee_id'] == userId;
+        return row['requester_id'] == userId || row['addressee_id'] == userId;
       }).toList();
 
       debugPrint('🔍 filtered friendships for $userId: ${filtered.length}');
@@ -794,6 +875,43 @@ class DatabaseService {
 
       debugPrint(
           '✅ friendsStreamFromDatabase returning ${profiles.length} profiles');
+      return profiles;
+    });
+  }
+
+  // 🔄 New: realtime friends stream for ANY user (not just current user)
+  Stream<List<UserProfile>> friendsStreamForUserFromDatabase(
+      String profileUserId) {
+    if (profileUserId.isEmpty) {
+      return const Stream.empty();
+    }
+
+    return _db
+        .from('friendships')
+        .stream(primaryKey: ['id'])
+        .eq('status', 'accepted')
+        .asyncMap((rows) async {
+      // Only friendships where this profile user is involved
+      final filtered = rows.where((row) {
+        final requester = row['requester_id']?.toString();
+        final addressee = row['addressee_id']?.toString();
+        return requester == profileUserId || addressee == profileUserId;
+      }).toList();
+
+      // Determine "the other person" in each friendship
+      final friendIds = filtered.map<String>((row) {
+        final requester = row['requester_id'] as String;
+        final addressee = row['addressee_id'] as String;
+        return requester == profileUserId ? addressee : requester;
+      }).toSet().toList(); // unique
+
+      // Load profiles for each friend
+      final profiles = <UserProfile>[];
+      for (final fid in friendIds) {
+        final profile = await getUserFromDatabase(fid);
+        if (profile != null) profiles.add(profile);
+      }
+
       return profiles;
     });
   }
@@ -1029,8 +1147,8 @@ class DatabaseService {
         'id': c['id'],
         'name': c['name'],
         'description': c['description'],
-        'is_joined': (c['members'] as List)
-            .any((m) => m['user_id'] == userId),
+        'is_joined':
+        (c['members'] as List).any((m) => m['user_id'] == userId),
       })
           .toList();
     } catch (e) {
@@ -1071,11 +1189,11 @@ class DatabaseService {
 
       // Step 2: Fetch full profiles from profiles table
       // Using filter 'id' in array
-      final profiles = await _db
-          .from('profiles')
-          .select()
-          .filter('id', 'in',
-          '(${userIds.join(',')})'); // Supabase requires string like "(id1,id2)"
+      final profiles = await _db.from('profiles').select().filter(
+        'id',
+        'in',
+        '(${userIds.join(',')})',
+      ); // Supabase requires string like "(id1,id2)"
 
       return List<Map<String, dynamic>>.from(profiles);
     } catch (e) {
@@ -1162,7 +1280,6 @@ class DatabaseService {
       return [];
     }
   }
-
 
   /// Load saved answers for the current user & story.
   ///

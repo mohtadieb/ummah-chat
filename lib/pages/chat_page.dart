@@ -19,7 +19,7 @@ import '../helper/message_grouping.dart';
 import '../helper/voice_recorder_helper.dart';
 import '../helper/likes_bottom_sheet_helper.dart';
 import '../models/message.dart';
-import '../models/user.dart';
+import '../models/user_profile.dart';
 import '../services/chat/chat_provider.dart';
 import '../services/chat/chat_service.dart';
 import '../services/database/database_service.dart';

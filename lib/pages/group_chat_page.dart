@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/message.dart';
-import '../models/user.dart';
+import '../models/user_profile.dart';
 import '../services/auth/auth_service.dart';
 import '../services/chat/chat_provider.dart';
 import '../services/chat/chat_service.dart';

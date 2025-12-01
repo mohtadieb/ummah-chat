@@ -1,7 +1,7 @@
 
 import 'package:ummah_chat/stories/sulayman_story.dart';
 
-import '../models/storyData.dart';
+import '../models/story_data.dart';
 import '../stories/nuh_story.dart';
 import '../stories/yunus_story.dart';
 import '../stories/yusuf_story.dart';

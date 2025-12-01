@@ -5,7 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/post.dart';
-import '../../models/user.dart';
+import '../../models/user_profile.dart';
 import '../../services/database/database_provider.dart';
 import '../../components/my_input_alert_box.dart';
 import '../../components/my_post_tile.dart';

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/storyData.dart';
+import '../models/story_data.dart';
 
 const StoryData nuhStory = StoryData(
   id: 'nuh',

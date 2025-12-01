@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/user.dart';
+import '../models/user_profile.dart';
 import 'my_card_tile.dart';
 
 class MyFriendTile extends StatelessWidget {

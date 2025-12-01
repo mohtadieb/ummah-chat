@@ -1,3 +1,5 @@
+// lib/services/database/database_provider.dart
+
 /*
 DATABASE PROVIDER
 
@@ -23,7 +25,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/comment.dart';
 import '../../models/post.dart';
-import '../../models/user.dart';
+import '../../models/user_profile.dart';
 import '../auth/auth_service.dart';
 import 'database_service.dart';
 
@@ -38,8 +40,39 @@ class DatabaseProvider extends ChangeNotifier {
   Future<UserProfile?> getUserProfile(String userId) =>
       _db.getUserFromDatabase(userId);
 
+  Future<void> updateProfilePhoto(Uint8List bytes) async {
+    final userId = _auth.getCurrentUserId();
+    if (userId == null) return;
+
+    final url = await _db.uploadProfilePhotoToDatabase(bytes, userId);
+    if (url != null) {
+      await _db.updateUserProfilePhotoInDatabase(url);
+    }
+  }
+
+
   /// Update user bio
   Future<void> updateBio(String bio) => _db.updateUserBioInDatabase(bio);
+
+  /// Update profile song
+  Future<void> updateProfileSong(String songId) =>
+      _db.updateUserProfileSong(songId);
+
+  /// Update about me
+  Future<void> updateAboutMe({
+    required String? fromLocation,
+    required List<String> languages,
+    required List<String> interests,
+  }) async {
+    await _db.updateUserAboutMeInDatabase(
+      fromLocation: fromLocation,
+      languages: languages,
+      interests: interests,
+    );
+  }
+
+
+
 
   /* ==================== POSTS ==================== */
 
@@ -91,10 +124,7 @@ class DatabaseProvider extends ChangeNotifier {
       // 5️⃣ Load which posts are liked by the current user (from post_likes)
       final currentUserId = _auth.getCurrentUserId();
       if (currentUserId.isNotEmpty && _allPosts.isNotEmpty) {
-        final postIds = _allPosts
-            .map((p) => p.id)
-            .whereType<String>()
-            .toList();
+        final postIds = _allPosts.map((p) => p.id).whereType<String>().toList();
 
         _likedPosts =
         await _db.getLikedPostIdsFromDatabase(currentUserId, postIds);
@@ -134,9 +164,8 @@ class DatabaseProvider extends ChangeNotifier {
       final followingUserIds = await _db.getFollowingFromDatabase(currentUserId);
 
       // filter all the posts to be the ones for the following tab
-      _followingPosts = _allPosts
-          .where((post) => followingUserIds.contains(post.userId))
-          .toList();
+      _followingPosts =
+          _allPosts.where((post) => followingUserIds.contains(post.userId)).toList();
 
       // update UI
       notifyListeners();
@@ -384,6 +413,11 @@ class DatabaseProvider extends ChangeNotifier {
   /// Get friend stream for current user (for FriendsPage)
   Stream<List<UserProfile>> friendsStream() {
     return _db.friendsStreamFromDatabase();
+  }
+
+  /// Friends stream for ANY user profile (used to show friends on their profile)
+  Stream<List<UserProfile>> friendsStreamForUser(String userId) {
+    return _db.friendsStreamForUserFromDatabase(userId);
   }
 
   /* ==================== FOLLOWERS / FOLLOWING ==================== */
@@ -807,8 +841,6 @@ class DatabaseProvider extends ChangeNotifier {
     }
   }
 
-
-
   /// Fetch completed story IDs for any user (used for profile pages)
   Future<List<String>> getCompletedStoriesForUser(String userId) async {
     try {
@@ -828,8 +860,6 @@ class DatabaseProvider extends ChangeNotifier {
       return {};
     }
   }
-
-
 
   /* ==================== LOG OUT ==================== */
 

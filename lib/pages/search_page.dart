@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../components/my_user_tile.dart';
 import '../components/my_search_bar.dart';
-import '../models/user.dart';
+import '../models/user_profile.dart';
 import '../services/database/database_provider.dart';
 
 class SearchPage extends StatefulWidget {

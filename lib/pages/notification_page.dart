@@ -184,7 +184,6 @@ class _NotificationPageState extends State<NotificationPage> {
       itemBuilder: (context, index) {
         final n = _notifications[index];
 
-        // 🔧 Use trimmed body for routing, keep raw for legacy display
         final rawBody = n.body ?? '';
         final body = rawBody.trim();
         final isUnread = !n.isRead;
@@ -194,6 +193,7 @@ class _NotificationPageState extends State<NotificationPage> {
         final isFriendAccepted = body.startsWith('FRIEND_ACCEPTED:');
         final isLike = body.startsWith('LIKE_POST:');
         final isComment = body.startsWith('COMMENT_POST:');
+        final isCommentReply = body.startsWith('COMMENT_REPLY:'); // 👈 NEW
         final isFollow = body.startsWith('FOLLOW_USER:');
 
         String? friendRequesterId;
@@ -202,6 +202,9 @@ class _NotificationPageState extends State<NotificationPage> {
         String? likePreview;
         String? commentPostId;
         String? commentPreview;
+        String? commentReplyPostId;      // 👈 NEW
+        String? commentReplyCommentId;   // 👈 NEW
+        String? commentReplyPreview;     // 👈 NEW
         String? followUserId;
 
         // 🧑‍🤝‍🧑 Friend request → sender
@@ -236,6 +239,15 @@ class _NotificationPageState extends State<NotificationPage> {
           if (parts.length > 1) commentPreview = parts[1];
         }
 
+        // 💬 Comment reply
+        if (isCommentReply) {
+          final rest = body.substring('COMMENT_REPLY:'.length);
+          final parts = rest.split('::');
+          if (parts.isNotEmpty) commentReplyPostId = parts[0];
+          if (parts.length > 1) commentReplyCommentId = parts[1];
+          if (parts.length > 2) commentReplyPreview = parts[2];
+        }
+
         // 👤 Follow (new-style with encoded userId in body)
         if (isFollow) {
           final parts = body.split(':');
@@ -250,9 +262,11 @@ class _NotificationPageState extends State<NotificationPage> {
           subtitleText = likePreview;
         } else if (isComment) {
           subtitleText = commentPreview;
+        } else if (isCommentReply) {
+          subtitleText = commentReplyPreview;
         } else if (!isFriendRequest &&
             !isFriendAccepted &&
-            !isFollow && // 👈 no subtitle for follow; body stays hidden
+            !isFollow &&
             rawBody.isNotEmpty &&
             !rawBody.contains(':')) {
           // legacy / generic text-only notifications (no routing codes)
@@ -265,6 +279,7 @@ class _NotificationPageState extends State<NotificationPage> {
           isFriendAccepted: isFriendAccepted,
           isLike: isLike,
           isComment: isComment,
+          isCommentReply: isCommentReply, // 👈 NEW
           isFollow: isFollow,
         );
 
@@ -399,10 +414,15 @@ class _NotificationPageState extends State<NotificationPage> {
                 );
               }
 
-              // 3) Like or Comment → go to post
-              else if ((isLike || isComment) &&
-                  (likePostId != null || commentPostId != null)) {
-                final postId = isLike ? likePostId : commentPostId;
+              // 3) Like / Comment / Comment reply → go to post
+              else if ((isLike || isComment || isCommentReply) &&
+                  (likePostId != null ||
+                      commentPostId != null ||
+                      commentReplyPostId != null)) {
+                final postId = isLike
+                    ? likePostId
+                    : (isComment ? commentPostId : commentReplyPostId);
+
                 if (postId == null) return;
 
                 final post = await dbProvider.getPostById(postId);
@@ -410,9 +430,10 @@ class _NotificationPageState extends State<NotificationPage> {
                   await goPostPage(
                     context,
                     post,
-                    scrollToComments: isComment,
+                    scrollToComments: isComment || isCommentReply,
                     highlightPost: true,
-                    highlightComments: isComment,
+                    highlightComments: isComment || isCommentReply,
+                    // Later you can add: scrollToCommentId: commentReplyCommentId
                   );
                 } else if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -526,12 +547,13 @@ class _NotificationPageState extends State<NotificationPage> {
     required bool isFriendAccepted,
     required bool isLike,
     required bool isComment,
+    required bool isCommentReply, // 👈 NEW
     required bool isFollow,
   }) {
     if (isFriendRequest) return Icons.person_add_alt_1;
     if (isFriendAccepted) return Icons.handshake;
     if (isLike) return Icons.favorite;
-    if (isComment) return Icons.mode_comment_outlined;
+    if (isComment || isCommentReply) return Icons.mode_comment_outlined;
     if (isFollow) return Icons.person;
     return Icons.notifications;
   }

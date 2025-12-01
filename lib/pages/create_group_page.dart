@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../services/auth/auth_service.dart';
 import '../services/chat/chat_service.dart';
 import '../services/database/database_provider.dart';
-import '../models/user.dart';
+import '../models/user_profile.dart';
 import 'group_chat_page.dart';
 
 /// CREATE GROUP PAGE

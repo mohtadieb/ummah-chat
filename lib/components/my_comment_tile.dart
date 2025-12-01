@@ -13,7 +13,8 @@ import '../models/comment.dart';
 import '../services/auth/auth_service.dart';
 import '../services/database/database_provider.dart';
 import 'my_confirmation_box.dart';
-import '../components/my_input_alert_box.dart'; // 👈 NEW
+import '../components/my_input_alert_box.dart';
+import '../services/notification_service.dart'; // 👈 NEW
 
 class MyCommentTile extends StatefulWidget {
   final Comment comment;
@@ -150,21 +151,29 @@ class _MyCommentTileState extends State<MyCommentTile> {
     if (text.isEmpty) return;
 
     try {
-      // Save as a normal comment on the same post, but with @username at start
+      // 1) Save reply as a normal comment on the same post
       await databaseProvider.addComment(
         widget.comment.postId,
         text,
       );
 
-      // OPTIONAL: if addComment returns the created comment id, you can:
-      // final newCommentId = await databaseProvider.addComment(...);
-      // await databaseProvider.notifyCommentReply(
-      //   repliedToUserId: widget.comment.userId,
-      //   postId: widget.comment.postId,
-      //   parentCommentId: widget.comment.id,
-      //   newCommentId: newCommentId,
-      // );
+      // 2) Create notification for the user who wrote the original comment
+      final currentUserId = AuthService().getCurrentUserId();
 
+      // don't notify yourself when replying to your own comment
+      if (widget.comment.userId != currentUserId) {
+        final preview =
+        text.length > 80 ? '${text.substring(0, 80)}…' : text;
+
+        // BODY FORMAT:
+        // COMMENT_REPLY:<postId>::<commentId>::<preview>
+        await NotificationService().createNotificationForUser(
+          targetUserId: widget.comment.userId,
+          title: 'New reply on your comment',
+          body:
+          'COMMENT_REPLY:${widget.comment.postId}::${widget.comment.id}::$preview',
+        );
+      }
     } catch (e) {
       debugPrint('Error sending reply: $e');
     } finally {

@@ -1,6 +1,6 @@
 // lib/pages/musa_story.dart  (or lib/stories/musa_story.dart if you prefer)
 import 'package:flutter/material.dart';
-import '../models/storyData.dart';
+import '../models/story_data.dart';
 import 'stories_page.dart';
 
 const StoryData musaStory = StoryData(

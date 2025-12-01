@@ -5,7 +5,7 @@ import 'package:ummah_chat/stories/ibrahim_story.dart';
 import 'package:ummah_chat/stories/nuh_story.dart';
 import 'package:ummah_chat/stories/sulayman_story.dart';
 
-import '../models/storyData.dart';
+import '../models/story_data.dart';
 import '../services/database/database_provider.dart';
 import '../services/auth/auth_service.dart';
 import 'stories_page.dart';
