@@ -24,6 +24,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/comment.dart';
+import '../../models/dua.dart';
 import '../../models/post.dart';
 import '../../models/user_profile.dart';
 import '../auth/auth_service.dart';
@@ -892,6 +893,77 @@ class DatabaseProvider extends ChangeNotifier {
       return {};
     }
   }
+
+  /* ==================== DUA WALL ==================== */
+
+  List<Dua> _duaWall = [];
+  List<Dua> get duaWall => _duaWall;
+
+  /// Load all visible duas into local state.
+  ///
+  /// - Filters out duas from blocked users.
+  Future<void> loadDuaWall() async {
+    try {
+      // 1️⃣ Fetch all duas
+      final allDuas = await _db.getDuaWallFromDatabase();
+
+      // 2️⃣ Filter out blocked users from the Dua Wall (same logic as posts)
+      final blockedUserIds = await _db.getBlockedUserIdsFromDatabase();
+
+      _duaWall = allDuas
+          .where((d) => !blockedUserIds.contains(d.userId))
+          .toList();
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading dua wall: $e');
+    }
+  }
+
+  /// Create a new dua and refresh wall.
+  Future<void> createDua({
+    required String text,
+    required bool isAnonymous,
+    required bool isPrivate,
+  }) async {
+    try {
+      await _db.createDuaInDatabase(
+        text: text,
+        isAnonymous: isAnonymous,
+        isPrivate: isPrivate,
+      );
+
+      // Refresh after posting
+      await loadDuaWall();
+    } catch (e) {
+      debugPrint('Error creating dua: $e');
+      rethrow;
+    }
+  }
+
+  /// Toggle Ameen for a specific dua and refresh.
+  ///
+  /// (You can later make this optimistic if you want smoother UX.)
+  Future<void> toggleAmeenForDua(String duaId) async {
+    try {
+      await _db.toggleAmeenForDuaInDatabase(duaId);
+      await loadDuaWall();
+    } catch (e) {
+      debugPrint('Error toggling Ameen for dua $duaId: $e');
+    }
+  }
+
+  /// Delete a dua and refresh the wall.
+  Future<void> deleteDua(String duaId) async {
+    try {
+      await _db.deleteDuaFromDatabase(duaId);
+      await loadDuaWall();
+    } catch (e) {
+      debugPrint('Error deleting dua: $e');
+      rethrow;
+    }
+  }
+
 
   /* ==================== LOG OUT ==================== */
 

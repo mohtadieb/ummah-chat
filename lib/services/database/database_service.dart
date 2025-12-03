@@ -24,6 +24,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:ummah_chat/services/auth/auth_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/comment.dart';
+import '../../models/dua.dart';
 import '../../models/post.dart';
 import '../../models/user_profile.dart';
 import '../notification_service.dart';
@@ -1359,6 +1360,151 @@ class DatabaseService {
     }
   }
 
+  /* ==================== DUA WALL ==================== */
+
+  /// Get all duas for the Dua Wall.
+  ///
+  /// - Includes public duas from everyone.
+  /// - Includes *private* duas only for the current user (RLS will also help later).
+  Future<List<Dua>> getDuaWallFromDatabase() async {
+    final currentUserId = _auth.currentUser?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return [];
+
+    try {
+      // 1️⃣ Fetch all duas (we’ll add RLS later to enforce privacy)
+      final raw = await _db
+          .from('duas')
+          .select(
+        '''
+            id,
+            user_id,
+            user_name,
+            text,
+            is_anonymous,
+            is_private,
+            created_at,
+            ameen_count,
+            ameens:dua_ameens(user_id)
+            ''',
+      )
+          .order('created_at', ascending: false);
+
+      if (raw is! List) return [];
+
+      // 2️⃣ Map to Dua model, with userHasAmeened detection
+      return raw
+          .map((row) => Dua.fromMap(
+        Map<String, dynamic>.from(row),
+        currentUserId,
+      ))
+          .toList();
+    } catch (e, st) {
+      print('❌ Error loading Dua Wall: $e\n$st');
+      return [];
+    }
+  }
+
+  /// Create a new dua.
+  ///
+  /// - `isAnonymous` → others see "Anonymous" instead of your name
+  /// - `isPrivate`   → only you can see this dua (RLS will be added later)
+  Future<void> createDuaInDatabase({
+    required String text,
+    required bool isAnonymous,
+    required bool isPrivate,
+  }) async {
+    final currentUserId = _auth.currentUser?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return;
+
+    try {
+      final user = await getUserFromDatabase(currentUserId);
+      if (user == null) {
+        throw Exception('User profile not found for dua creation');
+      }
+
+      // Use username if available, fallback to name
+      final displayName =
+      user.username.isNotEmpty ? user.username : user.name;
+
+      final payload = {
+        'user_id': currentUserId,
+        'user_name': displayName,
+        'text': text,
+        'is_anonymous': isAnonymous,
+        'is_private': isPrivate,
+        // `created_at` & `ameen_count` can be defaulted in DB
+      };
+
+      await _db.from('duas').insert(payload);
+    } catch (e, st) {
+      print('❌ Error creating dua: $e\n$st');
+      rethrow;
+    }
+  }
+
+  /// Toggle "Ameen" for the current user on a given dua.
+  ///
+  /// - Inserts into `dua_ameens` if not yet ameen'd
+  /// - Deletes from `dua_ameens` if already ameen'd
+  /// - `ameen_count` will later be kept in sync via DB trigger.
+  Future<void> toggleAmeenForDuaInDatabase(String duaId) async {
+    final currentUserId = _auth.currentUser?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return;
+
+    try {
+      // Check if an Ameen already exists
+      final existing = await _db
+          .from('dua_ameens')
+          .select('id')
+          .eq('dua_id', duaId)
+          .eq('user_id', currentUserId)
+          .maybeSingle();
+
+      final bool isCurrentlyAmeened = existing != null;
+
+      if (isCurrentlyAmeened) {
+        // 🔁 Remove Ameen
+        await _db
+            .from('dua_ameens')
+            .delete()
+            .eq('dua_id', duaId)
+            .eq('user_id', currentUserId);
+      } else {
+        // ✅ Add Ameen
+        await _db.from('dua_ameens').insert({
+          'dua_id': duaId,
+          'user_id': currentUserId,
+        });
+      }
+
+      // We’ll add a trigger to keep `ameen_count` in sync in the DB,
+      // so we don’t manually update the count here.
+    } catch (e, st) {
+      print('❌ Error toggling Ameen for dua $duaId: $e\n$st');
+      rethrow;
+    }
+  }
+
+  /// Delete a dua (only if it belongs to the current user).
+  Future<void> deleteDuaFromDatabase(String duaId) async {
+    final currentUserId = _auth.currentUser?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return;
+
+    try {
+      await _db
+          .from('duas')
+          .delete()
+          .eq('id', duaId)
+          .eq('user_id', currentUserId); // safety: only delete own dua
+    } catch (e, st) {
+      print('❌ Error deleting dua $duaId: $e\n$st');
+      rethrow;
+    }
+  }
+
+
+
+
   /* ==================== TIME ==================== */
 
   Future<DateTime?> getServerTime() async {
@@ -1375,4 +1521,5 @@ class DatabaseService {
       return null;
     }
   }
+
 }

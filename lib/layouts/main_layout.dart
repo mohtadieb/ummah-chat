@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 // Pages
 import 'package:ummah_chat/pages/chat_tabs_page.dart';
+import 'package:ummah_chat/pages/dua_wall_page.dart';
 import '../pages/home_page.dart';
 import '../pages/notification_page.dart';
 import '../pages/profile_page.dart';
@@ -51,6 +52,7 @@ class _MainLayoutState extends State<MainLayout> {
       const ChatTabsPage(),          // 1
       SelectStoriesPage(),           // 2
       ProfilePage(userId: currentUserId), // 3
+      DuaWallPage(),
     ];
   }
 
@@ -151,6 +153,8 @@ class _MainLayoutState extends State<MainLayout> {
             label: 'Stories',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          BottomNavigationBarItem(icon: Icon(Icons.view_list), label: 'Dua Wall'),
+
         ],
       ),
     );
