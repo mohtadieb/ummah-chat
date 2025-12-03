@@ -9,7 +9,8 @@ import '../services/auth/auth_service.dart';
 import 'my_confirmation_box.dart';
 import '../pages/profile_page.dart'; // 👈 NEW
 import '../services/navigation/bottom_nav_provider.dart'; // 👈 ADD
-
+import 'package:video_player/video_player.dart';
+import 'package:visibility_detector/visibility_detector.dart'; // 👈 NEW
 
 class MyPostTile extends StatefulWidget {
   final Post post;
@@ -256,7 +257,6 @@ class _MyPostTileState extends State<MyPostTile> {
     // No push, no new ProfilePage → it will reuse the existing tab instance
   }
 
-
   Widget _buildHeader(BuildContext context) {
     final theme = Theme.of(context);
 
@@ -270,7 +270,7 @@ class _MyPostTileState extends State<MyPostTile> {
               children: [
                 CircleAvatar(
                   radius: 18,
-                  backgroundColor: theme.colorScheme.secondary.withOpacity(0.2),
+                  backgroundColor: theme.colorScheme.secondary.withValues(alpha: 0.2),
                   child: Text(
                     widget.post.name.isNotEmpty
                         ? widget.post.name[0].toUpperCase()
@@ -309,7 +309,7 @@ class _MyPostTileState extends State<MyPostTile> {
             onPressed: _showOptions,
             icon: const Icon(Icons.more_horiz),
             splashRadius: 18,
-            color: theme.colorScheme.onSurface.withOpacity(0.7),
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
           ),
         ],
       ),
@@ -319,8 +319,19 @@ class _MyPostTileState extends State<MyPostTile> {
   Widget _buildImageOrText(BuildContext context) {
     final theme = Theme.of(context);
 
+    // 🎥 Video post
+    if (widget.post.videoUrl != null && widget.post.videoUrl!.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: AspectRatio(
+          aspectRatio: 4 / 5,
+          child: _VideoPostPlayer(videoUrl: widget.post.videoUrl!),
+        ),
+      );
+    }
+
+    // 🖼️ Image post
     if (widget.post.imageUrl != null) {
-      // Image post
       return ClipRRect(
         borderRadius: BorderRadius.circular(18),
         child: AspectRatio(
@@ -339,7 +350,7 @@ class _MyPostTileState extends State<MyPostTile> {
             },
             errorBuilder: (context, error, stackTrace) {
               return Container(
-                color: theme.colorScheme.surfaceVariant,
+                color: theme.colorScheme.surfaceContainerHighest,
                 alignment: Alignment.center,
                 child: const Text('Failed to load image'),
               );
@@ -349,12 +360,12 @@ class _MyPostTileState extends State<MyPostTile> {
       );
     }
 
-    // Text-only post
+    // 📝 Text-only post
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+        color: theme.colorScheme.surfaceVariant.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Text(
@@ -372,7 +383,7 @@ class _MyPostTileState extends State<MyPostTile> {
 
     final likedByCurrentUser =
     listeningProvider.isPostLikedByCurrentUser(widget.post.id);
-    final iconColor = theme.colorScheme.onSurface.withOpacity(0.9);
+    final iconColor = theme.colorScheme.onSurface.withValues(alpha: 0.9);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -416,18 +427,17 @@ class _MyPostTileState extends State<MyPostTile> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final likeCount = listeningProvider.getLikeCount(widget.post.id);
-    final commentCount =
-        listeningProvider.getComments(widget.post.id).length;
+    final commentCount = listeningProvider.getComments(widget.post.id).length;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       child: InkWell(
         borderRadius: BorderRadius.circular(22),
-        onTap: widget.onPostTap,
+        onTap: widget.onPostTap, // 👈 still opens post page when tapping outside video
         child: Card(
           elevation: theme.brightness == Brightness.dark ? 0.5 : 1.5,
           shadowColor: theme.colorScheme.shadow
-              .withOpacity(theme.brightness == Brightness.dark ? 0.25 : 0.18),
+              .withValues(alpha: theme.brightness == Brightness.dark ? 0.25 : 0.18),
           color: theme.colorScheme.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(22),
@@ -446,7 +456,7 @@ class _MyPostTileState extends State<MyPostTile> {
 
                 const SizedBox(height: 4),
 
-                // image or text content
+                // image / video / text content
                 _buildImageOrText(context),
 
                 const SizedBox(height: 6),
@@ -469,10 +479,9 @@ class _MyPostTileState extends State<MyPostTile> {
 
                 const SizedBox(height: 4),
 
-                // caption
-                // Only show caption if there is an image;
-                // for pure text posts it's already shown inside _buildImageOrText
-                if (widget.post.imageUrl != null &&
+                // caption for IMAGE *or VIDEO* posts
+                if ((widget.post.imageUrl != null ||
+                    widget.post.videoUrl != null) &&
                     widget.post.message.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -525,7 +534,7 @@ class _MyPostTileState extends State<MyPostTile> {
                     createdAt: widget.post.createdAt,
                     style: theme.textTheme.labelSmall?.copyWith(
                       color:
-                      theme.colorScheme.primary.withOpacity(0.8),
+                      theme.colorScheme.primary.withValues(alpha: 0.8),
                       letterSpacing: 0.2,
                     ),
                   ),
@@ -533,6 +542,159 @@ class _MyPostTileState extends State<MyPostTile> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _VideoPostPlayer extends StatefulWidget {
+  final String videoUrl;
+
+  const _VideoPostPlayer({required this.videoUrl});
+
+  @override
+  State<_VideoPostPlayer> createState() => _VideoPostPlayerState();
+}
+
+class _VideoPostPlayerState extends State<_VideoPostPlayer> {
+  late final VideoPlayerController _controller;
+  bool _initialized = false;
+  bool _muted = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
+      ..initialize().then((_) {
+        if (!mounted) return;
+        setState(() {
+          _initialized = true;
+        });
+
+        _controller.setLooping(true);
+        _controller.setVolume(_muted ? 0.0 : 1.0);
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _togglePlay() {
+    if (!_initialized) return;
+    if (_controller.value.isPlaying) {
+      _controller.pause();
+    } else {
+      _controller.play();
+    }
+    setState(() {}); // update play icon
+  }
+
+  void _toggleMute() {
+    if (!_initialized) return;
+
+    if (_muted) {
+      _controller.setVolume(1.0);
+    } else {
+      _controller.setVolume(0.0);
+    }
+
+    setState(() {
+      _muted = !_muted;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_initialized) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    final isPlaying = _controller.value.isPlaying;
+
+    return VisibilityDetector(
+      key: Key('video_${widget.videoUrl}'),
+      onVisibilityChanged: (info) {
+        final visibleFraction = info.visibleFraction;
+        if (!_initialized) return;
+
+        // ▶️ Auto-play when mostly visible
+        if (visibleFraction >= 0.6 && !_controller.value.isPlaying) {
+          _controller.play();
+          setState(() {}); // hide play icon
+        }
+
+        // ⏸️ Pause when mostly off-screen
+        if (visibleFraction < 0.3 && _controller.value.isPlaying) {
+          _controller.pause();
+          setState(() {}); // show play icon again if needed
+        }
+      },
+      child: GestureDetector(
+        // 👇 tapping anywhere on the video only plays/pauses, no navigation
+        onTap: _togglePlay,
+        behavior: HitTestBehavior.opaque,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Video background
+            Positioned.fill(
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: _controller.value.size.width,
+                  height: _controller.value.size.height,
+                  child: VideoPlayer(_controller),
+                ),
+              ),
+            ),
+
+            // Center play button (only when paused)
+            if (!isPlaying)
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.45),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.play_circle_fill,
+                  size: 70,
+                  color: Colors.white,
+                ),
+              ),
+
+            // Top-right mute/unmute, always tappable
+            Positioned(
+              top: 12,
+              right: 12,
+              child: GestureDetector(
+                onTap: _toggleMute,
+                behavior: HitTestBehavior.translucent,
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    _muted ? Icons.volume_off : Icons.volume_up,
+                    size: 22,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

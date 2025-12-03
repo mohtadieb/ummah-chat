@@ -21,13 +21,13 @@ const List<ProfileSong> kProfileSongs = [
     id: 'calm_1',
     title: 'Ambient',
     artist: 'Sufi Sama',
-    assetPath: 'assets/audio/profile_song_1.wav',
+    assetPath: 'assets/audio/profile_song_1.mp3',
   ),
   ProfileSong(
     id: 'soft_2',
     title: 'Nasheed',
     artist: 'Abdul Miah',
-    assetPath: 'assets/audio/profile_song_2.mp3',
+    assetPath: 'assets/audio/profile_song_2.wav',
   ),
   ProfileSong(
     id: 'uplift_3',
@@ -37,7 +37,7 @@ const List<ProfileSong> kProfileSongs = [
   ),
   ProfileSong(
     id: 'arabic_4',
-    title: 'Islamic Background',
+    title: 'Arabic 4',
     artist: 'Omar Faruque',
     assetPath: 'assets/audio/profile_song_4.mp3',
   ),
@@ -55,8 +55,14 @@ const List<ProfileSong> kProfileSongs = [
   ),
   ProfileSong(
     id: 'islamic_7',
-    title: 'Islamic beats',
+    title: 'Islamic beats 1',
     artist: 'Omar Faruque',
     assetPath: 'assets/audio/profile_song_7.mp3',
+  ),
+  ProfileSong(
+    id: 'islamic_8',
+    title: 'Islamic beats 2',
+    artist: 'Omar Faruque',
+    assetPath: 'assets/audio/profile_song_8.mp3',
   ),
 ];

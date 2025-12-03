@@ -15,6 +15,8 @@ import '../services/database/database_provider.dart';
 import 'my_confirmation_box.dart';
 import '../components/my_input_alert_box.dart';
 import '../services/notification_service.dart'; // 👈 NEW
+import '../services/navigation/bottom_nav_provider.dart';
+
 
 class MyCommentTile extends StatefulWidget {
   final Comment comment;
@@ -181,6 +183,29 @@ class _MyCommentTileState extends State<MyCommentTile> {
     }
   }
 
+  void _handleUserTap() {
+    final currentUserId = AuthService().getCurrentUserId();
+
+    // 👉 If comment belongs to the logged-in user: switch to profile tab
+    if (widget.comment.userId == currentUserId) {
+      final bottomNav = Provider.of<BottomNavProvider>(context, listen: false);
+      bottomNav.setIndex(3); // profile tab index
+
+      // Also go back so MainLayout becomes visible
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      return;
+    }
+
+    // 👉 If it's another user → do the normal navigation
+    if (widget.onUserTap != null) {
+      widget.onUserTap!();
+    }
+  }
+
+
+
   void _reportPostConfirmationBox() {
     showDialog(
       context: context,
@@ -230,7 +255,7 @@ class _MyCommentTileState extends State<MyCommentTile> {
         children: [
           // Avatar
           GestureDetector(
-            onTap: widget.onUserTap,
+            onTap: _handleUserTap,
             child: CircleAvatar(
               radius: 16,
               backgroundColor: colorScheme.secondary,
@@ -251,7 +276,7 @@ class _MyCommentTileState extends State<MyCommentTile> {
               children: [
                 // username + comment
                 GestureDetector(
-                  onTap: widget.onUserTap,
+                  onTap: _handleUserTap,
                   child: RichText(
                     text: TextSpan(
                       children: [

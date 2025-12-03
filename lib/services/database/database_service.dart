@@ -196,7 +196,8 @@ class DatabaseService {
   Future<void> postMessageInDatabase(
       String message, {
         File? imageFile,
-        String? communityId, // ✅ NEW
+        File? videoFile,          // 👈 NEW
+        String? communityId,
       }) async {
     try {
       final currentUserId = _auth.currentUser!.id;
@@ -205,21 +206,40 @@ class DatabaseService {
       if (user == null) throw Exception("User profile not found");
 
       String? imageUrl;
+      String? videoUrl;
 
-      // If an image was picked, upload it to Supabase Storage
+      debugPrint('postMessageInDatabase: imageFile=$imageFile, videoFile=$videoFile');
+
+      // 🎥 Upload video if present
+      if (videoFile != null) {
+        final fileName =
+            '${DateTime.now().millisecondsSinceEpoch}_${currentUserId}.mp4';
+        final storagePath = 'posts/$fileName';
+
+        final bytes = await videoFile.readAsBytes();
+
+        await _db.storage.from('post_videos').uploadBinary(
+          storagePath,
+          bytes,
+          fileOptions: const FileOptions(contentType: 'video/mp4'),
+        );
+
+        videoUrl = _db.storage.from('post_videos').getPublicUrl(storagePath);
+        debugPrint('Uploaded video, url=$videoUrl');
+      }
+
+      // 🖼️ Upload image if present
       if (imageFile != null) {
         final fileName =
             '${DateTime.now().millisecondsSinceEpoch}_${currentUserId}.jpg';
         final storagePath = 'posts/$fileName';
 
-        // Convert file to bytes
         final bytes = await imageFile.readAsBytes();
 
-        // Upload to Supabase Storage
         await _db.storage.from('post_images').uploadBinary(storagePath, bytes);
 
-        // Get public URL
         imageUrl = _db.storage.from('post_images').getPublicUrl(storagePath);
+        debugPrint('Uploaded image, url=$imageUrl');
       }
 
       // Create new post object
@@ -230,28 +250,30 @@ class DatabaseService {
         username: user.username,
         message: message,
         imageUrl: imageUrl,
-        communityId: communityId, // ✅ store the community link (can be null)
+        videoUrl: videoUrl,             // 👈 IMPORTANT
+        communityId: communityId,
         createdAt: DateTime.now().toUtc(),
-        likeCount:
-        0, // initial value; DB trigger will keep this in sync with post_likes
+        likeCount: 0,
       );
 
-      // Insert post into database
       await _db.from('posts').insert(newPost.toMap()).select().single();
-    } catch (e) {
-      print("Error posting message: $e");
+      debugPrint('Inserted post with videoUrl=${newPost.videoUrl}');
+    } catch (e, st) {
+      print("Error posting message: $e\n$st");
     }
   }
 
+
   /// Delete a post
-  Future<void> deletePostFromDatabase(String postId, {String? imagePath}) async {
+  Future<void> deletePostFromDatabase(
+      String postId, {
+        String? imagePath,
+        String? videoPath,
+      }) async {
     try {
       // 1️⃣ Delete image from Supabase Storage if provided
       if (imagePath != null && imagePath.isNotEmpty) {
         try {
-          // Extract the relative path inside the bucket
-          // Example: https://xyz.supabase.co/storage/v1/object/public/post_images/my_image.jpg
-          // => we only want: "my_image.jpg" (everything after 'post_images/')
           final uri = Uri.parse(imagePath);
           final segments = uri.pathSegments;
           final bucketIndex = segments.indexOf('post_images');
@@ -269,13 +291,34 @@ class DatabaseService {
         }
       }
 
-      // 2️⃣ Delete post from database
+      // 2️⃣ Delete video from Supabase Storage if provided
+      if (videoPath != null && videoPath.isNotEmpty) {
+        try {
+          final uri = Uri.parse(videoPath);
+          final segments = uri.pathSegments;
+          final bucketIndex = segments.indexOf('post_videos');
+          String? pathToDelete;
+          if (bucketIndex != -1 && bucketIndex + 1 < segments.length) {
+            pathToDelete = segments.sublist(bucketIndex + 1).join('/');
+          }
+
+          if (pathToDelete != null && pathToDelete.isNotEmpty) {
+            await _storage.from('post_videos').remove([pathToDelete]);
+            print('Video deleted from storage: $pathToDelete');
+          }
+        } catch (e) {
+          print('Error deleting video from storage: $e');
+        }
+      }
+
+      // 3️⃣ Delete post from database
       await _db.from('posts').delete().eq('id', postId);
       print('Post deleted from database: $postId');
     } catch (e) {
-      print("Error deleting post (or image): $e");
+      print("Error deleting post (or media): $e");
     }
   }
+
 
   /// Get all posts
   ///

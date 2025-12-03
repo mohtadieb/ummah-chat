@@ -25,46 +25,37 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage>
     with SingleTickerProviderStateMixin {
-  // Extra safety to avoid setState after dispose
   @override
   void setState(VoidCallback fn) {
     if (!mounted) return;
     super.setState(fn);
   }
 
-  // Providers
   late final DatabaseProvider databaseProvider =
   Provider.of<DatabaseProvider>(context, listen: false);
   late final DatabaseProvider listeningProvider =
   Provider.of<DatabaseProvider>(context);
 
-  // Text controllers
   final TextEditingController _messageController = TextEditingController();
-
   late final TabController _tabController;
 
   File? _selectedImage;
+  File? _selectedVideo;
 
   @override
   void initState() {
     super.initState();
 
-    // ➕ 3 tabs now: For You, Following, Communities
     _tabController = TabController(length: 3, vsync: this);
 
-    // Load all posts on startup
     loadAllPosts();
-
-    // Load communities so we know which ones the user joined
     _loadCommunities();
   }
 
-  // Load all posts
   Future<void> loadAllPosts() async {
     await databaseProvider.loadAllPosts();
   }
 
-  // Load communities (for membership info)
   Future<void> _loadCommunities() async {
     try {
       await databaseProvider.getAllCommunities();
@@ -80,7 +71,9 @@ class _HomePageState extends State<HomePage>
     super.dispose();
   }
 
-  // Show "create post" dialog
+  // -------------------------------
+  // Create Post
+  // -------------------------------
   void _openPostMessageBox() {
     final messenger = ScaffoldMessenger.maybeOf(context);
     final TextEditingController messageController = TextEditingController();
@@ -101,26 +94,27 @@ class _HomePageState extends State<HomePage>
                     content: Text("Your message must have at least 2 characters"),
                   ),
                 );
-
                 setInnerState(() {
                   _selectedImage = null;
+                  _selectedVideo = null;
                 });
                 return;
               }
 
               try {
-                // Try posting
-                await _postMessage(message, imageFile: _selectedImage);
+                await _postMessage(
+                  message,
+                  imageFile: _selectedImage,
+                  videoFile: _selectedVideo,
+                );
+
                 messageController.clear();
 
-                // ✅ SUCCESS SNACKBAR
                 messenger?.showSnackBar(
                   const SnackBar(
                     content: Text("Post uploaded successfully!"),
                   ),
                 );
-
-                // ❌ Do NOT Navigator.pop here — MyInputAlertBox closes itself
               } catch (e) {
                 debugPrint('Error posting home message: $e');
                 messenger?.showSnackBar(
@@ -137,20 +131,61 @@ class _HomePageState extends State<HomePage>
                     _selectedImage!,
                     height: 150,
                     fit: BoxFit.cover,
+                  )
+                else if (_selectedVideo != null)
+                  Container(
+                    height: 150,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.black12,
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.videocam, size: 28),
+                        SizedBox(width: 8),
+                        Text("Video selected"),
+                      ],
+                    ),
                   ),
-                TextButton.icon(
-                  icon: const Icon(Icons.image),
-                  label: const Text("Add Image"),
-                  onPressed: () async {
-                    final picker = ImagePicker();
-                    final picked =
-                    await picker.pickImage(source: ImageSource.gallery);
-                    if (picked != null) {
-                      setInnerState(() {
-                        _selectedImage = File(picked.path);
-                      });
-                    }
-                  },
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    TextButton.icon(
+                      icon: const Icon(Icons.image),
+                      label: const Text("Add Image"),
+                      onPressed: () async {
+                        final picker = ImagePicker();
+                        final picked = await picker.pickImage(
+                          source: ImageSource.gallery,
+                        );
+                        if (picked != null) {
+                          setInnerState(() {
+                            _selectedVideo = null;
+                            _selectedImage = File(picked.path);
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton.icon(
+                      icon: const Icon(Icons.videocam),
+                      label: const Text("Add Video"),
+                      onPressed: () async {
+                        final picker = ImagePicker();
+                        final picked = await picker.pickVideo(
+                          source: ImageSource.gallery,
+                        );
+                        if (picked != null) {
+                          setInnerState(() {
+                            _selectedImage = null;
+                            _selectedVideo = File(picked.path);
+                          });
+                        }
+                      },
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -160,29 +195,43 @@ class _HomePageState extends State<HomePage>
     );
   }
 
+  Future<void> _postMessage(
+      String message, {
+        File? imageFile,
+        File? videoFile,
+      }) async {
+    // Show temporary post
+    databaseProvider.showLoadingPost(
+      message: message,
+      imageFile: imageFile,
+      videoFile: videoFile,
+    );
 
-  // User posts a message (normal/global post, not community)
-  Future<void> _postMessage(String message, {File? imageFile}) async {
-    // Global feed post → no communityId
+    // Upload
     await databaseProvider.postMessage(
       message,
       imageFile: imageFile,
+      videoFile: videoFile,
     );
+
+    // Remove temporary tile
+    databaseProvider.clearLoadingPost();
 
     if (!mounted) return;
 
-    // Clear the selected image after posting
     setState(() {
       _selectedImage = null;
+      _selectedVideo = null;
     });
   }
 
-  // BUILD UI
+  // -------------------------------
+  // Build UI
+  // -------------------------------
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    // 🔎 Global posts (no communityId)
     final List<Post> forYouPosts =
     listeningProvider.allPosts.where((p) => p.communityId == null).toList();
 
@@ -190,7 +239,6 @@ class _HomePageState extends State<HomePage>
         .where((p) => p.communityId == null)
         .toList();
 
-    // 🟣 Community posts from communities the user joined
     final joinedCommunityIds = listeningProvider.allCommunities
         .where((c) => c['is_joined'] == true)
         .map<String>((c) => c['id'] as String)
@@ -199,19 +247,17 @@ class _HomePageState extends State<HomePage>
     final List<Post> communityPosts = listeningProvider.allPosts
         .where(
           (p) =>
-      p.communityId != null && joinedCommunityIds.contains(p.communityId),
+      p.communityId != null &&
+          joinedCommunityIds.contains(p.communityId),
     )
         .toList();
 
     return Scaffold(
-      // Floating action button (global post only)
       floatingActionButton: FloatingActionButton(
         onPressed: _openPostMessageBox,
         backgroundColor: colorScheme.primary,
         child: const Icon(Icons.add),
       ),
-
-      // Body: tabbed feed
       body: Column(
         children: [
           Container(
@@ -245,16 +291,28 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildPostList(List<Post> posts) {
-    if (posts.isEmpty) {
+    final loadingPost = listeningProvider.loadingPost;
+
+    final list = [
+      if (loadingPost != null) loadingPost,
+      ...posts,
+    ];
+
+    if (list.isEmpty) {
       return const Center(
         child: Text("Nothing here.."),
       );
     }
 
     return ListView.builder(
-      itemCount: posts.length,
+      itemCount: list.length,
       itemBuilder: (context, index) {
-        final post = posts[index];
+        final post = list[index];
+
+        if (post.id == 'loading') {
+          return _buildLoadingPostTile();
+        }
+
         return MyPostTile(
           post: post,
           onUserTap: () => goUserPage(context, post.userId),
@@ -262,6 +320,29 @@ class _HomePageState extends State<HomePage>
           scaffoldContext: context,
         );
       },
+    );
+  }
+
+  Widget _buildLoadingPostTile() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade900,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Row(
+        children: [
+          CircularProgressIndicator(),
+          SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              "Posting your content…",
+              style: TextStyle(fontSize: 14, color: Colors.white70),
+            ),
+          )
+        ],
+      ),
     );
   }
 }

@@ -161,7 +161,7 @@ class _StoriesPageState extends State<StoriesPage> {
                   padding:
                   const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: _accent.withOpacity(0.1),
+                    color: _accent.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Row(

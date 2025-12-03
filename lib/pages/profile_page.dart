@@ -1,15 +1,12 @@
 // lib/pages/profile_page.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:just_audio/just_audio.dart';        // 🆕 audio player
+import 'package:just_audio/just_audio.dart'; // 🆕 audio player
 import 'package:flutter/services.dart' show rootBundle;
 import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
-import 'dart:typed_data';
-
-
-
+import '../services/navigation/bottom_nav_provider.dart';
 
 import '../components/my_bio_box.dart';
 import '../components/my_follow_button.dart';
@@ -25,10 +22,16 @@ import 'follow_list_page.dart';
 import 'friends_page.dart';
 import '../models/profile_song.dart';
 
-
 // Story registry (id -> StoryData with chipLabel/title/icon)
 import '../models/story_registry.dart';
 
+/// Internal helper to keep track of Muhammad (ﷺ) parts and their number.
+class _MuhammadPartInfo {
+  final String id;
+  final int? partNo;
+
+  _MuhammadPartInfo({required this.id, this.partNo});
+}
 
 /*
 PROFILE PAGE (Supabase Ready)
@@ -148,12 +151,6 @@ class _ProfilePageState extends State<ProfilePage> {
       return;
     }
 
-    // If already playing this song, don't restart
-    if (_audioPlayer.playing && _currentSongId == songId) {
-      debugPrint('🎵 Already playing songId=$songId, skipping restart.');
-      return;
-    }
-
     try {
       // 1) Check asset is loadable
       try {
@@ -210,7 +207,6 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-
   // 🆕 toggle play/pause
   Future<void> _toggleProfileSongPlayPause() async {
     final songId = user?.profileSongId ?? '';
@@ -256,20 +252,25 @@ class _ProfilePageState extends State<ProfilePage> {
     await _startProfileSong(songId);
   }
 
-
-
   // 🆕 change the song from the picker
   Future<void> _setProfileSong(String songId) async {
     if (!_isOwnProfile) return;
 
+    // 👉 Immediately update local state so UI changes right away
+    if (mounted) {
+      setState(() {
+        _currentSongId = songId; // ok now because _startProfileSong always reloads
+        if (user != null) {
+          user = user!.copyWith(profileSongId: songId);
+        }
+      });
+    }
+
     // 1) update in DB
     await databaseProvider.updateProfileSong(songId);
 
-    // 2) play immediately
+    // 2) play immediately (this will stop old song + load new one)
     await _startProfileSong(songId);
-
-    // 3) refresh user profile so profileSongId reflects it
-    await loadUser();
   }
 
   Future<void> loadUser() async {
@@ -313,10 +314,9 @@ class _ProfilePageState extends State<ProfilePage> {
       _currentSongId = songId;
 
       if (_isOwnProfile) {
-        // own profile: don't auto-play, just make sure nothing is playing
-        await _audioPlayer.stop();
+        // 🔧 Own profile: no auto-play
         debugPrint(
-          '🎵 Own profile has songId=$songId, not auto-playing.',
+          '🎵 Own profile has songId=$songId (no auto-play, no forced stop).',
         );
       } else {
         // other user's profile: AUTO-PLAY, but don't block loadUser()
@@ -324,15 +324,12 @@ class _ProfilePageState extends State<ProfilePage> {
           '🎵 Scheduling autoplay for other user profile songId=$songId',
         );
 
-        // fire-and-forget so UI isn't stuck in loading state
         Future.microtask(() async {
-          // extra mounted check in case user navigated away quickly
           if (!mounted) return;
           await _startProfileSong(songId);
         });
       }
     } else {
-      // no song set
       await _audioPlayer.stop();
       _currentSongId = null;
       debugPrint('🎵 No profile song set for this profile.');
@@ -344,7 +341,6 @@ class _ProfilePageState extends State<ProfilePage> {
       _isLoading = false;
     });
   }
-
 
   void _showEditBioBox() {
     bioTextController.text = user?.bio ?? '';
@@ -425,9 +421,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-
   void _editAboutMe() {
-    // prefill fields with current values
     final fromCtrl = TextEditingController(text: user?.fromLocation ?? '');
     final langsCtrl = TextEditingController(
       text: (user?.languages ?? []).join(', '),
@@ -544,8 +538,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-
-
   Future<void> _toggleFollow() async {
     if (_isFollowing) {
       final confirm = await showDialog<bool>(
@@ -578,24 +570,55 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _pickProfilePhoto() async {
-    final ImagePicker picker = ImagePicker();
-    final XFile? file = await picker.pickImage(source: ImageSource.gallery);
+    try {
+      final ImagePicker picker = ImagePicker();
 
-    if (file == null) return;
+      final XFile? picked = await picker.pickImage(source: ImageSource.gallery);
+      if (picked == null) return;
 
-    final bytes = await file.readAsBytes();
+      final CroppedFile? cropped = await ImageCropper().cropImage(
+        sourcePath: picked.path,
+        maxWidth: 800,
+        maxHeight: 800,
+        compressFormat: ImageCompressFormat.jpg,
+        compressQuality: 85,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Crop profile photo',
+            toolbarColor: Theme.of(context).colorScheme.primary,
+            toolbarWidgetColor: Colors.white,
+            initAspectRatio: CropAspectRatioPreset.square,
+            lockAspectRatio: true,
+            hideBottomControls: true,
+            cropStyle: CropStyle.circle,
+          ),
+          IOSUiSettings(
+            title: 'Crop profile photo',
+            aspectRatioLockEnabled: true,
+            cropStyle: CropStyle.circle,
+          ),
+        ],
+      );
 
-    await databaseProvider.updateProfilePhoto(bytes);
-    await loadUser();
+      if (cropped == null) return;
+
+      final Uint8List bytes = await cropped.readAsBytes();
+
+      await databaseProvider.updateProfilePhoto(bytes);
+      await loadUser();
+    } catch (e, st) {
+      debugPrint('❌ Error in _pickProfilePhoto: $e\n$st');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not update profile picture')),
+      );
+    }
   }
-
 
   Future<void> _removeProfilePhoto() async {
-    await databaseProvider.updateProfilePhoto(Uint8List(0)); // or add a DB method to set null
+    await databaseProvider.updateProfilePhoto(Uint8List(0));
     await loadUser();
   }
-
-
 
   Future<void> _addFriendFromProfile() async {
     await databaseProvider.sendFriendRequest(widget.userId);
@@ -603,8 +626,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _cancelFriendFromProfile() async {
-    await databaseProvider
-        .cancelFriendRequest(widget.userId);
+    await databaseProvider.cancelFriendRequest(widget.userId);
     setState(() => _friendStatus = 'none');
   }
 
@@ -730,9 +752,11 @@ class _ProfilePageState extends State<ProfilePage> {
             );
           }
 
-          final allFriends =
-          (snapshot.data ?? []).where((u) => u.id != currentUserId).toList();
+          final rawFriends = snapshot.data ?? [];
 
+          final allFriends = isOwn
+              ? rawFriends.where((u) => u.id != currentUserId).toList()
+              : rawFriends;
           final totalFriends = allFriends.length;
 
           if (totalFriends == 0) {
@@ -790,7 +814,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       : "No friends to show yet.",
                   style: TextStyle(
                     fontSize: 12,
-                    color: colorScheme.primary.withOpacity(0.7),
+                    color: colorScheme.primary.withValues(alpha: 0.7),
                   ),
                 ),
               ],
@@ -858,12 +882,21 @@ class _ProfilePageState extends State<ProfilePage> {
 
                     return GestureDetector(
                       onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ProfilePage(userId: friend.id),
-                          ),
-                        );
+                        if (friend.id == currentUserId) {
+                          final bottomNav =
+                          Provider.of<BottomNavProvider>(context,
+                              listen: false);
+
+                          bottomNav.setIndex(3);
+                          Navigator.pop(context);
+                        } else {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ProfilePage(userId: friend.id),
+                            ),
+                          );
+                        }
                       },
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -1025,8 +1058,8 @@ class _ProfilePageState extends State<ProfilePage> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 12,
-                      color:
-                      colorScheme.primary.withValues(alpha: hasSong ? 0.75 : 0.6),
+                      color: colorScheme.primary
+                          .withValues(alpha: hasSong ? 0.75 : 0.6),
                     ),
                   ),
                 ],
@@ -1096,7 +1129,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
     final allUserPosts = listeningProvider.getUserPosts(widget.userId);
@@ -1110,6 +1142,91 @@ class _ProfilePageState extends State<ProfilePage> {
     // Stories progress values
     final totalStories = allStoriesById.length;
     final effectiveCompletedIds = _effectiveCompletedStoryIds;
+
+    // 🔹 First: split completed stories into Muhammad (ﷺ) parts and other prophets
+    final List<String> otherCompletedIds = [];
+    final List<_MuhammadPartInfo> muhammadPartInfos = [];
+
+    for (final id in effectiveCompletedIds) {
+      final story = allStoriesById[id];
+      if (story == null) continue;
+
+      final chipLower = story.chipLabel.toLowerCase();
+      final titleLower = story.title.toLowerCase();
+
+      final bool isMuhammadStory =
+          chipLower.contains('muhammad') || titleLower.contains('muhammad');
+
+      if (isMuhammadStory) {
+        // Try to detect part number from id or chipLabel
+        int? partNo;
+
+        final idMatch = RegExp(r'(\d+)').firstMatch(story.id);
+        if (idMatch != null) {
+          partNo = int.tryParse(idMatch.group(1)!);
+        }
+
+        if (partNo == null) {
+          final chipMatch = RegExp(r'(\d+)').firstMatch(story.chipLabel);
+          if (chipMatch != null) {
+            partNo = int.tryParse(chipMatch.group(1)!);
+          }
+        }
+
+        muhammadPartInfos.add(_MuhammadPartInfo(id: id, partNo: partNo));
+      } else {
+        otherCompletedIds.add(id);
+      }
+    }
+
+    // 🔹 Order non-Muhammad stories according to SelectStoriesPage order
+    const nonMuhammadOrder = [
+      'yunus',
+      'yusuf',
+      'musa',
+      'ibrahim',
+      'nuh',
+      'sulayman',
+      'ayyub',
+      'ishaq',
+      'zakariya',
+      'idris',
+      'harun',
+      'maryam',
+    ];
+
+    final List<String> nonMuhammadSorted = [
+      ...nonMuhammadOrder.where((id) => otherCompletedIds.contains(id)),
+      ...otherCompletedIds.where((id) => !nonMuhammadOrder.contains(id)),
+    ];
+
+    // 🔹 Sort Muhammad parts by part number (1 → 7)
+    muhammadPartInfos.sort((a, b) {
+      if (a.partNo == null && b.partNo == null) return 0;
+      if (a.partNo == null) return 1;
+      if (b.partNo == null) return -1;
+      return a.partNo!.compareTo(b.partNo!);
+    });
+
+    final muhammadIdSet =
+    muhammadPartInfos.map((m) => m.id).toSet(); // For quick lookup
+
+    // Final ordered list: all other prophets, then Muhammad (ﷺ) 1–7
+    final List<String> sortedCompletedIds = [
+      ...nonMuhammadSorted,
+      ...muhammadPartInfos.map((m) => m.id),
+    ];
+
+    // Level system: every 3 completed stories = +1 level
+    final int levelsCompleted = sortedCompletedIds.length ~/ 3;
+
+    // Muhammad series completion: must have parts 1–7
+    final Set<int> muhammadParts = {
+      for (final m in muhammadPartInfos)
+        if (m.partNo != null) m.partNo!,
+    };
+    final bool muhammadSeriesCompleted =
+    muhammadParts.containsAll({1, 2, 3, 4, 5, 6, 7});
 
     Widget bodyChild;
     if (_isLoading) {
@@ -1159,12 +1276,11 @@ class _ProfilePageState extends State<ProfilePage> {
 
           const SizedBox(height: 24),
 
-          // PROFILE PICTURE (with edit button for own profile)
+          // PROFILE PICTURE
           Center(
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Profile image or placeholder
                 GestureDetector(
                   onTap: _isOwnProfile ? _pickProfilePhoto : null,
                   child: user!.profilePhotoUrl.isNotEmpty
@@ -1177,17 +1293,17 @@ class _ProfilePageState extends State<ProfilePage> {
                     height: 112,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Theme.of(context).colorScheme.secondary,
+                      color:
+                      Theme.of(context).colorScheme.secondary,
                     ),
                     child: Icon(
                       Icons.person,
                       size: 70,
-                      color: Theme.of(context).colorScheme.primary,
+                      color:
+                      Theme.of(context).colorScheme.primary,
                     ),
                   ),
                 ),
-
-                // Small edit icon overlay (only on own profile)
                 if (_isOwnProfile)
                   Positioned(
                     bottom: 4,
@@ -1198,7 +1314,8 @@ class _ProfilePageState extends State<ProfilePage> {
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Theme.of(context).colorScheme.primary,
+                          color:
+                          Theme.of(context).colorScheme.primary,
                         ),
                         child: const Icon(
                           Icons.edit,
@@ -1211,7 +1328,6 @@ class _ProfilePageState extends State<ProfilePage> {
               ],
             ),
           ),
-
 
           const SizedBox(height: 28),
 
@@ -1295,24 +1411,21 @@ class _ProfilePageState extends State<ProfilePage> {
 
           const SizedBox(height: 7),
 
-          // 🔹 "About me" edit + chips
           _buildEditAboutMeButton(),
           _buildAboutMeSection(),
 
-          // 🆕 Profile song section
           _buildProfileSongSection(context),
 
-          // 🧑‍🤝‍🧑 FRIENDS ROW
           _buildFriendsSection(context),
 
-          // Stories progress + medals with names
+          // Stories progress + medals
           if (totalStories > 0) ...[
             const SizedBox(height: 24),
 
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28.0),
               child: Text(
-                "Stories completed: ${effectiveCompletedIds.length} / $totalStories",
+                "Stories completed: ${sortedCompletedIds.length} / $totalStories",
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.primary,
                   fontWeight: FontWeight.bold,
@@ -1321,34 +1434,58 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
 
-            if (effectiveCompletedIds.isNotEmpty) ...[
-              const SizedBox(height: 12),
+            if (sortedCompletedIds.isNotEmpty) ...[
+              const SizedBox(height: 10),
 
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: effectiveCompletedIds.length,
+                  itemCount: sortedCompletedIds.length,
                   gridDelegate:
                   const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 4,
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    childAspectRatio: 0.75,
+                    crossAxisCount: 4, // ✅ 4 badges per row
+                    mainAxisSpacing: 10, // ✅ compact vertical spacing
+                    crossAxisSpacing: 10,
+                    childAspectRatio:
+                    0.85, // ✅ slightly taller for 2-line labels
                   ),
                   itemBuilder: (context, index) {
-                    final id = effectiveCompletedIds[index];
+                    final id = sortedCompletedIds[index];
                     final story = allStoriesById[id];
                     if (story == null) {
                       return const SizedBox.shrink();
                     }
 
-                    final rawLabel = story.chipLabel;
-                    final lower = rawLabel.toLowerCase();
-                    final displayName = lower.startsWith('prophet ')
-                        ? rawLabel.substring('Prophet '.length)
-                        : rawLabel;
+                    final bool isMuhammad = muhammadIdSet.contains(id);
+
+                    // Badge colors: golden for Muhammad (ﷺ) stories, green for others
+                    final Color startColor = isMuhammad
+                        ? const Color(0xFFF7D98A) // gold
+                        : const Color(0xFF0F8254); // green
+                    final Color endColor = isMuhammad
+                        ? const Color(0xFFE0B95A)
+                        : const Color(0xFF0B6841);
+
+                    // Label text (no special Musa anymore)
+                    String displayName;
+                    if (isMuhammad) {
+                      final partInfo = muhammadPartInfos.firstWhere(
+                            (m) => m.id == id,
+                        orElse: () => _MuhammadPartInfo(id: id),
+                      );
+                      final int? partNo = partInfo.partNo;
+                      displayName = partNo != null
+                          ? 'Muhammad (ﷺ) $partNo'
+                          : 'Muhammad (ﷺ)';
+                    } else {
+                      final rawLabel = story.chipLabel;
+                      final lower = rawLabel.toLowerCase();
+                      displayName = lower.startsWith('prophet ')
+                          ? rawLabel.substring('Prophet '.length)
+                          : rawLabel;
+                    }
 
                     return Column(
                       mainAxisSize: MainAxisSize.min,
@@ -1358,18 +1495,15 @@ class _ProfilePageState extends State<ProfilePage> {
                           height: 56,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            gradient: const LinearGradient(
-                              colors: [
-                                Color(0xFF0F8254),
-                                Color(0xFF0B6841),
-                              ],
+                            gradient: LinearGradient(
+                              colors: [startColor, endColor],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black26.withOpacity(0.12),
-                                blurRadius: 6,
+                                color: Colors.black26.withValues(alpha: 0.12),
+                                blurRadius: 5,
                                 offset: const Offset(0, 3),
                               ),
                             ],
@@ -1382,16 +1516,20 @@ class _ProfilePageState extends State<ProfilePage> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          displayName,
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
+                        const SizedBox(height: 4),
+                        SizedBox(
+                          width: 72,
+                          child: Text(
+                            displayName,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color:
+                              Theme.of(context).colorScheme.primary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
@@ -1400,8 +1538,10 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
 
-              if (effectiveCompletedIds.length == totalStories) ...[
-                const SizedBox(height: 12),
+              const SizedBox(height: 8),
+
+              // Muhammad (ﷺ) series completed ribbon (golden)
+              if (muhammadSeriesCompleted) ...[
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 28.0),
                   child: Container(
@@ -1410,10 +1550,11 @@ class _ProfilePageState extends State<ProfilePage> {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0F8254).withOpacity(0.06),
+                      color: const Color(0xFFF7D98A).withValues(alpha: 0.18),
                       borderRadius: BorderRadius.circular(999),
                       border: Border.all(
-                        color: const Color(0xFF0F8254).withOpacity(0.4),
+                        color:
+                        const Color(0xFFE0B95A).withValues(alpha: 0.7),
                       ),
                     ),
                     child: const Row(
@@ -1422,12 +1563,53 @@ class _ProfilePageState extends State<ProfilePage> {
                         Icon(
                           Icons.emoji_events_rounded,
                           size: 18,
-                          color: Color(0xFF0F8254),
+                          color: Color(0xFFE0B95A),
                         ),
                         SizedBox(width: 8),
                         Text(
-                          "Prophets Stories Level 1 completed",
+                          "Muhammad (ﷺ) series completed",
                           style: TextStyle(
+                            color: Color(0xFF8C6B24),
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+              ],
+
+              // Prophets Stories Level X ribbon – every 3 stories = +1 level
+              if (levelsCompleted > 0) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 28.0),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F8254).withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color:
+                        const Color(0xFF0F8254).withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.emoji_events_rounded,
+                          size: 18,
+                          color: Color(0xFF0F8254),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          "Prophets Stories Level $levelsCompleted",
+                          style: const TextStyle(
                             color: Color(0xFF0F8254),
                             fontSize: 12.5,
                             fontWeight: FontWeight.w600,
@@ -1502,7 +1684,8 @@ class _ProfilePageState extends State<ProfilePage> {
                           Text(
                             "Posts",
                             style: TextStyle(
-                              color: Theme.of(context).colorScheme.primary,
+                              color:
+                              Theme.of(context).colorScheme.primary,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -1550,7 +1733,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                 ? Icons.keyboard_arrow_up_rounded
                                 : Icons.keyboard_arrow_down_rounded,
                             size: 18,
-                            color: Theme.of(context).colorScheme.primary,
+                            color:
+                            Theme.of(context).colorScheme.primary,
                           ),
                         ],
                       ),

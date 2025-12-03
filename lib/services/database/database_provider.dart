@@ -84,6 +84,35 @@ class DatabaseProvider extends ChangeNotifier {
   List<Post> get allPosts => _allPosts;
   List<Post> get followingPosts => _followingPosts;
 
+  Post? _loadingPost;
+  Post? get loadingPost => _loadingPost;
+
+  void showLoadingPost({
+    required String message,
+    File? imageFile,
+    File? videoFile,
+  }) {
+    _loadingPost = Post(
+      id: 'loading',
+      userId: currentUserId,
+      name: 'Posting…',
+      username: 'posting...',
+      message: message,
+      imageUrl: null,
+      communityId: null,
+      createdAt: DateTime.now(),
+      likeCount: 0,
+    );
+
+    notifyListeners();
+  }
+
+  void clearLoadingPost() {
+    _loadingPost = null;
+    notifyListeners();
+  }
+
+
   /// post message
   ///
   /// `communityId` is:
@@ -92,12 +121,14 @@ class DatabaseProvider extends ChangeNotifier {
   Future<void> postMessage(
       String message, {
         File? imageFile,
+        File? videoFile,      // 👈 NEW
         String? communityId, // ✅ NEW
       }) async {
     // Forward message, optional image + optional community to database service
     await _db.postMessageInDatabase(
       message,
       imageFile: imageFile,
+      videoFile: videoFile,        // 👈 NEW
       communityId: communityId,
     );
 
@@ -185,6 +216,7 @@ class DatabaseProvider extends ChangeNotifier {
       await _db.deletePostFromDatabase(
         post.id,
         imagePath: post.imageUrl, // optional, may be null
+        videoPath: post.videoUrl,       // 👈 NEW
       );
 
       // 2️⃣ Update local state: remove the post from _allPosts list

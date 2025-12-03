@@ -1,13 +1,26 @@
 // lib/pages/select_stories_page.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:ummah_chat/stories/ayyub_story.dart';
+import 'package:ummah_chat/stories/harun_story.dart';
 import 'package:ummah_chat/stories/ibrahim_story.dart';
+import 'package:ummah_chat/stories/idris_story.dart';
+import 'package:ummah_chat/stories/ishaq_story.dart';
+import 'package:ummah_chat/stories/maryam_story.dart';
+import 'package:ummah_chat/stories/muhammad_story_part_1.dart';
 import 'package:ummah_chat/stories/nuh_story.dart';
 import 'package:ummah_chat/stories/sulayman_story.dart';
+import 'package:ummah_chat/stories/zakariya_story.dart';
 
 import '../models/story_data.dart';
 import '../services/database/database_provider.dart';
 import '../services/auth/auth_service.dart';
+import 'muhammad_story_part_2.dart';
+import 'muhammad_story_part_3.dart';
+import 'muhammad_story_part_4.dart';
+import 'muhammad_story_part_5.dart';
+import 'muhammad_story_part_6.dart';
+import 'muhammad_story_part_7.dart';
 import 'stories_page.dart';
 import 'yunus_story.dart';
 import 'yusuf_story.dart';
@@ -22,6 +35,7 @@ class SelectStoriesPage extends StatefulWidget {
 
 class _SelectStoriesPageState extends State<SelectStoriesPage> {
   final Color _accent = const Color(0xFF0F8254);
+  final Color _gold = const Color(0xFFC9A74E); // ✨ soft golden for Muhammad (ﷺ)
   late final List<StoryData> _stories;
 
   bool _loaded = false;
@@ -36,6 +50,20 @@ class _SelectStoriesPageState extends State<SelectStoriesPage> {
       ibrahimStory,
       nuhStory,
       sulaymanStory,
+      ayyubStory,
+      ishaqStory,
+      zakariyaStory,
+      idrisStory,
+      harunStory,
+      maryamStory,
+      // Group: Muhammad (ﷺ) stories
+      muhammadPart1Story,
+      muhammadPart2Story,
+      muhammadPart3Story,
+      muhammadPart4Story,
+      muhammadPart5Story,
+      muhammadPart6Story,
+      muhammadPart7Story,
     ];
 
     _loadProgress();
@@ -50,6 +78,22 @@ class _SelectStoriesPageState extends State<SelectStoriesPage> {
         _loaded = true;
       });
     }
+  }
+
+  bool _isMuhammadStory(StoryData story) {
+    return story.id.startsWith('muhammad_part');
+  }
+
+  bool _isFirstMuhammadStory(int index) {
+    final story = _stories[index];
+    if (!_isMuhammadStory(story)) return false;
+
+    for (int i = 0; i < index; i++) {
+      if (_isMuhammadStory(_stories[i])) {
+        return false;
+      }
+    }
+    return true;
   }
 
   @override
@@ -112,12 +156,39 @@ class _SelectStoriesPageState extends State<SelectStoriesPage> {
                   itemBuilder: (context, index) {
                     final story = _stories[index];
                     final isCompleted = completedIds.contains(story.id);
+                    final isMuhammad = _isMuhammadStory(story);
+                    final isFirstMuhammad = _isFirstMuhammadStory(index);
 
-                    return _buildStoryCard(
+                    final card = _buildStoryCard(
                       context: context,
                       story: story,
                       isCompleted: isCompleted,
+                      isMuhammad: isMuhammad,
                     );
+
+                    if (isFirstMuhammad) {
+                      // Insert a headline above the first Muhammad (ﷺ) story
+                      final textTheme = Theme.of(context).textTheme;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          const SizedBox(height: 28),
+                          Text(
+                            'Muhammad (ﷺ)',
+                            style: textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 21,
+                              color: _gold,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                          const SizedBox(height: 7),
+                          card,
+                        ],
+                      );
+                    }
+
+                    return card;
                   },
                 ),
               );
@@ -132,9 +203,9 @@ class _SelectStoriesPageState extends State<SelectStoriesPage> {
     required BuildContext context,
     required StoryData story,
     required bool isCompleted,
+    required bool isMuhammad,
   }) {
     final textTheme = Theme.of(context).textTheme;
-
     final String subtitlePreview = story.cardPreview ?? '';
 
     return InkWell(
@@ -153,6 +224,12 @@ class _SelectStoriesPageState extends State<SelectStoriesPage> {
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.secondary,
           borderRadius: BorderRadius.circular(16),
+          border: isMuhammad
+              ? Border.all(
+            color: _gold,
+            width: 1.6,
+          )
+              : null, // ✨ golden border only for Muhammad (ﷺ) stories
           boxShadow: [
             BoxShadow(
               blurRadius: 12,
@@ -194,10 +271,10 @@ class _SelectStoriesPageState extends State<SelectStoriesPage> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.06),
+                          color: Colors.green.withValues(alpha: 0.06),
                           borderRadius: BorderRadius.circular(999),
                           border: Border.all(
-                            color: Colors.green.withOpacity(0.6),
+                            color: Colors.green.withValues(alpha: 0.6),
                             width: 0.8,
                           ),
                         ),

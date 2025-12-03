@@ -1,144 +1,150 @@
 import 'package:flutter/material.dart';
 import '../models/story_data.dart';
+import 'stories_page.dart';
 
 const StoryData nuhStory = StoryData(
   id: 'nuh',
   appBarTitle: 'Prophet Nuh (as)',
   chipLabel: 'Prophet Nuh (as)',
   title: 'The Story of Prophet Nuh (as)',
-  subtitle: 'Patience, calling to Allah and the great flood',
-  icon: Icons.sailing_rounded,
-  cardPreview: 'The prophet who built the ark, trusted Allah through the flood, and stayed patient for many years.',
+  subtitle: 'Calling with patience and trusting Allah through the flood',
+  icon: Icons.directions_boat_filled_rounded,
+  cardPreview:
+  'The prophet who called his people for many years, built an ark by Allah’s command, and trusted Allah in the storm.',
   body:
-  'Prophet Nuh (peace be upon him) was sent by Allah to a people who worshipped idols instead of Him. '
-      'They had forgotten the guidance of the earlier righteous people and began to bow to statues that they themselves had made.\n\n'
-      'Nuh (as) called his people to Allah for many, many years. He spoke to them kindly, in public and in private, during the day and during the night. '
-      'He reminded them that Allah is their only Lord, that He created them, provides for them, and that they would one day return to Him.\n\n'
-      'He warned them about the consequences of disbelief and encouraged them with the rewards of Paradise if they believed and did good. '
-      'But most of the people turned away. Some mocked him, some laughed at him, and some closed their ears when he spoke.\n\n'
-      'Even though they rejected him again and again, Nuh (as) stayed patient. He did not give up his mission. He continued to invite them for centuries. '
-      'Only a small group of people believed in him and followed the truth.\n\n'
-      'After a very long time of rejection, Allah informed Nuh (as) that no more people from his nation would believe. '
-      'Then Allah commanded him to build a huge ship — an ark — on dry land, far away from the sea.\n\n'
-      'While Nuh (as) and the believers were building the ark, the disbelievers laughed and made fun of them. '
-      'They said, “You used to call yourself a prophet, and now you are a carpenter building a ship in the middle of the desert!”\n\n'
-      'But Nuh (as) knew that he was following Allah’s command. When the ark was finished, Allah ordered him to take pairs of animals on board, '
-      'along with the believers who followed him.\n\n'
-      'Then the sky opened with heavy rain, and water burst forth from the earth. What looked like normal land became covered in water. '
-      'The waves grew higher and higher, like mountains. The people who had mocked Nuh (as) realized too late that the warning was true.\n\n'
-      'The ark floated safely on top of the waves by the protection of Allah. Everyone inside the ark was safe, while the flood destroyed the people who rejected the truth. '
-      'Among those who did not join Nuh (as) was one of his own sons, who chose to disbelieve and stay with the wrongdoers.\n\n'
-      'After some time, Allah commanded the earth to swallow its water and the sky to stop its rain. The flood ended. '
-      'The ark came to rest on a mountain. Nuh (as) and the believers stepped out to begin a new life on earth, based on faith and obedience to Allah.\n\n'
-      'From the story of Prophet Nuh (as) we learn that:\n'
-      '• A believer should be patient and keep doing good even when others laugh or reject them.\n'
-      '• Guidance belongs to Allah; we must call people kindly but we cannot force their hearts.\n'
-      '• Trusting Allah and obeying Him is the only true safety — in this life and the next.\n',
+  'Prophet Nuh (peace be upon him) was sent to a people who had forgotten Allah and started worshipping idols. '
+      'They made statues and gave them names, hoping they would bring them closer to Allah. But these idols could not hear, see, or help anyone.\n\n'
+      'Allah chose Nuh (as) to remind his people of the truth. He called them day and night, in public and in private, with gentle words and clear warnings. '
+      'He told them that Allah is their true Lord, that they should worship Him alone, and that they should ask for forgiveness.\n\n'
+      'Nuh (as) spoke to them with patience for many, many years — some narrations mention 950 years of calling his people. '
+      'Still, most of them refused to listen. They covered their ears, pulled their clothes over their heads, and turned away whenever he spoke. '
+      'They mocked him and called him names, but he did not stop inviting them to Allah.\n\n'
+      'Only a small group believed in him. These believers were not always rich or powerful; many were simple, humble people. '
+      'The leaders of the community looked down on them and used them as an excuse not to follow Nuh (as).\n\n'
+      'After a very long time of da’wah and rejection, Nuh (as) made dua to Allah, asking for help. '
+      'Allah informed him that no more people would believe except those who had already believed. '
+      'Then Allah gave Nuh (as) a special command: to build a large ark (ship) under Allah’s guidance.\n\n'
+      'Nuh (as) began to build the ark far away from the sea. The disbelievers laughed at him and made fun of him, saying, '
+      '“Have you become a carpenter now?” They could not understand why a ship was being built on dry land.\n\n'
+      'When the ark was ready, Allah commanded Nuh (as) to take with him the believers and pairs of animals. '
+      'Then, the sky began to pour with heavy rain, and water burst from the earth. '
+      'The waters rose and rose until they covered homes, trees, and mountains. The great flood had begun.\n\n'
+      'Inside the ark, Nuh (as) and the believers were safe by Allah’s mercy. '
+      'The ship sailed over the strong waves while the rest of the land was flooded. '
+      'Nuh (as) trusted Allah completely during this frightening time.\n\n'
+      'Among those who refused to board the ark was one of Nuh’s own sons. Nuh (as) felt great sadness and called to him, asking him to come aboard and be safe. '
+      'But his son chose to trust a mountain instead of Allah’s command and was lost in the flood.\n\n'
+      'After some time, the rain stopped, and the water slowly went down. The ark came to rest on a mountain. '
+      'Nuh (as) and the believers left the ship and began a new life, starting a fresh community based on faith in Allah.\n\n'
+      'From the story of Nuh (as), we learn about patience in giving da’wah, trusting Allah even when others mock us, and understanding that true safety lies in obeying Allah, not in things or places.\n\n'
+      'We also learn that guidance is in Allah’s hands. Our duty is to invite others kindly and to remain steadfast, just like Nuh (as) did for so many years.',
   questions: [
     QuizQuestion(
-      question: 'Why was Prophet Nuh (as) sent to his people?',
+      question: 'What was the main sin of Nuh’s people?',
       options: [
-        'To teach them farming and trade',
-        'To call them to worship Allah alone and leave idols',
-        'To build houses for them',
-        'To make them travel to another land',
-      ],
-      correctIndex: 1,
-    ),
-    QuizQuestion(
-      question: 'How did most of Nuh’s (as) people react to his message?',
-      options: [
-        'They believed quickly',
-        'They ignored and mocked him',
-        'They moved to another city',
-        'They kept silent but obeyed',
-      ],
-      correctIndex: 1,
-    ),
-    QuizQuestion(
-      question:
-      'For how long did Prophet Nuh (as) call his people to Allah?',
-      options: [
-        'Only a few months',
-        'A couple of years',
-        'A very long time, for many years',
-        'Just one day',
+        'They did not eat properly',
+        'They slept too much',
+        'They worshipped idols instead of Allah',
+        'They travelled too far',
       ],
       correctIndex: 2,
     ),
     QuizQuestion(
-      question: 'What did Allah command Nuh (as) to build?',
-      options: [
-        'A tall tower',
-        'A huge ark (ship)',
-        'A large wall',
-        'A deep well',
-      ],
-      correctIndex: 1,
-    ),
-    QuizQuestion(
       question:
-      'Why did the disbelievers laugh at Nuh (as) while he was building the ark?',
+      'How long did Prophet Nuh (as) call his people to Allah?',
       options: [
-        'Because it was made of gold',
-        'Because he built it on a mountain',
-        'Because he built a ship on dry land, far from the sea',
-        'Because it was very small',
-      ],
-      correctIndex: 2,
-    ),
-    QuizQuestion(
-      question: 'Who went onto the ark with Prophet Nuh (as)?',
-      options: [
-        'Only his family',
-        'The believers and pairs of animals',
-        'Everyone in the town',
-        'Only children',
-      ],
-      correctIndex: 1,
-    ),
-    QuizQuestion(
-      question: 'What happened to the people who refused to believe?',
-      options: [
-        'They also entered the ark later',
-        'They were saved by climbing a mountain',
-        'They escaped to another country',
-        'They were drowned in the great flood',
+        'A few days',
+        'One year',
+        'Ten years',
+        'Many hundreds of years',
       ],
       correctIndex: 3,
     ),
     QuizQuestion(
-      question:
-      'What happened after the rain stopped and the water went down?',
+      question: 'How did most people respond to Nuh (as)?',
       options: [
-        'The ark disappeared in the sea',
-        'The ark settled on a mountain and the believers left it',
-        'The ark turned into a house',
-        'The believers went back into the sea',
+        'They listened quickly',
+        'They covered their ears and ignored him',
+        'They built the ark for him',
+        'They became his guards',
       ],
       correctIndex: 1,
     ),
     QuizQuestion(
       question:
-      'What is one important lesson from the story of Prophet Nuh (as)?',
+      'What did Allah command Nuh (as) to build?',
       options: [
-        'We should stop doing good if people laugh at us',
-        'We should always trust Allah and stay patient',
-        'We must never travel by ship',
-        'We should not talk to others about Allah',
-      ],
-      correctIndex: 1,
-    ),
-    QuizQuestion(
-      question:
-      'Who controls guidance and knows whose hearts will believe?',
-      options: [
-        'The prophets',
-        'The leaders of the town',
-        'Only Allah',
-        'The richest people',
+        'A tower',
+        'A big palace',
+        'A large ark (ship)',
+        'A school',
       ],
       correctIndex: 2,
+    ),
+    QuizQuestion(
+      question:
+      'Who boarded the ark with Nuh (as)?',
+      options: [
+        'Only his family',
+        'The believers and pairs of animals',
+        'Only children',
+        'Only leaders of the people',
+      ],
+      correctIndex: 1,
+    ),
+    QuizQuestion(
+      question:
+      'What happened when the flood began?',
+      options: [
+        'The water came only from the sea',
+        'Rain fell from the sky and water burst from the earth',
+        'Only snow fell',
+        'Only a little rain came',
+      ],
+      correctIndex: 1,
+    ),
+    QuizQuestion(
+      question:
+      'What sad thing happened with one of Nuh’s sons?',
+      options: [
+        'He fell from the ark',
+        'He refused to board the ark and was lost in the flood',
+        'He became a captain',
+        'He went to another country',
+      ],
+      correctIndex: 1,
+    ),
+    QuizQuestion(
+      question: 'Where did the ark finally come to rest?',
+      options: [
+        'In the middle of the sea',
+        'On a mountain',
+        'Under the ground',
+        'In a desert',
+      ],
+      correctIndex: 1,
+    ),
+    QuizQuestion(
+      question:
+      'What is one lesson from the story of Nuh (as)?',
+      options: [
+        'To give up quickly when people refuse us',
+        'That Allah does not protect anyone',
+        'That true safety is in obeying Allah',
+        'That we should never warn others',
+      ],
+      correctIndex: 2,
+    ),
+    QuizQuestion(
+      question:
+      'How can we follow Nuh (as) in our own lives?',
+      options: [
+        'Mock people who do wrong',
+        'Stay patient and keep inviting others kindly to goodness',
+        'Never talk about Allah',
+        'Hide our faith completely',
+      ],
+      correctIndex: 1,
     ),
   ],
 );
