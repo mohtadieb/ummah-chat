@@ -59,20 +59,31 @@ class DatabaseProvider extends ChangeNotifier {
   Future<void> updateProfileSong(String songId) =>
       _db.updateUserProfileSong(songId);
 
-  /// Update about me
+  /// Update about me (city + languages + interests)
   Future<void> updateAboutMe({
-    required String? fromLocation,
+    required String? city,
     required List<String> languages,
     required List<String> interests,
   }) async {
     await _db.updateUserAboutMeInDatabase(
-      fromLocation: fromLocation,
+      city: city,
       languages: languages,
       interests: interests,
     );
   }
 
-
+  /// 🆕 Update core profile (name + country + gender) from CompleteProfilePage
+  Future<void> updateCoreProfile({
+    required String name,
+    required String country,
+    required String gender,
+  }) async {
+    await _db.updateUserCoreProfileInDatabase(
+      name: name,
+      country: country,
+      gender: gender,
+    );
+  }
 
 
   /* ==================== POSTS ==================== */

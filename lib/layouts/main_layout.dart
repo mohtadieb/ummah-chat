@@ -28,7 +28,7 @@ class MainLayout extends StatefulWidget {
 class _MainLayoutState extends State<MainLayout> {
   // index of the Chats tab in bottom navigation (still 1)
   static const int _chatsIndex = 1;
-  static const int _profileTabIndex = 3;
+  static const int _profileTabIndex = 4;
 
   // Auth service to get current user id for ProfilePage
   final _auth = AuthService();
@@ -51,8 +51,8 @@ class _MainLayoutState extends State<MainLayout> {
       const HomePage(),              // 0
       const ChatTabsPage(),          // 1
       SelectStoriesPage(),           // 2
-      ProfilePage(userId: currentUserId), // 3
       DuaWallPage(),
+      ProfilePage(userId: currentUserId), // 4
     ];
   }
 
@@ -152,9 +152,8 @@ class _MainLayoutState extends State<MainLayout> {
             icon: Icon(Icons.menu_book_rounded),
             label: 'Stories',
           ),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
           BottomNavigationBarItem(icon: Icon(Icons.view_list), label: 'Dua Wall'),
-
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
     );

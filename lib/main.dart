@@ -8,6 +8,7 @@ import 'pages/home_page.dart';
 import 'pages/search_page.dart';
 import 'pages/settings_page.dart';
 import 'services/auth/auth_gate.dart';
+import 'services/auth/startup_gate.dart'; // 🆕 NEW
 import 'services/database/database_provider.dart';
 import 'themes/theme_provider.dart';
 import 'services/navigation/bottom_nav_provider.dart';
@@ -46,7 +47,10 @@ class MyApp extends StatelessWidget {
       theme: themeProvider.themeData,
       initialRoute: '/',
       routes: {
-        '/': (context) => const AuthGate(),
+        // 🆕 First go through StartupGate, which decides:
+        // - first time? -> Onboarding
+        // - not first time? -> AuthGate
+        '/': (context) => const StartupGate(),
         '/home': (context) => const HomePage(),
         '/search': (context) => const SearchPage(),
         '/settings': (context) => const SettingsPage(),

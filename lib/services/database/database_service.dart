@@ -42,54 +42,81 @@ class DatabaseService {
   // 🆕 Notification service (used to create in-app notifications)
   final NotificationService _notifications = NotificationService();
 
-  /* ==================== USER PROFILE ==================== */
+/* ==================== USER PROFILE ==================== */
 
-  /// Save user in database
-  Future<void> saveUserInDatabase({
+  /// 🆕 Update core profile info after CompleteProfilePage:
+  /// name, country, gender – and CREATE row if it doesn't exist.
+  Future<void> updateUserCoreProfileInDatabase({
     required String name,
-    required String email,
+    required String country,
+    required String gender, // 'male' or 'female'
   }) async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      throw Exception('No logged-in user');
+    }
+
+    final email = currentUser.email ?? '';
+    String username = email.split('@').first.trim();
+    if (username.isEmpty) {
+      username = 'user_${currentUser.id.substring(0, 8)}';
+    }
+
     try {
-      // get current userId
-      String currentUserId = _auth.currentUser!.id;
-
-      // Generate a safe username
-      String username = email.split('@').first.trim();
-      if (username.isEmpty) {
-        username = 'user_$currentUserId';
-      }
-
-      // Create user profile
-      UserProfile user = UserProfile(
-        id: currentUserId,
-        name: name,
-        email: email,
-        username: username,
-        bio: '',
-        createdAt: DateTime.now().toUtc(),
-      );
-
-      // convert user into map so that we can store in in supabase
-      final userMap = user.toMap();
-
-      print('Inserting user: $userMap');
-
-      // save user in database
-      await _db.from('profiles').insert(userMap);
+      await _db.from('profiles').upsert({
+        'id': currentUser.id,
+        'name': name,
+        'email': email,
+        'username': username,
+        'country': country,
+        'gender': gender,
+        // if the row is new we set created_at now, if existing it can be ignored/overwritten
+        'created_at': DateTime.now().toUtc().toIso8601String(),
+      });
     } catch (e, st) {
-      print("Error saving user info: $e\n$st");
+      print("Error updating core profile info: $e\n$st");
+      rethrow;
     }
   }
 
+  /// Check if the current user's profile is completed
+  Future<bool> isProfileCompleted() async {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+
+    try {
+      final data = await _db
+          .from('profiles')
+          .select('country, gender')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (data == null) {
+        // No row yet = not completed
+        return false;
+      }
+
+      final country = (data['country'] ?? '').toString().trim();
+      final gender = (data['gender'] ?? '').toString().trim();
+
+      // ✅ profile is "complete" if both are filled
+      return country.isNotEmpty && gender.isNotEmpty;
+    } catch (e) {
+      print('Error checking profile completion: $e');
+      // On error, be safe and treat as incomplete
+      return false;
+    }
+  }
+
+
+
   /// Get user from database
   Future<UserProfile?> getUserFromDatabase(String userId) async {
-    // Retrieve user info from database
     try {
       final userData =
       await _db.from('profiles').select().eq('id', userId).maybeSingle();
       if (userData == null) return null;
 
-      // Convert userData to user profile
       return UserProfile.fromMap(userData);
     } catch (e) {
       print("Error fetching user: $e");
@@ -97,14 +124,13 @@ class DatabaseService {
     }
   }
 
-
-  Future<String?> uploadProfilePhotoToDatabase(Uint8List bytes, String userId) async {
+  Future<String?> uploadProfilePhotoToDatabase(
+      Uint8List bytes, String userId) async {
     try {
-      // 🔹 only the *path inside the bucket*, no bucket name here
       final filePath = '$userId-${DateTime.now().millisecondsSinceEpoch}.jpg';
 
       final response = await _db.storage
-          .from('profile_photos') // 👈 bucket name
+          .from('profile_photos')
           .uploadBinary(
         filePath,
         bytes,
@@ -125,16 +151,14 @@ class DatabaseService {
     return null;
   }
 
-
-
   Future<void> updateUserProfilePhotoInDatabase(String url) async {
     final userId = _auth.currentUser?.id;
     if (userId == null) return;
 
     try {
-      await _db.from('profiles').update({
-        'profile_photo_url': url,
-      }).eq('id', userId);
+      await _db
+          .from('profiles')
+          .update({'profile_photo_url': url}).eq('id', userId);
     } catch (e) {
       print("Error updating profile picture in DB: $e");
     }
@@ -142,8 +166,8 @@ class DatabaseService {
 
   /// Update user bio
   Future<void> updateUserBioInDatabase(String bio) async {
-    // Get current user Id
-    final currentUserId = _auth.currentUser!.id;
+    final currentUserId = _auth.currentUser?.id;
+    if (currentUserId == null) return;
 
     try {
       await _db.from('profiles').update({'bio': bio}).eq('id', currentUserId);
@@ -160,16 +184,15 @@ class DatabaseService {
     try {
       await _db
           .from('profiles')
-          .update({'profile_song_id': songId})
-          .eq('id', currentUserId);
+          .update({'profile_song_id': songId}).eq('id', currentUserId);
     } catch (e) {
       print('Error updating profile song: $e');
     }
   }
 
-  /// Update the About Me section
+  /// Update the About Me section (city + languages + interests)
   Future<void> updateUserAboutMeInDatabase({
-    required String? fromLocation,
+    required String? city,
     required List<String> languages,
     required List<String> interests,
   }) async {
@@ -178,7 +201,7 @@ class DatabaseService {
 
     try {
       await _db.from('profiles').update({
-        'from_location': fromLocation,
+        'city': city,
         'languages': languages,
         'interests': interests,
       }).eq('id', currentUserId);
@@ -186,7 +209,6 @@ class DatabaseService {
       print("Error updating About Me: $e");
     }
   }
-
 
   /* ==================== POSTS ==================== */
 

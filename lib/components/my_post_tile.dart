@@ -252,8 +252,8 @@ class _MyPostTileState extends State<MyPostTile> {
     final bottomNav =
     Provider.of<BottomNavProvider>(context, listen: false);
 
-    // 3 = index of Profile tab in MainLayout's BottomNavigationBar
-    bottomNav.setIndex(3);
+    // 4 = index of Profile tab in MainLayout's BottomNavigationBar
+    bottomNav.setIndex(4);
     // No push, no new ProfilePage → it will reuse the existing tab instance
   }
 

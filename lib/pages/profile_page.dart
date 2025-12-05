@@ -365,20 +365,29 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget _buildAboutMeSection() {
     if (user == null) return const SizedBox();
 
-    final from = user!.fromLocation;
+    final country = user!.country;
+    final city = user!.city;
     final langs = user!.languages;
     final ints = user!.interests;
 
     final chips = <Widget>[];
 
-    if (from != null && from.isNotEmpty) {
-      chips.add(_chip("From: $from"));
+    // Country first (always set after CompleteProfilePage)
+    if (country.isNotEmpty) {
+      chips.add(_chip(country));
     }
 
+    // Then city
+    if (city != null && city.isNotEmpty) {
+      chips.add(_chip(city));
+    }
+
+    // Then languages
     if (langs.isNotEmpty) {
       chips.addAll(langs.map((l) => _chip(l)));
     }
 
+    // Then interests
     if (ints.isNotEmpty) {
       chips.addAll(ints.map((i) => _chip(i)));
     }
@@ -396,6 +405,7 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
   }
+
 
   Widget _chip(String label) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -422,7 +432,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _editAboutMe() {
-    final fromCtrl = TextEditingController(text: user?.fromLocation ?? '');
+    final cityCtrl = TextEditingController(text: user?.city ?? '');
     final langsCtrl = TextEditingController(
       text: (user?.languages ?? []).join(', '),
     );
@@ -432,93 +442,102 @@ class _ProfilePageState extends State<ProfilePage> {
 
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true,
+      isScrollControlled: true, // ✅ important so sheet can move with keyboard
       backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) {
-        return Padding(
+      builder: (ctx) {
+        final viewInsets = MediaQuery.of(ctx).viewInsets;
+
+        return AnimatedPadding(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
           padding: EdgeInsets.only(
             left: 20,
             right: 20,
             top: 24,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+            bottom: viewInsets.bottom + 16, // ✅ shifts up with keyboard
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                "About me",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.primary,
+          child: SingleChildScrollView(
+            // ✅ makes content scrollable when space is tight
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "About me",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: fromCtrl,
-                decoration: const InputDecoration(
-                  labelText: "From (city / country)",
+                const SizedBox(height: 16),
+                TextField(
+                  controller: cityCtrl,
+                  decoration: const InputDecoration(
+                    labelText: "City",
+                    hintText: "e.g. Rotterdam",
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: langsCtrl,
-                decoration: const InputDecoration(
-                  labelText: "Languages (comma separated)",
-                  hintText: "Dutch, Arabic, English",
+                const SizedBox(height: 12),
+                TextField(
+                  controller: langsCtrl,
+                  decoration: const InputDecoration(
+                    labelText: "Languages (comma separated)",
+                    hintText: "Dutch, Arabic, English",
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: intsCtrl,
-                decoration: const InputDecoration(
-                  labelText: "Interests (comma separated)",
-                  hintText: "Qur’an, Psychology, Travel",
+                const SizedBox(height: 12),
+                TextField(
+                  controller: intsCtrl,
+                  decoration: const InputDecoration(
+                    labelText: "Interests (comma separated)",
+                    hintText: "Qur’an, Psychology, Travel",
+                  ),
                 ),
-              ),
-              const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () async {
-                    final fromLocation = fromCtrl.text.trim().isEmpty
-                        ? null
-                        : fromCtrl.text.trim();
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () async {
+                      final city = cityCtrl.text.trim().isEmpty
+                          ? null
+                          : cityCtrl.text.trim();
 
-                    final languages = langsCtrl.text
-                        .split(',')
-                        .map((e) => e.trim())
-                        .where((e) => e.isNotEmpty)
-                        .toList();
+                      final languages = langsCtrl.text
+                          .split(',')
+                          .map((e) => e.trim())
+                          .where((e) => e.isNotEmpty)
+                          .toList();
 
-                    final interests = intsCtrl.text
-                        .split(',')
-                        .map((e) => e.trim())
-                        .where((e) => e.isNotEmpty)
-                        .toList();
+                      final interests = intsCtrl.text
+                          .split(',')
+                          .map((e) => e.trim())
+                          .where((e) => e.isNotEmpty)
+                          .toList();
 
-                    await databaseProvider.updateAboutMe(
-                      fromLocation: fromLocation,
-                      languages: languages,
-                      interests: interests,
-                    );
+                      await databaseProvider.updateAboutMe(
+                        city: city,
+                        languages: languages,
+                        interests: interests,
+                      );
 
-                    await loadUser();
+                      await loadUser();
 
-                    if (mounted) Navigator.pop(context);
-                  },
-                  child: const Text("Save"),
+                      if (mounted) Navigator.pop(context);
+                    },
+                    child: const Text("Save"),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
     );
   }
+
 
   Widget _buildEditAboutMeButton() {
     if (!_isOwnProfile) return const SizedBox.shrink();
@@ -887,7 +906,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           Provider.of<BottomNavProvider>(context,
                               listen: false);
 
-                          bottomNav.setIndex(3);
+                          bottomNav.setIndex(4);
                           Navigator.pop(context);
                         } else {
                           Navigator.push(

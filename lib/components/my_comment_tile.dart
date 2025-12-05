@@ -189,7 +189,7 @@ class _MyCommentTileState extends State<MyCommentTile> {
     // 👉 If comment belongs to the logged-in user: switch to profile tab
     if (widget.comment.userId == currentUserId) {
       final bottomNav = Provider.of<BottomNavProvider>(context, listen: false);
-      bottomNav.setIndex(3); // profile tab index
+      bottomNav.setIndex(4); // profile tab index
 
       // Also go back so MainLayout becomes visible
       if (Navigator.of(context).canPop()) {

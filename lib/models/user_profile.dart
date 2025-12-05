@@ -7,10 +7,18 @@ class UserProfile {
   final String profilePhotoUrl;
   final DateTime createdAt;
   final String profileSongId;
-  final String? fromLocation;
+
+  /// 🆕 Country (set on CompleteProfilePage)
+  final String country;
+
+  /// 🆕 City (editable in "About me")
+  final String? city;
+
+  /// 🆕 Gender: "male" or "female"
+  final String gender;
+
   final List<String> languages;
   final List<String> interests;
-
 
   /// 🆕 When the user was last active in the app (UTC in Supabase)
   final DateTime? lastSeenAt;
@@ -24,8 +32,10 @@ class UserProfile {
     this.profilePhotoUrl = '',
     required this.createdAt,
     this.lastSeenAt,
-    this.profileSongId = '', // 🆕 default: no song selected
-    this.fromLocation,
+    this.profileSongId = '',
+    this.country = '',
+    this.city,
+    this.gender = '',
     this.languages = const [],
     this.interests = const [],
   });
@@ -41,13 +51,11 @@ class UserProfile {
 
   /// Create a UserProfile from a Supabase row (Map)
   factory UserProfile.fromMap(Map<String, dynamic> map) {
-    // Supabase usually returns timestamps as ISO 8601 strings
     final createdAtRaw = map['created_at'];
     final lastSeenRaw = map['last_seen_at'];
 
     DateTime parseDate(dynamic value) {
       if (value == null) {
-        // fallback to now if created_at is unexpectedly null
         return DateTime.now().toUtc();
       }
       if (value is DateTime) return value.toUtc();
@@ -69,9 +77,10 @@ class UserProfile {
       profilePhotoUrl: (map['profile_photo_url'] ?? '') as String,
       createdAt: parseDate(createdAtRaw),
       lastSeenAt: parseNullableDate(lastSeenRaw),
-      profileSongId: map['profile_song_id'] as String? ??
-          '', // 🆕 read from DB (or empty if null)
-      fromLocation: map['from_location'],
+      profileSongId: map['profile_song_id'] as String? ?? '',
+      country: (map['country'] ?? '') as String,
+      city: map['city'] as String?,
+      gender: (map['gender'] ?? '') as String,
       languages: List<String>.from(map['languages'] ?? []),
       interests: List<String>.from(map['interests'] ?? []),
     );
@@ -88,8 +97,10 @@ class UserProfile {
       'profile_photo_url': profilePhotoUrl,
       'created_at': createdAt.toIso8601String(),
       if (lastSeenAt != null) 'last_seen_at': lastSeenAt!.toIso8601String(),
-      'profile_song_id': profileSongId, // 🆕 write to DB
-      'from_location': fromLocation,
+      'profile_song_id': profileSongId,
+      'country': country,
+      'city': city,
+      'gender': gender,
       'languages': languages,
       'interests': interests,
     };
@@ -106,6 +117,11 @@ class UserProfile {
     DateTime? createdAt,
     DateTime? lastSeenAt,
     String? profileSongId,
+    String? country,
+    String? city,
+    String? gender,
+    List<String>? languages,
+    List<String>? interests,
   }) {
     return UserProfile(
       id: id ?? this.id,
@@ -117,6 +133,11 @@ class UserProfile {
       createdAt: createdAt ?? this.createdAt,
       lastSeenAt: lastSeenAt ?? this.lastSeenAt,
       profileSongId: profileSongId ?? this.profileSongId,
+      country: country ?? this.country,
+      city: city ?? this.city,
+      gender: gender ?? this.gender,
+      languages: languages ?? this.languages,
+      interests: interests ?? this.interests,
     );
   }
 }

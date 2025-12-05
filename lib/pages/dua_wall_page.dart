@@ -54,116 +54,126 @@ class _DuaWallPageState extends State<DuaWallPage> {
     showDialog(
       context: context,
       builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (innerContext, setInnerState) {
-            return MyInputAlertBox(
-              textController: duaController,
-              hintText: "Write your dua here...",
-              onPressedText: "Post",
-              onPressed: () async {
-                final text = duaController.text.trim();
+        return SingleChildScrollView(
+          // so it moves up / shrinks nicely when keyboard opens
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            bottom: MediaQuery.of(dialogContext).viewInsets.bottom + 16,
+          ),
+          child: StatefulBuilder(
+            builder: (innerContext, setInnerState) {
+              return MyInputAlertBox(
+                textController: duaController,
+                hintText: "Write your dua here...",
+                onPressedText: "Post",
+                onPressed: () async {
+                  final text = duaController.text.trim();
 
-                if (text.replaceAll(RegExp(r'\s+'), '').length < 5) {
-                  messenger?.showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        "Your dua should be at least 5 characters.",
+                  if (text.replaceAll(RegExp(r'\s+'), '').length < 5) {
+                    messenger?.showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          "Your dua should be at least 5 characters.",
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+
+                  try {
+                    await databaseProvider.createDua(
+                      text: text,
+                      isAnonymous: isAnonymous,
+                      isPrivate: isPrivate,
+                    );
+
+                    duaController.clear();
+                    messenger?.showSnackBar(
+                      const SnackBar(
+                        content: Text("Your dua has been shared."),
+                      ),
+                    );
+
+                    // Refresh list
+                    await _loadDuaWall();
+                  } catch (e) {
+                    debugPrint('Error creating dua: $e');
+                    messenger?.showSnackBar(
+                      const SnackBar(
+                        content:
+                        Text("Could not share dua. Please try again."),
+                      ),
+                    );
+                  }
+                },
+                extraWidget: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 12),
+                    Text(
+                      "Visibility",
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
-                  );
-                  return;
-                }
-
-                try {
-                  await databaseProvider.createDua(
-                    text: text,
-                    isAnonymous: isAnonymous,
-                    isPrivate: isPrivate,
-                  );
-
-                  duaController.clear();
-                  messenger?.showSnackBar(
-                    const SnackBar(
-                      content: Text("Your dua has been shared."),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8, // a bit of vertical spacing when wrapped
+                      children: [
+                        FilterChip(
+                          label: const Text("Show my name"),
+                          selected: !isAnonymous && !isPrivate,
+                          onSelected: (_) {
+                            setInnerState(() {
+                              isAnonymous = false;
+                              isPrivate = false;
+                            });
+                          },
+                        ),
+                        FilterChip(
+                          label: const Text("Anonymous"),
+                          selected: isAnonymous,
+                          onSelected: (value) {
+                            setInnerState(() {
+                              isAnonymous = value;
+                              if (value) isPrivate = false;
+                            });
+                          },
+                        ),
+                        FilterChip(
+                          label: const Text("Private (only me)"),
+                          selected: isPrivate,
+                          onSelected: (value) {
+                            setInnerState(() {
+                              isPrivate = value;
+                              if (value) isAnonymous = false;
+                            });
+                          },
+                        ),
+                      ],
                     ),
-                  );
-
-                  // Refresh list
-                  await _loadDuaWall();
-                } catch (e) {
-                  debugPrint('Error creating dua: $e');
-                  messenger?.showSnackBar(
-                    const SnackBar(
-                      content:
-                      Text("Could not share dua. Please try again."),
-                    ),
-                  );
-                }
-              },
-              extraWidget: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 12),
-                  Text(
-                    "Visibility",
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      FilterChip(
-                        label: const Text("Show my name"),
-                        selected: !isAnonymous && !isPrivate,
-                        onSelected: (_) {
-                          setInnerState(() {
-                            isAnonymous = false;
-                            isPrivate = false;
-                          });
-                        },
+                    const SizedBox(height: 4),
+                    Text(
+                      "• Anonymous: others see “Anonymous” instead of your name.\n"
+                          "• Private: only you can see this dua in your Dua Wall.",
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0.7),
                       ),
-                      FilterChip(
-                        label: const Text("Anonymous"),
-                        selected: isAnonymous,
-                        onSelected: (value) {
-                          setInnerState(() {
-                            isAnonymous = value;
-                            if (value) isPrivate = false;
-                          });
-                        },
-                      ),
-                      FilterChip(
-                        label: const Text("Private (only me)"),
-                        selected: isPrivate,
-                        onSelected: (value) {
-                          setInnerState(() {
-                            isPrivate = value;
-                            if (value) isAnonymous = false;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    "• Anonymous: others see “Anonymous” instead of your name.\n"
-                        "• Private: only you can see this dua in your Dua Wall.",
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .primary
-                          .withValues(alpha: 0.7),
                     ),
-                  ),
-                ],
-              ),
-            );
-          },
+                  ],
+                ),
+              );
+            },
+          ),
         );
       },
     );
@@ -339,7 +349,8 @@ class _DuaWallPageState extends State<DuaWallPage> {
           padding: const EdgeInsets.symmetric(
               horizontal: 16, vertical: 20),
           itemCount: visibleDuas.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 10),
+          separatorBuilder: (_, __) =>
+          const SizedBox(height: 10),
           itemBuilder: (context, index) {
             final dua = visibleDuas[index];
             final isMine = dua.userId == _currentUserId;
@@ -360,14 +371,16 @@ class _DuaWallPageState extends State<DuaWallPage> {
               children: [
                 // CARD (with internal stack for Ameen counter)
                 Container(
-                  margin: const EdgeInsets.only(bottom: 22),
+                  margin:
+                  const EdgeInsets.only(bottom: 22),
                   child: Stack(
                     children: [
                       // Card background + content
                       Container(
                         decoration: BoxDecoration(
                           color: colorScheme.secondary,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius:
+                          BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
                               blurRadius: 10,
@@ -379,7 +392,8 @@ class _DuaWallPageState extends State<DuaWallPage> {
                         ),
                         child: Padding(
                           // extra bottom padding so text doesn't overlap counter
-                          padding: const EdgeInsets.fromLTRB(
+                          padding:
+                          const EdgeInsets.fromLTRB(
                               14, 12, 14, 30),
                           child: Column(
                             crossAxisAlignment:
@@ -394,24 +408,29 @@ class _DuaWallPageState extends State<DuaWallPage> {
                                         .isAnonymous &&
                                         !isMine
                                         ? colorScheme.primary
-                                        .withValues(alpha: 0.1)
+                                        .withValues(
+                                        alpha: 0.1)
                                         : colorScheme.primary
-                                        .withValues(alpha: 0.15),
+                                        .withValues(
+                                        alpha: 0.15),
                                     child: dua.isAnonymous &&
                                         !isMine
                                         ? Icon(
-                                      Icons.nightlight_round,
-                                      color:
-                                      colorScheme.primary,
+                                      Icons
+                                          .nightlight_round,
+                                      color: colorScheme
+                                          .primary,
                                       size: 20,
                                     )
                                         : Text(
                                       avatarInitial,
                                       style: TextStyle(
-                                        color: colorScheme
+                                        color:
+                                        colorScheme
                                             .primary,
                                         fontWeight:
-                                        FontWeight.bold,
+                                        FontWeight
+                                            .bold,
                                       ),
                                     ),
                                   ),
@@ -419,40 +438,45 @@ class _DuaWallPageState extends State<DuaWallPage> {
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                      CrossAxisAlignment
+                                          .start,
                                       children: [
                                         Row(
                                           children: [
                                             Flexible(
                                               child: Text(
                                                 displayName,
-                                                style: TextStyle(
-                                                  fontSize: 14,
+                                                style:
+                                                TextStyle(
+                                                  fontSize:
+                                                  14,
                                                   fontWeight:
-                                                  FontWeight.w600,
-                                                  color:
-                                                  colorScheme
+                                                  FontWeight
+                                                      .w600,
+                                                  color: colorScheme
                                                       .primary,
                                                 ),
-                                                overflow: TextOverflow
+                                                overflow:
+                                                TextOverflow
                                                     .ellipsis,
                                               ),
                                             ),
-                                            if (dua.isPrivate) ...[
+                                            if (dua
+                                                .isPrivate) ...[
                                               const SizedBox(
                                                   width: 6),
                                               Container(
                                                 padding:
                                                 const EdgeInsets
                                                     .symmetric(
-                                                  horizontal: 6,
+                                                  horizontal:
+                                                  6,
                                                   vertical: 2,
                                                 ),
                                                 decoration:
                                                 BoxDecoration(
                                                   borderRadius:
-                                                  BorderRadius
-                                                      .circular(
+                                                  BorderRadius.circular(
                                                       999),
                                                   color: Colors
                                                       .orange
@@ -460,10 +484,13 @@ class _DuaWallPageState extends State<DuaWallPage> {
                                                       alpha:
                                                       0.08),
                                                 ),
-                                                child: const Text(
+                                                child:
+                                                const Text(
                                                   "Private",
-                                                  style: TextStyle(
-                                                    fontSize: 10,
+                                                  style:
+                                                  TextStyle(
+                                                    fontSize:
+                                                    10,
                                                     fontWeight:
                                                     FontWeight
                                                         .w600,
@@ -475,14 +502,17 @@ class _DuaWallPageState extends State<DuaWallPage> {
                                             ],
                                           ],
                                         ),
-                                        const SizedBox(height: 2),
+                                        const SizedBox(
+                                            height: 2),
                                         Text(
                                           timeLabel,
                                           style: TextStyle(
                                             fontSize: 11,
-                                            color: colorScheme.primary
+                                            color: colorScheme
+                                                .primary
                                                 .withValues(
-                                                alpha: 0.65),
+                                                alpha:
+                                                0.65),
                                           ),
                                         ),
                                       ],
@@ -500,7 +530,8 @@ class _DuaWallPageState extends State<DuaWallPage> {
                                   fontSize: 14,
                                   height: 1.4,
                                   color: colorScheme.primary
-                                      .withValues(alpha: 0.95),
+                                      .withValues(
+                                      alpha: 0.95),
                                 ),
                               ),
                             ],
@@ -538,29 +569,30 @@ class _DuaWallPageState extends State<DuaWallPage> {
                         Icons.delete_outline,
                         size: 20,
                       ),
-                      color:
-                      Colors.red.withValues(alpha: 0.85),
-                      onPressed: () => _confirmDeleteDua(dua),
+                      color: Colors.red
+                          .withValues(alpha: 0.85),
+                      onPressed: () =>
+                          _confirmDeleteDua(dua),
                       tooltip: 'Delete dua',
                     ),
                   ),
 
-                // FLOATING AMEEN BUTTON (half in / half out of the card)
+                // FLOATING AMEEN BUTTON
                 Positioned(
                   left: 0,
                   right: 0,
-                  bottom: -16, // half sticks out below the card
+                  bottom: 0,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
                           elevation: isAmeened ? 3 : 0,
-                          padding: const EdgeInsets.symmetric(
+                          padding:
+                          const EdgeInsets.symmetric(
                             horizontal: 16,
                             vertical: 8,
                           ),
-                          // 🌿 Solid subtle green when NOT Ameen'ed, deep green when Ameen'ed
                           backgroundColor: isAmeened
                               ? const Color(0xFF0F8254)
                               : const Color(0xFFE0F2EB),
@@ -574,7 +606,8 @@ class _DuaWallPageState extends State<DuaWallPage> {
                                 ? BorderSide.none
                                 : BorderSide(
                               color: colorScheme.primary
-                                  .withValues(alpha: 0.35),
+                                  .withValues(
+                                  alpha: 0.35),
                               width: 1.3,
                             ),
                           ),
@@ -583,11 +616,12 @@ class _DuaWallPageState extends State<DuaWallPage> {
                           '🤲',
                           style: TextStyle(fontSize: 21),
                         ),
-                        label: const Text(
+                        label: Text(
                           "Ameen",
                           style: TextStyle(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w600,
+                            color: Colors.black54,
                           ),
                         ),
                         onPressed: () => _toggleAmeen(dua),

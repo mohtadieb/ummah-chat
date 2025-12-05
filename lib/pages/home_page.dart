@@ -23,8 +23,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage>
-    with SingleTickerProviderStateMixin {
+class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
   @override
   void setState(VoidCallback fn) {
     if (!mounted) return;
@@ -298,28 +297,44 @@ class _HomePageState extends State<HomePage>
       ...posts,
     ];
 
-    if (list.isEmpty) {
-      return const Center(
-        child: Text("Nothing here.."),
-      );
-    }
-
-    return ListView.builder(
-      itemCount: list.length,
-      itemBuilder: (context, index) {
-        final post = list[index];
-
-        if (post.id == 'loading') {
-          return _buildLoadingPostTile();
-        }
-
-        return MyPostTile(
-          post: post,
-          onUserTap: () => goUserPage(context, post.userId),
-          onPostTap: () => goPostPage(context, post),
-          scaffoldContext: context,
-        );
+    return RefreshIndicator(
+      onRefresh: () async {
+        await loadAllPosts();
       },
+      child: list.isEmpty
+          ? LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight,
+              ),
+              child: const Center(
+                child: Text("Nothing here.."),
+              ),
+            ),
+          );
+        },
+      )
+          : ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        itemCount: list.length,
+        itemBuilder: (context, index) {
+          final post = list[index];
+
+          if (post.id == 'loading') {
+            return _buildLoadingPostTile();
+          }
+
+          return MyPostTile(
+            post: post,
+            onUserTap: () => goUserPage(context, post.userId),
+            onPostTap: () => goPostPage(context, post),
+            scaffoldContext: context,
+          );
+        },
+      ),
     );
   }
 

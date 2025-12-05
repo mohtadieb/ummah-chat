@@ -39,6 +39,7 @@ dependencies:
   image_cropper: ^7.0.0      # or latest compatible version
 
 
+
   # Voice recording
   flutter_sound: ^9.2.13
   permission_handler: ^11.0.0
@@ -54,7 +55,7 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  shared_preferences: ^2.2.0
+  shared_preferences: ^2.3.2
   url_launcher: ^6.3.0
 
 
@@ -84,6 +85,9 @@ flutter_icons:
 flutter:
   assets:
     - assets/login_page_image_green.png
+    - assets/onboarding_ummah_chat_1.png
+    - assets/onboarding_dua_wall.png
+    - assets/onboarding_stories_communities.png
     - assets/audio/profile_song_1.mp3
     - assets/audio/profile_song_2.wav
     - assets/audio/profile_song_3.mp3

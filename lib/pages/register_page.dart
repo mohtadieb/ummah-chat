@@ -1,29 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:ummah_chat/services/database/database_service.dart';
+
 import '../components/my_button.dart';
 import '../components/my_dialogs.dart';
 import '../components/my_text_field.dart';
 import '../services/auth/auth_service.dart';
 
-/*
-REGISTER PAGE (Supabase Version)
-
-This page allows a new user to create an account using Supabase authentication.
-We need:
-
-- Name
-- Email
-- Password
-- Confirm Password
-
---------------------------------------------------------------------------------
-
-Once the user successfully created an account they will be redirected to home page
-via AuthGate (listening to auth changes).
-
-Also, if user already has an account, they can go to login page from here.
-*/
-
+/// REGISTER PAGE (Supabase Version)
+///
+/// Only handles account credentials:
+/// - Email
+/// - Password
+/// - Confirm Password
+///
+/// Profile details (name, country, gender) are asked
+/// on CompleteProfilePage after registration/login.
 class RegisterPage extends StatefulWidget {
   final void Function()? onTap; // Callback to switch to LoginPage
 
@@ -34,30 +24,37 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
-  // services
   final AuthService _auth = AuthService();
-  final DatabaseService _db = DatabaseService();
 
   // Text Controllers
-  final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController pwController = TextEditingController();
   final TextEditingController confirmPwController = TextEditingController();
 
-  // Local loading state
   bool _isRegistering = false;
 
-  /// Register user
   Future<void> register() async {
-    // Hide keyboard first to avoid flicker
+    // Hide keyboard
     FocusScope.of(context).unfocus();
 
-    // Password check
-    if (pwController.text != confirmPwController.text) {
+    final email = emailController.text.trim();
+    final pw = pwController.text;
+    final confirmPw = confirmPwController.text;
+
+    if (email.isEmpty || pw.isEmpty || confirmPw.isEmpty) {
       showAppErrorDialog(
         context,
         title: "Registration Error",
-        message: "Passwords don't match",
+        message: "Please fill in all fields.",
+      );
+      return;
+    }
+
+    if (pw != confirmPw) {
+      showAppErrorDialog(
+        context,
+        title: "Registration Error",
+        message: "Passwords don't match.",
       );
       return;
     }
@@ -65,27 +62,14 @@ class _RegisterPageState extends State<RegisterPage> {
     setState(() => _isRegistering = true);
 
     try {
-      // 1) Create Supabase user
-      await _auth.registerEmailPassword(
-        emailController.text.trim(),
-        pwController.text.trim(),
-      );
+      await _auth.registerEmailPassword(email, pw);
 
-      // 2) Save profile in database
-      await _db.saveUserInDatabase(
-        name: nameController.text.trim(),
-        email: emailController.text.trim(),
-      );
-
-      // 3) Optional success feedback
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Account created successfully!')),
         );
       }
-
-      // ⚠️ Navigation is handled by AuthGate listening to auth changes,
-      // so we don't push MainLayout here manually.
+      // 👉 AuthGate + your logic should route to CompleteProfilePage next.
     } catch (e) {
       if (mounted) {
         showAppErrorDialog(
@@ -95,29 +79,24 @@ class _RegisterPageState extends State<RegisterPage> {
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isRegistering = false);
-      }
+      if (mounted) setState(() => _isRegistering = false);
     }
   }
 
   @override
   void dispose() {
-    nameController.dispose();
     emailController.dispose();
     pwController.dispose();
     confirmPwController.dispose();
     super.dispose();
   }
 
-  // Build UI
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Stack(
       children: [
-        // SCAFFOLD
         Scaffold(
           backgroundColor: colorScheme.surface,
           body: SafeArea(
@@ -130,7 +109,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     children: [
                       const SizedBox(height: 7),
 
-                      // Logo
+                      // Logo / illustration
                       Image.asset(
                         'assets/login_page_image_green.png',
                         width: 256,
@@ -140,7 +119,6 @@ class _RegisterPageState extends State<RegisterPage> {
 
                       const SizedBox(height: 7),
 
-                      //TEXT
                       Text(
                         "Let's create an account for you",
                         style: TextStyle(
@@ -151,16 +129,6 @@ class _RegisterPageState extends State<RegisterPage> {
 
                       const SizedBox(height: 28),
 
-                      // Name Text Field
-                      MyTextField(
-                        controller: nameController,
-                        hintText: "Enter name",
-                        obscureText: false,
-                      ),
-
-                      const SizedBox(height: 7),
-
-                      //Email Text Field
                       MyTextField(
                         controller: emailController,
                         hintText: "Enter email",
@@ -169,7 +137,6 @@ class _RegisterPageState extends State<RegisterPage> {
 
                       const SizedBox(height: 7),
 
-                      //Password Text Field
                       MyTextField(
                         controller: pwController,
                         hintText: "Enter password",
@@ -178,7 +145,6 @@ class _RegisterPageState extends State<RegisterPage> {
 
                       const SizedBox(height: 7),
 
-                      // Confirm password text field
                       MyTextField(
                         controller: confirmPwController,
                         hintText: "Confirm password",
@@ -187,12 +153,13 @@ class _RegisterPageState extends State<RegisterPage> {
 
                       const SizedBox(height: 28),
 
-                      // Register button
-                      MyButton(text: "Register", onTap: register),
+                      MyButton(
+                        text: "Register",
+                        onTap: register,
+                      ),
 
                       const SizedBox(height: 56),
 
-                      // Text
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -202,10 +169,7 @@ class _RegisterPageState extends State<RegisterPage> {
                               color: colorScheme.primary,
                             ),
                           ),
-
                           const SizedBox(width: 7),
-
-                          // Register tap
                           GestureDetector(
                             onTap: widget.onTap,
                             child: Text(
@@ -226,10 +190,9 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
         ),
 
-        // 🔄 Local loading overlay
+        // Loading overlay
         if (_isRegistering)
           Container(
-            // semi-transparent black overlay
             color: const Color.fromRGBO(0, 0, 0, 0.25),
             child: Center(
               child: Material(
@@ -237,8 +200,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 color: colorScheme.surface.withValues(alpha: 0.95),
                 elevation: 8,
                 child: Padding(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
