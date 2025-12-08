@@ -464,6 +464,11 @@ class DatabaseProvider extends ChangeNotifier {
     return _db.friendsStreamForUserFromDatabase(userId);
   }
 
+  Future<void> unfriendUser(String otherUserId) async {
+    await _db.unfriendUserInDatabase(otherUserId);
+    // FriendsPage uses a realtime stream, so it will auto-update.
+  }
+
   /* ==================== FOLLOWERS / FOLLOWING ==================== */
 
   /// Local map of followers and following

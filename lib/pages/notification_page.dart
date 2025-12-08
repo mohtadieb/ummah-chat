@@ -5,7 +5,7 @@ import 'package:ummah_chat/pages/profile_page.dart';
 
 import '../helper/navigate_pages.dart';
 import '../helper/time_ago_text.dart';
-import '../services/notification_service.dart';
+import '../services/notifications/notification_service.dart';
 
 // Providers
 import 'package:provider/provider.dart';

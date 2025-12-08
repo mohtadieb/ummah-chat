@@ -41,6 +41,7 @@ stories progress, horizontal Friends row, and now an optional profile song.
 
 class ProfilePage extends StatefulWidget {
   final String userId;
+
   const ProfilePage({super.key, required this.userId});
 
   @override
@@ -49,8 +50,10 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   // Providers
-  late final databaseProvider =
-  Provider.of<DatabaseProvider>(context, listen: false);
+  late final databaseProvider = Provider.of<DatabaseProvider>(
+    context,
+    listen: false,
+  );
   late final listeningProvider = Provider.of<DatabaseProvider>(context);
 
   // user info
@@ -108,7 +111,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
     // listen to player state to update the play/pause icon
     _audioPlayer.playerStateStream.listen((state) {
-      final isPlaying = state.playing &&
+      final isPlaying =
+          state.playing &&
           state.processingState != ProcessingState.completed &&
           state.processingState != ProcessingState.idle;
 
@@ -259,7 +263,8 @@ class _ProfilePageState extends State<ProfilePage> {
     // 👉 Immediately update local state so UI changes right away
     if (mounted) {
       setState(() {
-        _currentSongId = songId; // ok now because _startProfileSong always reloads
+        _currentSongId =
+            songId; // ok now because _startProfileSong always reloads
         if (user != null) {
           user = user!.copyWith(profileSongId: songId);
         }
@@ -304,8 +309,9 @@ class _ProfilePageState extends State<ProfilePage> {
 
     _isFollowing = databaseProvider.isFollowing(widget.userId);
     _friendStatus = await databaseProvider.getFriendStatus(widget.userId);
-    _completedStoryIds =
-    await databaseProvider.getCompletedStoriesForUser(widget.userId);
+    _completedStoryIds = await databaseProvider.getCompletedStoriesForUser(
+      widget.userId,
+    );
 
     // 🔊 PROFILE SONG HANDLING
     final songId = user!.profileSongId ?? '';
@@ -398,14 +404,9 @@ class _ProfilePageState extends State<ProfilePage> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: chips,
-      ),
+      child: Wrap(spacing: 8, runSpacing: 8, children: chips),
     );
   }
-
 
   Widget _chip(String label) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -442,7 +443,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true, // ✅ important so sheet can move with keyboard
+      isScrollControlled: true,
+      // ✅ important so sheet can move with keyboard
       backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -538,7 +540,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-
   Widget _buildEditAboutMeButton() {
     if (!_isOwnProfile) return const SizedBox.shrink();
 
@@ -548,10 +549,7 @@ class _ProfilePageState extends State<ProfilePage> {
         alignment: Alignment.centerRight,
         child: TextButton(
           onPressed: _editAboutMe,
-          child: const Text(
-            "Edit about me",
-            style: TextStyle(fontSize: 12),
-          ),
+          child: const Text("Edit about me", style: TextStyle(fontSize: 12)),
         ),
       ),
     );
@@ -660,6 +658,39 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _declineFriendFromProfile() async {
     await databaseProvider.declineFriendRequest(widget.userId);
     final updated = await databaseProvider.getFriendStatus(widget.userId);
+    setState(() {
+      _friendStatus = updated;
+    });
+  }
+
+  Future<void> _unfriendFromProfile() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Unfriend"),
+        content: const Text(
+          "Are you sure you want to remove this person from your friends?",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text("Yes, unfriend"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    await databaseProvider.unfriendUser(widget.userId);
+
+    // refresh local status from DB
+    final updated = await databaseProvider.getFriendStatus(widget.userId);
+    if (!mounted) return;
     setState(() {
       _friendStatus = updated;
     });
@@ -902,9 +933,10 @@ class _ProfilePageState extends State<ProfilePage> {
                     return GestureDetector(
                       onTap: () {
                         if (friend.id == currentUserId) {
-                          final bottomNav =
-                          Provider.of<BottomNavProvider>(context,
-                              listen: false);
+                          final bottomNav = Provider.of<BottomNavProvider>(
+                            context,
+                            listen: false,
+                          );
 
                           bottomNav.setIndex(4);
                           Navigator.pop(context);
@@ -926,17 +958,15 @@ class _ProfilePageState extends State<ProfilePage> {
                                 radius: 26,
                                 backgroundColor: colorScheme.secondary,
                                 backgroundImage:
-                                friend.profilePhotoUrl.isNotEmpty
-                                    ? NetworkImage(
-                                  friend.profilePhotoUrl,
-                                )
+                                    friend.profilePhotoUrl.isNotEmpty
+                                    ? NetworkImage(friend.profilePhotoUrl)
                                     : null,
                                 child: friend.profilePhotoUrl.isEmpty
                                     ? Icon(
-                                  Icons.person,
-                                  color: colorScheme.primary,
-                                  size: 26,
-                                )
+                                        Icons.person,
+                                        color: colorScheme.primary,
+                                        size: 26,
+                                      )
                                     : null,
                               ),
                               if (friend.isOnline)
@@ -1019,10 +1049,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 title: Text(s.title),
                 subtitle: Text(s.artist),
                 trailing: isSelected
-                    ? Icon(
-                  Icons.check_circle,
-                  color: colorScheme.primary,
-                )
+                    ? Icon(Icons.check_circle, color: colorScheme.primary)
                     : null,
                 onTap: () {
                   Navigator.pop(ctx);
@@ -1071,14 +1098,15 @@ class _ProfilePageState extends State<ProfilePage> {
                     hasSong
                         ? '${song!.title} • ${song.artist}'
                         : (_isOwnProfile
-                        ? "Choose a song that plays on your profile"
-                        : "No profile song set"),
+                              ? "Choose a song that plays on your profile"
+                              : "No profile song set"),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 12,
-                      color: colorScheme.primary
-                          .withValues(alpha: hasSong ? 0.75 : 0.6),
+                      color: colorScheme.primary.withValues(
+                        alpha: hasSong ? 0.75 : 0.6,
+                      ),
                     ),
                   ),
                 ],
@@ -1227,8 +1255,9 @@ class _ProfilePageState extends State<ProfilePage> {
       return a.partNo!.compareTo(b.partNo!);
     });
 
-    final muhammadIdSet =
-    muhammadPartInfos.map((m) => m.id).toSet(); // For quick lookup
+    final muhammadIdSet = muhammadPartInfos
+        .map((m) => m.id)
+        .toSet(); // For quick lookup
 
     // Final ordered list: all other prophets, then Muhammad (ﷺ) 1–7
     final List<String> sortedCompletedIds = [
@@ -1244,8 +1273,15 @@ class _ProfilePageState extends State<ProfilePage> {
       for (final m in muhammadPartInfos)
         if (m.partNo != null) m.partNo!,
     };
-    final bool muhammadSeriesCompleted =
-    muhammadParts.containsAll({1, 2, 3, 4, 5, 6, 7});
+    final bool muhammadSeriesCompleted = muhammadParts.containsAll({
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+    });
 
     Widget bodyChild;
     if (_isLoading) {
@@ -1257,9 +1293,7 @@ class _ProfilePageState extends State<ProfilePage> {
           child: Text(
             "Profile not found yet.\nPlease try again in a moment.",
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.primary,
-            ),
+            style: TextStyle(color: Theme.of(context).colorScheme.primary),
           ),
         ),
       );
@@ -1304,24 +1338,22 @@ class _ProfilePageState extends State<ProfilePage> {
                   onTap: _isOwnProfile ? _pickProfilePhoto : null,
                   child: user!.profilePhotoUrl.isNotEmpty
                       ? CircleAvatar(
-                    radius: 56,
-                    backgroundImage: NetworkImage(user!.profilePhotoUrl),
-                  )
+                          radius: 56,
+                          backgroundImage: NetworkImage(user!.profilePhotoUrl),
+                        )
                       : Container(
-                    width: 112,
-                    height: 112,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color:
-                      Theme.of(context).colorScheme.secondary,
-                    ),
-                    child: Icon(
-                      Icons.person,
-                      size: 70,
-                      color:
-                      Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
+                          width: 112,
+                          height: 112,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Theme.of(context).colorScheme.secondary,
+                          ),
+                          child: Icon(
+                            Icons.person,
+                            size: 70,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
                 ),
                 if (_isOwnProfile)
                   Positioned(
@@ -1333,8 +1365,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color:
-                          Theme.of(context).colorScheme.primary,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                         child: const Icon(
                           Icons.edit,
@@ -1393,6 +1424,9 @@ class _ProfilePageState extends State<ProfilePage> {
                       },
                       onDeclineRequest: () async {
                         await _declineFriendFromProfile();
+                      },
+                      onUnfriend: () async {
+                        await _unfriendFromProfile(); // 👈 confirmation + unfriend
                       },
                     ),
                   ),
@@ -1462,13 +1496,12 @@ class _ProfilePageState extends State<ProfilePage> {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: sortedCompletedIds.length,
-                  gridDelegate:
-                  const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 4, // ✅ 4 badges per row
                     mainAxisSpacing: 10, // ✅ compact vertical spacing
                     crossAxisSpacing: 10,
                     childAspectRatio:
-                    0.85, // ✅ slightly taller for 2-line labels
+                        0.85, // ✅ slightly taller for 2-line labels
                   ),
                   itemBuilder: (context, index) {
                     final id = sortedCompletedIds[index];
@@ -1491,7 +1524,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     String displayName;
                     if (isMuhammad) {
                       final partInfo = muhammadPartInfos.firstWhere(
-                            (m) => m.id == id,
+                        (m) => m.id == id,
                         orElse: () => _MuhammadPartInfo(id: id),
                       );
                       final int? partNo = partInfo.partNo;
@@ -1544,8 +1577,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color:
-                              Theme.of(context).colorScheme.primary,
+                              color: Theme.of(context).colorScheme.primary,
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
                             ),
@@ -1572,8 +1604,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       color: const Color(0xFFF7D98A).withValues(alpha: 0.18),
                       borderRadius: BorderRadius.circular(999),
                       border: Border.all(
-                        color:
-                        const Color(0xFFE0B95A).withValues(alpha: 0.7),
+                        color: const Color(0xFFE0B95A).withValues(alpha: 0.7),
                       ),
                     ),
                     child: const Row(
@@ -1613,8 +1644,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       color: const Color(0xFF0F8254).withValues(alpha: 0.06),
                       borderRadius: BorderRadius.circular(999),
                       border: Border.all(
-                        color:
-                        const Color(0xFF0F8254).withValues(alpha: 0.4),
+                        color: const Color(0xFF0F8254).withValues(alpha: 0.4),
                       ),
                     ),
                     child: Row(
@@ -1669,13 +1699,14 @@ class _ProfilePageState extends State<ProfilePage> {
                 }
               },
               child: Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .surfaceVariant
-                      .withValues(alpha: 0.55),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.surfaceVariant.withValues(alpha: 0.55),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Row(
@@ -1684,10 +1715,9 @@ class _ProfilePageState extends State<ProfilePage> {
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withValues(alpha: 0.12),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.12),
                       ),
                       child: Icon(
                         Icons.article_outlined,
@@ -1703,8 +1733,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           Text(
                             "Posts",
                             style: TextStyle(
-                              color:
-                              Theme.of(context).colorScheme.primary,
+                              color: Theme.of(context).colorScheme.primary,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -1715,10 +1744,9 @@ class _ProfilePageState extends State<ProfilePage> {
                                 : "$postCount post${postCount == 1 ? '' : 's'} • tap to view",
                             style: TextStyle(
                               fontSize: 12,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .primary
-                                  .withValues(alpha: 0.75),
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.primary.withValues(alpha: 0.75),
                             ),
                           ),
                         ],
@@ -1727,13 +1755,14 @@ class _ProfilePageState extends State<ProfilePage> {
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(999),
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withValues(alpha: 0.08),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.08),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -1752,8 +1781,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                 ? Icons.keyboard_arrow_up_rounded
                                 : Icons.keyboard_arrow_down_rounded,
                             size: 18,
-                            color:
-                            Theme.of(context).colorScheme.primary,
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                         ],
                       ),
@@ -1769,29 +1797,29 @@ class _ProfilePageState extends State<ProfilePage> {
           if (_showPosts)
             (allUserPosts.isEmpty
                 ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(14.0),
-                child: Text(
-                  "No posts yet..",
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-              ),
-            )
+                    child: Padding(
+                      padding: const EdgeInsets.all(14.0),
+                      child: Text(
+                        "No posts yet..",
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  )
                 : ListView.builder(
-              itemCount: allUserPosts.length,
-              physics: const NeverScrollableScrollPhysics(),
-              shrinkWrap: true,
-              itemBuilder: (context, index) {
-                final post = allUserPosts[index];
-                return MyPostTile(
-                  post: post,
-                  onPostTap: () => goPostPage(context, post),
-                  scaffoldContext: context,
-                );
-              },
-            )),
+                    itemCount: allUserPosts.length,
+                    physics: const NeverScrollableScrollPhysics(),
+                    shrinkWrap: true,
+                    itemBuilder: (context, index) {
+                      final post = allUserPosts[index];
+                      return MyPostTile(
+                        post: post,
+                        onPostTap: () => goPostPage(context, post),
+                        scaffoldContext: context,
+                      );
+                    },
+                  )),
         ],
       );
     }
@@ -1799,9 +1827,7 @@ class _ProfilePageState extends State<ProfilePage> {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: widget.userId != currentUserId
-          ? AppBar(
-        foregroundColor: Theme.of(context).colorScheme.primary,
-      )
+          ? AppBar(foregroundColor: Theme.of(context).colorScheme.primary)
           : null,
       body: bodyChild,
     );

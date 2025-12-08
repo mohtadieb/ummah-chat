@@ -7,6 +7,9 @@ class MyFriendButton extends StatelessWidget {
   final VoidCallback? onAcceptRequest;
   final VoidCallback? onDeclineRequest;
 
+  // 👇 NEW: used when already friends
+  final VoidCallback? onUnfriend;
+
   const MyFriendButton({
     super.key,
     required this.friendStatus,
@@ -14,6 +17,7 @@ class MyFriendButton extends StatelessWidget {
     required this.onCancelRequest,
     required this.onAcceptRequest,
     required this.onDeclineRequest,
+    this.onUnfriend, // 👈 optional
   });
 
   @override
@@ -90,7 +94,7 @@ class MyFriendButton extends StatelessWidget {
       case 'accepted':
         bg = colorScheme.tertiary;
         fg = colorScheme.primary;
-        onTap = null; // disabled
+        onTap = onUnfriend; // 👈 now clickable
         break;
 
       case 'blocked':
@@ -113,7 +117,7 @@ class MyFriendButton extends StatelessWidget {
         label = 'Cancel request';
         break;
       case 'accepted':
-        label = 'Friends';
+        label = 'Unfriend'; // 👈 changed
         break;
       case 'blocked':
         label = 'Blocked';

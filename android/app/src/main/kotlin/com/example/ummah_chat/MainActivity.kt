@@ -1,4 +1,4 @@
-package com.example.my_supabase_app
+package com.example.ummah_chat
 
 import io.flutter.embedding.android.FlutterActivity
 

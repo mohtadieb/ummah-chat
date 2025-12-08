@@ -9,7 +9,7 @@ import '../services/chat/chat_service.dart';
 import '../services/database/database_provider.dart';
 import '../helper/last_message_time_formatter.dart';
 import 'chat_page.dart';
-import 'profile_page.dart';
+// removed: import 'profile_page.dart';
 
 class FriendsPage extends StatefulWidget {
   const FriendsPage({super.key});
@@ -19,11 +19,9 @@ class FriendsPage extends StatefulWidget {
 }
 
 class _FriendsPageState extends State<FriendsPage> {
-  // Local search within friends list
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
-  // Chat service for unread counts (and later: presence)
   final ChatService _chatService = ChatService();
 
   @override
@@ -34,11 +32,9 @@ class _FriendsPageState extends State<FriendsPage> {
 
   @override
   Widget build(BuildContext context) {
-    // ⬇️ No Scaffold here; this is content-only inside ChatTabsPage.
     return _buildFriendsList(context);
   }
 
-  /// Live-updating list of friends for the current logged-in user
   Widget _buildFriendsList(BuildContext context) {
     final dbProvider = Provider.of<DatabaseProvider>(context, listen: false);
     final auth = AuthService();
@@ -54,13 +50,11 @@ class _FriendsPageState extends State<FriendsPage> {
       );
     }
 
-    // 1️⃣ Live-ish unread message counts per friend (polling stream)
     return StreamBuilder<Map<String, int>>(
       stream: _chatService.unreadCountsPollingStream(currentUserId),
       builder: (context, unreadSnapshot) {
         final unreadByFriend = unreadSnapshot.data ?? const <String, int>{};
 
-        // 2️⃣ Live-ish "last message info" per friend (polling stream)
         return StreamBuilder<Map<String, LastMessageInfo>>(
           stream: _chatService.lastMessagesByFriendPollingStream(
             currentUserId,
@@ -69,9 +63,7 @@ class _FriendsPageState extends State<FriendsPage> {
             final lastMessageByFriend =
                 lastMsgSnapshot.data ?? const <String, LastMessageInfo>{};
 
-            // 3️⃣ Realtime friends stream
             return StreamBuilder<List<UserProfile>>(
-              // 🔄 Realtime stream of accepted friendships
               stream: dbProvider.friendsStream(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
@@ -87,12 +79,10 @@ class _FriendsPageState extends State<FriendsPage> {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                // All friends returned by the stream (filter out current user just in case)
                 final allFriends = (snapshot.data ?? [])
                     .where((u) => u.id != currentUserId)
                     .toList();
 
-                // No friends at all yet
                 if (allFriends.isEmpty) {
                   return Center(
                     child: Padding(
@@ -131,7 +121,6 @@ class _FriendsPageState extends State<FriendsPage> {
                   );
                 }
 
-                // 🎯 Apply local search filter
                 List<UserProfile> filteredFriends = allFriends;
                 if (_searchQuery.trim().isNotEmpty) {
                   final q = _searchQuery.toLowerCase();
@@ -142,23 +131,19 @@ class _FriendsPageState extends State<FriendsPage> {
                   }).toList();
                 }
 
-                // 🕒 SORT by most recent chat first
                 filteredFriends.sort((a, b) {
                   final infoA = lastMessageByFriend[a.id];
                   final infoB = lastMessageByFriend[b.id];
                   final timeA = infoA?.createdAt;
                   final timeB = infoB?.createdAt;
 
-                  // If both have no chats → fallback alphabetical
                   if (timeA == null && timeB == null) {
                     return a.username.compareTo(b.username);
                   }
 
-                  // Friends with chats come before friends with no chats
                   if (timeA == null) return 1;
                   if (timeB == null) return -1;
 
-                  // More recent first (descending)
                   return timeB.compareTo(timeA);
                 });
 
@@ -169,31 +154,25 @@ class _FriendsPageState extends State<FriendsPage> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 🔍 Local search bar for friends (shared MySearchBar component)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                          16.0, 8.0, 16.0, 4.0),
+                      padding:
+                      const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 4.0),
                       child: MySearchBar(
                         controller: _searchController,
                         hintText: 'Search friends',
                         onChanged: (value) {
-                          // Local, instant filtering of the in-memory friends list
                           setState(() {
                             _searchQuery = value;
                           });
                         },
                         onClear: () {
-                          // Clear query + reset filter when user taps the clear icon
                           setState(() {
                             _searchQuery = '';
                           });
                         },
                       ),
                     ),
-
                     const SizedBox(height: 4),
-
-                    // Header with total friends count
                     Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16.0,
@@ -231,10 +210,7 @@ class _FriendsPageState extends State<FriendsPage> {
                         ],
                       ),
                     ),
-
                     const SizedBox(height: 4),
-
-                    // Friends list or "no matches" message
                     Expanded(
                       child: noMatches
                           ? Center(
@@ -247,29 +223,25 @@ class _FriendsPageState extends State<FriendsPage> {
                         ),
                       )
                           : ScrollConfiguration(
-                        // 🚫 Disable stretch / weird independent text movement
                         behavior: ScrollConfiguration.of(context)
                             .copyWith(overscroll: false),
                         child: ListView.builder(
                           physics:
-                          const ClampingScrollPhysics(), // ⛔ no bounce
+                          const ClampingScrollPhysics(),
                           padding: EdgeInsets.only(
-                            bottom:
-                            MediaQuery.of(context).padding.bottom +
-                                96, // avoid FAB overlap in Chats screen
+                            bottom: MediaQuery.of(context)
+                                .padding
+                                .bottom +
+                                96,
                           ),
                           itemCount: filteredFriends.length,
                           itemBuilder: (context, index) {
                             final user = filteredFriends[index];
 
-                            // 🟢 Online based on last_seen_at from UserProfile
                             final isOnline = user.isOnline;
-
-                            // 🔴 Unread messages from this friend
                             final unreadCount =
                                 unreadByFriend[user.id] ?? 0;
 
-                            // 🕒 Last message meta
                             final lastInfo =
                             lastMessageByFriend[user.id];
                             final lastText = lastInfo?.text;
@@ -278,7 +250,6 @@ class _FriendsPageState extends State<FriendsPage> {
                             final lastTimeLabel =
                             formatLastMessageTime(lastTime);
 
-                            // Optional: prefix "You: " when last sender is current user
                             final preview =
                             (lastText == null ||
                                 lastText.trim().isEmpty)
@@ -296,20 +267,8 @@ class _FriendsPageState extends State<FriendsPage> {
                               lastMessagePreview: preview,
                               lastMessageTimeLabel: lastTimeLabel,
 
-                              // 👤 tap avatar/name/row → profile page
-                              onProfileTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ProfilePage(
-                                      userId: user.id,
-                                    ),
-                                  ),
-                                );
-                              },
-
-                              // 💬 tap "Chat" pill → open chat
-                              onChatTap: () async {
+                              // 👇 Whole tile opens chat
+                              onTap: () async {
                                 await Navigator.push(
                                   context,
                                   MaterialPageRoute(
@@ -320,9 +279,8 @@ class _FriendsPageState extends State<FriendsPage> {
                                   ),
                                 );
 
-                                // 🔄 when returning from ChatPage, rebuild to refresh unread counts
                                 if (mounted) {
-                                  setState(() {});
+                                  setState(() {}); // refresh unread
                                 }
                               },
                             );

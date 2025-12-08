@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ummah_chat/components/my_loading_circle.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart'; // 👈 NEW
@@ -10,6 +11,7 @@ import '../helper/navigate_pages.dart';
 import '../services/auth/auth_gate.dart'; // you can actually remove this now if unused
 import '../services/auth/auth_service.dart';
 import '../services/database/database_provider.dart';
+import '../services/notifications/notification_service.dart';
 import '../themes/theme_provider.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -133,6 +135,34 @@ class _SettingsPageState extends State<SettingsPage> {
             vertical: 20.0,
           ),
           children: [
+            ListTile(
+              leading: const Icon(Icons.notifications_active_outlined),
+              title: const Text('Test push notification'),
+              onTap: () async {
+                final user = Supabase.instance.client.auth.currentUser;
+                if (user == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('You must be logged in to test a push.')),
+                  );
+                  return;
+                }
+
+                try {
+                  await NotificationService().sendTestPushToUser();
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Push + in-app notification sent')),
+                  );
+                } catch (e) {
+                  debugPrint('Test push error: $e');
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Something went wrong sending the test')),
+                  );
+                }
+              },
+            ),
+
             // APPEARANCE SECTION
             Text(
               'Appearance',

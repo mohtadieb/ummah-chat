@@ -500,6 +500,12 @@ class ChatService {
     List<String> initialMemberIds = const [],
     String? avatarUrl,
   }) async {
+    // 0) Optional but recommended: enforce creatorId == auth.uid()
+    final currentUid = _supabase.auth.currentUser?.id;
+    if (currentUid == null || currentUid != creatorId) {
+      throw Exception('creatorId must be the authenticated user (auth.uid()).');
+    }
+
     // 1) Insert row in chat_rooms
     final createdRoom = await _supabase
         .from('chat_rooms')
@@ -521,26 +527,41 @@ class ChatService {
 
     final String roomId = createdRoom['id'] as String;
 
-    // 2) Insert members: creator + optional others
-    final members = <String>{creatorId, ...initialMemberIds}.toList();
+    // -------------------------------
+    // 2) FIRST: insert ONLY the creator as admin
+    //    This must satisfy the "Creator can create initial admin membership" policy.
+    // -------------------------------
+    await _supabase.from('chat_room_members').insert({
+      'chat_room_id': roomId,
+      'user_id': creatorId,   // MUST be auth.uid()
+      'role': 'admin',        // MUST be 'admin'
+    });
 
-    if (members.isNotEmpty) {
-      final rows = members
-          .map(
-            (uid) => {
+    // -------------------------------
+    // 3) THEN: insert the remaining members (if any) as member
+    //    Now the "Room admin can add members" policy will pass, because
+    //    an admin row for this room already exists.
+    // -------------------------------
+    final otherMembers = initialMemberIds
+        .where((id) => id != creatorId)
+        .toSet()
+        .toList();
+
+    if (otherMembers.isNotEmpty) {
+      final rows = otherMembers.map((uid) {
+        return {
           'chat_room_id': roomId,
           'user_id': uid,
-          // role: creator = 'admin', others = 'member'
-          'role': uid == creatorId ? 'admin' : 'member',
-        },
-      )
-          .toList();
+          'role': 'member',
+        };
+      }).toList();
 
       await _supabase.from('chat_room_members').insert(rows);
     }
 
     return roomId;
   }
+
 
   /// Add one or more users to an existing group chat.
   ///

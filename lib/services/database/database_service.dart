@@ -27,7 +27,7 @@ import '../../models/comment.dart';
 import '../../models/dua.dart';
 import '../../models/post.dart';
 import '../../models/user_profile.dart';
-import '../notification_service.dart';
+import '../notifications/notification_service.dart';
 import 'dart:typed_data';
 
 
@@ -616,16 +616,37 @@ class DatabaseService {
   /// Block user in database
   Future<void> blockUserInDatabase(String userId) async {
     try {
-      final currentUser = _auth.currentUser!.id;
+      final currentUserId = _auth.currentUser!.id;
 
+      // 1️⃣ Insert block row
       await _db.from('blocks').insert({
-        'blocker_id': currentUser,
+        'blocker_id': currentUserId,
         'blocked_id': userId,
       });
+
+      // 2️⃣ Clean up mutual likes between the two users
+      try {
+        await removeLikesBetweenUsers(currentUserId, userId);
+      } catch (e) {
+        print('⚠️ Error removing mutual likes on block: $e');
+      }
+
+      // 3️⃣ Clean up relationship notifications between the two users
+      try {
+        await _notifications.deleteAllRelationshipNotificationsBetween(
+          userAId: currentUserId,
+          userBId: userId,
+        );
+      } catch (e) {
+        print('⚠️ Error deleting relationship notifications on block: $e');
+      }
+
+      print("✅ User $userId blocked by $currentUserId (likes + notifications cleaned)");
     } catch (e) {
       print("Error blocking user: $e");
     }
   }
+
 
   /// Unblock user in database
   Future<void> unblockUserInDatabase(String userId) async {
@@ -872,6 +893,7 @@ class DatabaseService {
     if (currentUserId == null || currentUserId.isEmpty) return;
 
     try {
+      // 1️⃣ Delete the pending friendship row
       await _db
           .from('friendships')
           .delete()
@@ -879,7 +901,14 @@ class DatabaseService {
           .eq('addressee_id', otherUserId)
           .eq('status', 'pending');
 
-      print('✅ Friend request cancelled');
+      // 2️⃣ Delete the friend-request notification if it still exists:
+      //    user_id = otherUserId, body = FRIEND_REQUEST:<currentUserId>
+      await _notifications.deleteFriendRequestNotification(
+        targetUserId: otherUserId,
+        requesterId: currentUserId,
+      );
+
+      print('✅ Friend request cancelled (and notification removed)');
     } catch (e) {
       print('❌ Error cancelling friend request: $e');
     }
@@ -982,6 +1011,38 @@ class DatabaseService {
     });
   }
 
+  Future<void> unfriendUserInDatabase(String otherUserId) async {
+    final currentUserId = _auth.currentUser?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return;
+    if (currentUserId == otherUserId) return;
+
+    try {
+      // 1️⃣ Remove the accepted friendship in either direction
+      await _db
+          .from('friendships')
+          .delete()
+          .eq('status', 'accepted')
+          .or(
+        'and(requester_id.eq.$currentUserId,addressee_id.eq.$otherUserId),'
+            'and(requester_id.eq.$otherUserId,addressee_id.eq.$currentUserId)',
+      );
+
+      // 2️⃣ Clean up relationship notifications between the two users
+      try {
+        await _notifications.deleteAllRelationshipNotificationsBetween(
+          userAId: currentUserId,
+          userBId: otherUserId,
+        );
+      } catch (e) {
+        print('⚠️ Error deleting relationship notifications on unfriend: $e');
+      }
+
+      print('✅ Unfriended $otherUserId');
+    } catch (e) {
+      print('❌ Error unfriending user $otherUserId: $e');
+    }
+  }
+
   /* ==================== FOLLOW / UNFOLLOW ==================== */
 
   /// Follow user in database
@@ -1024,13 +1085,21 @@ class DatabaseService {
     final currentUserId = _auth.currentUser!.id;
 
     try {
+      // 1️⃣ Remove follow relation
       await _db
           .from('follows')
           .delete()
           .eq('follower_id', currentUserId)
           .eq('following_id', targetUserId);
 
-      print("✅ Unfollow successful");
+      // 2️⃣ Remove follow notification:
+      //    user_id = targetUserId, body = FOLLOW_USER:<currentUserId>
+      await _notifications.deleteFollowNotification(
+        targetUserId: targetUserId,
+        followerId: currentUserId,
+      );
+
+      print("✅ Unfollow successful (and follow notification removed)");
     } catch (e) {
       print("❌ Unfollow error: $e");
     }

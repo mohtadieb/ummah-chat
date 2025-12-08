@@ -6,11 +6,8 @@ class MyFriendTile extends StatelessWidget {
   final UserProfile user;
   final String? customTitle;
 
-  /// 👉 Tap on the *row* → go to profile
-  final VoidCallback onProfileTap;
-
-  /// 👉 Tap on the *Chat* pill → go to chat
-  final VoidCallback onChatTap;
+  /// 👉 Tap on the whole row → go to chat
+  final VoidCallback onTap;
 
   /// Whether the friend is currently online
   final bool isOnline;
@@ -28,8 +25,7 @@ class MyFriendTile extends StatelessWidget {
     super.key,
     required this.user,
     this.customTitle,
-    required this.onProfileTap,
-    required this.onChatTap,
+    required this.onTap,
     this.isOnline = false,
     this.unreadCount = 0,
     this.lastMessagePreview,
@@ -48,10 +44,10 @@ class MyFriendTile extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return MyCardTile(
-      onTap: onProfileTap,
+      onTap: onTap,
       child: Row(
         children: [
-          // 👤 Avatar + online dot (tap handled by MyCardTile.onTap)
+          // 👤 Avatar + online dot
           Stack(
             children: [
               user.profilePhotoUrl.isNotEmpty
@@ -71,8 +67,6 @@ class MyFriendTile extends StatelessWidget {
                   ),
                 ),
               ),
-
-              // 🟢 Online indicator (bottom-right)
               if (isOnline)
                 Positioned(
                   right: 0,
@@ -81,7 +75,7 @@ class MyFriendTile extends StatelessWidget {
                     width: 11,
                     height: 11,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF12B981), // soft green
+                      color: const Color(0xFF12B981),
                       shape: BoxShape.circle,
                       border: Border.all(
                         color: colorScheme.surface,
@@ -95,7 +89,7 @@ class MyFriendTile extends StatelessWidget {
 
           const SizedBox(width: 12),
 
-          // 📝 Name + username + last message (tap handled by MyCardTile.onTap)
+          // 📝 Name + username + last message
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -112,7 +106,6 @@ class MyFriendTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
 
-                // Username + inline "Online"
                 Row(
                   children: [
                     Flexible(
@@ -121,7 +114,8 @@ class MyFriendTile extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: colorScheme.primary.withValues(alpha: 0.7),
+                          color:
+                          colorScheme.primary.withValues(alpha: 0.7),
                           fontSize: 12,
                         ),
                       ),
@@ -149,7 +143,6 @@ class MyFriendTile extends StatelessWidget {
                   ],
                 ),
 
-                // Last message preview (if available)
                 if (lastMessagePreview != null &&
                     lastMessagePreview!.trim().isNotEmpty) ...[
                   const SizedBox(height: 3),
@@ -158,7 +151,8 @@ class MyFriendTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: colorScheme.primary.withValues(alpha: 0.7),
+                      color:
+                      colorScheme.primary.withValues(alpha: 0.7),
                       fontSize: 12,
                     ),
                   ),
@@ -169,7 +163,7 @@ class MyFriendTile extends StatelessWidget {
 
           const SizedBox(width: 8),
 
-          // 💬 Time + Chat pill + unread badge
+          // 🕒 Time + unread badge (no chat pill anymore)
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -185,70 +179,25 @@ class MyFriendTile extends StatelessWidget {
                   ),
                 ),
 
-              // Chat pill – only opens chat, with unread badge on top
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  InkWell(
+              if (unreadCount > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent,
                     borderRadius: BorderRadius.circular(999),
-                    onTap: onChatTap,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(999),
-                        color: colorScheme.primary.withValues(alpha: 0.08),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.chat_bubble_outline,
-                            size: 16,
-                            color: colorScheme.primary,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Chat',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: colorScheme.primary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
+                  ),
+                  child: Text(
+                    unreadCount > 9 ? '9+' : '$unreadCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-
-                  // 🔴 Unread messages badge on the chat pill
-                  if (unreadCount > 0)
-                    Positioned(
-                      right: -3,
-                      top: -3,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.redAccent,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          unreadCount > 9 ? '9+' : '$unreadCount',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+                ),
             ],
           ),
         ],

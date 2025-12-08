@@ -267,10 +267,30 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               labelColor: colorScheme.inversePrimary,
               unselectedLabelColor: colorScheme.primary,
               indicatorColor: colorScheme.secondary,
+              // optional but helps on small phones
+              labelStyle: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
               tabs: const [
-                Tab(text: "For You"),
-                Tab(text: "Following"),
-                Tab(text: "Communities"),
+                Tab(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text("For You"),
+                  ),
+                ),
+                Tab(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text("Following"),
+                  ),
+                ),
+                Tab(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text("Communities"),
+                  ),
+                ),
               ],
             ),
           ),

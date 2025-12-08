@@ -6,6 +6,8 @@ import 'package:ummah_chat/layouts/main_layout.dart';
 import 'package:ummah_chat/services/auth/login_or_register.dart';
 import 'package:ummah_chat/pages/complete_profile_page.dart';
 
+import '../notifications/push_notification_service.dart';
+
 /// AUTH GATE
 ///
 /// - If there is a Supabase session:
@@ -124,6 +126,9 @@ class _ProfileGateState extends State<_ProfileGate> {
       });
       return;
     }
+
+    // 🔔 NEW: make sure FCM token is synced now that we know who the user is
+    await PushNotificationService.syncFcmTokenWithSupabase();
 
     try {
       // 👇 Make sure these columns exist in your "profiles" table:

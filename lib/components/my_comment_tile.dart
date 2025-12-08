@@ -14,7 +14,7 @@ import '../services/auth/auth_service.dart';
 import '../services/database/database_provider.dart';
 import 'my_confirmation_box.dart';
 import '../components/my_input_alert_box.dart';
-import '../services/notification_service.dart'; // 👈 NEW
+import '../services/notifications/notification_service.dart'; // 👈 NEW
 import '../services/navigation/bottom_nav_provider.dart';
 
 

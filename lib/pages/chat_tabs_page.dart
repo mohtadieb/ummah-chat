@@ -86,12 +86,27 @@ class _ChatTabsPageState extends State<ChatTabsPage>
                   unselectedLabelColor: colorScheme.primary,
                   labelStyle: const TextStyle(
                     fontWeight: FontWeight.w600,
-                    fontSize: 14,
+                    fontSize: 13,
                   ),
                   tabs: const [
-                    Tab(text: "Friends"),
-                    Tab(text: "Groups"),
-                    Tab(text: "Communities"),
+                    Tab(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text("Friends"),
+                      ),
+                    ),
+                    Tab(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text("Groups"),
+                      ),
+                    ),
+                    Tab(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text("Communities"),
+                      ),
+                    ),
                   ],
                 ),
               ),

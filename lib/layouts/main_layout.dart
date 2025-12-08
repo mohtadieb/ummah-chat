@@ -11,7 +11,7 @@ import '../pages/settings_page.dart';
 
 // Services
 import '../services/auth/auth_service.dart';
-import '../services/notification_service.dart';
+import '../services/notifications/notification_service.dart';
 
 // Providers
 import 'package:provider/provider.dart';

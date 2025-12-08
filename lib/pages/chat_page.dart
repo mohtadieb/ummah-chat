@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:ummah_chat/pages/profile_page.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:ummah_chat/services/auth/auth_service.dart';
@@ -744,9 +745,25 @@ class _ChatPageState extends State<ChatPage> {
               : Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                widget.friendName,
-                style: const TextStyle(fontWeight: FontWeight.w600),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  // 👤 Open friend's profile when tapping the name
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ProfilePage(
+                        userId: widget.friendId,
+                      ),
+                    ),
+                  );
+                },
+                child: Text(
+                  widget.friendName,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
               if (subtitleWidget != null) subtitleWidget,
             ],
