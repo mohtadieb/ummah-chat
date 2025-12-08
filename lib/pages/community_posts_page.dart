@@ -11,6 +11,7 @@ import '../../components/my_input_alert_box.dart';
 import '../../components/my_post_tile.dart';
 import '../../components/my_user_tile.dart';
 import '../../helper/navigate_pages.dart';
+import 'create_post_page.dart';
 
 enum _CommunityMenuAction { viewMembers, joinCommunity, leaveCommunity }
 
@@ -228,135 +229,135 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
   // Post creation dialog
   // ---------------------------------------------------------------------------
 
-  void _openPostMessageBox() {
-    if (!_isJoined) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Join this community to share a post.')),
-      );
-      return;
-    }
-
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    final controller = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (ctx, setInnerState) => MyInputAlertBox(
-            textController: controller,
-            hintText: "Share something with ${widget.communityName}…",
-            onPressedText: "Post",
-            onPressed: () async {
-              final message = controller.text.trim();
-
-              if (message.replaceAll(RegExp(r'\s+'), '').length < 2) {
-                messenger?.showSnackBar(
-                  const SnackBar(
-                    content: Text("Your message must have at least 2 characters"),
-                  ),
-                );
-
-                setInnerState(() {
-                  _selectedImage = null;
-                  _selectedVideo = null; // ⭐ also clear video
-                });
-                return;
-              }
-
-              try {
-                // ⭐ SHOW TEMPORARY POST WHILE UPLOADING
-                databaseProvider.showLoadingPost(
-                  message: message,
-                  imageFile: _selectedImage,
-                  videoFile: _selectedVideo,
-                );
-
-                await _postMessage(
-                  message,
-                  communityId: widget.communityId,
-                  imageFile: _selectedImage,
-                  videoFile: _selectedVideo,
-                );
-
-                controller.clear();
-
-                messenger?.showSnackBar(
-                  const SnackBar(content: Text("Post uploaded successfully!")),
-                );
-              } catch (e) {
-                debugPrint('Error posting community message: $e');
-
-                messenger?.showSnackBar(
-                  const SnackBar(
-                    content: Text('Failed to post. Please try again.'),
-                  ),
-                );
-              }
-            },
-            extraWidget: Column(
-              children: [
-                if (_selectedImage != null)
-                  Image.file(_selectedImage!, height: 150, fit: BoxFit.cover)
-                else if (_selectedVideo != null)
-                  Container(
-                    height: 150,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: Colors.black12,
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.videocam, size: 28),
-                        SizedBox(width: 8),
-                        Text("Video selected"),
-                      ],
-                    ),
-                  ),
-
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    TextButton.icon(
-                      icon: const Icon(Icons.image),
-                      label: const Text("Add Image"),
-                      onPressed: () async {
-                        final picked = await ImagePicker()
-                            .pickImage(source: ImageSource.gallery);
-                        if (picked != null) {
-                          setInnerState(() {
-                            _selectedVideo = null;
-                            _selectedImage = File(picked.path);
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(width: 8),
-                    TextButton.icon(
-                      icon: const Icon(Icons.videocam),
-                      label: const Text("Add Video"),
-                      onPressed: () async {
-                        final picked = await ImagePicker()
-                            .pickVideo(source: ImageSource.gallery);
-                        if (picked != null) {
-                          setInnerState(() {
-                            _selectedImage = null;
-                            _selectedVideo = File(picked.path);
-                          });
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
+  // void _openPostMessageBox() {
+  //   if (!_isJoined) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(content: Text('Join this community to share a post.')),
+  //     );
+  //     return;
+  //   }
+  //
+  //   final messenger = ScaffoldMessenger.maybeOf(context);
+  //   final controller = TextEditingController();
+  //
+  //   showDialog(
+  //     context: context,
+  //     builder: (dialogContext) {
+  //       return StatefulBuilder(
+  //         builder: (ctx, setInnerState) => MyInputAlertBox(
+  //           textController: controller,
+  //           hintText: "Share something with ${widget.communityName}…",
+  //           onPressedText: "Post",
+  //           onPressed: () async {
+  //             final message = controller.text.trim();
+  //
+  //             if (message.replaceAll(RegExp(r'\s+'), '').length < 2) {
+  //               messenger?.showSnackBar(
+  //                 const SnackBar(
+  //                   content: Text("Your message must have at least 2 characters"),
+  //                 ),
+  //               );
+  //
+  //               setInnerState(() {
+  //                 _selectedImage = null;
+  //                 _selectedVideo = null; // ⭐ also clear video
+  //               });
+  //               return;
+  //             }
+  //
+  //             try {
+  //               // ⭐ SHOW TEMPORARY POST WHILE UPLOADING
+  //               databaseProvider.showLoadingPost(
+  //                 message: message,
+  //                 imageFile: _selectedImage,
+  //                 videoFile: _selectedVideo,
+  //               );
+  //
+  //               await _postMessage(
+  //                 message,
+  //                 communityId: widget.communityId,
+  //                 imageFile: _selectedImage,
+  //                 videoFile: _selectedVideo,
+  //               );
+  //
+  //               controller.clear();
+  //
+  //               messenger?.showSnackBar(
+  //                 const SnackBar(content: Text("Post uploaded successfully!")),
+  //               );
+  //             } catch (e) {
+  //               debugPrint('Error posting community message: $e');
+  //
+  //               messenger?.showSnackBar(
+  //                 const SnackBar(
+  //                   content: Text('Failed to post. Please try again.'),
+  //                 ),
+  //               );
+  //             }
+  //           },
+  //           extraWidget: Column(
+  //             children: [
+  //               if (_selectedImage != null)
+  //                 Image.file(_selectedImage!, height: 150, fit: BoxFit.cover)
+  //               else if (_selectedVideo != null)
+  //                 Container(
+  //                   height: 150,
+  //                   alignment: Alignment.center,
+  //                   decoration: BoxDecoration(
+  //                     borderRadius: BorderRadius.circular(12),
+  //                     color: Colors.black12,
+  //                   ),
+  //                   child: const Row(
+  //                     mainAxisSize: MainAxisSize.min,
+  //                     children: [
+  //                       Icon(Icons.videocam, size: 28),
+  //                       SizedBox(width: 8),
+  //                       Text("Video selected"),
+  //                     ],
+  //                   ),
+  //                 ),
+  //
+  //               Row(
+  //                 mainAxisAlignment: MainAxisAlignment.center,
+  //                 children: [
+  //                   TextButton.icon(
+  //                     icon: const Icon(Icons.image),
+  //                     label: const Text("Add Image"),
+  //                     onPressed: () async {
+  //                       final picked = await ImagePicker()
+  //                           .pickImage(source: ImageSource.gallery);
+  //                       if (picked != null) {
+  //                         setInnerState(() {
+  //                           _selectedVideo = null;
+  //                           _selectedImage = File(picked.path);
+  //                         });
+  //                       }
+  //                     },
+  //                   ),
+  //                   const SizedBox(width: 8),
+  //                   TextButton.icon(
+  //                     icon: const Icon(Icons.videocam),
+  //                     label: const Text("Add Video"),
+  //                     onPressed: () async {
+  //                       final picked = await ImagePicker()
+  //                           .pickVideo(source: ImageSource.gallery);
+  //                       if (picked != null) {
+  //                         setInnerState(() {
+  //                           _selectedImage = null;
+  //                           _selectedVideo = File(picked.path);
+  //                         });
+  //                       }
+  //                     },
+  //                   ),
+  //                 ],
+  //               ),
+  //             ],
+  //           ),
+  //         ),
+  //       );
+  //     },
+  //   );
+  // }
 
   Future<void> _postMessage(
       String message, {
@@ -522,9 +523,19 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
 
       floatingActionButton: _isJoined
           ? FloatingActionButton(
-        onPressed: _openPostMessageBox,
         backgroundColor: colorScheme.primary,
         child: const Icon(Icons.add),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => CreatePostPage(
+                communityId: widget.communityId,
+                communityName: widget.communityName,
+              ),
+            ),
+          );
+        },
       )
           : null,
 
