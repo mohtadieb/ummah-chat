@@ -26,10 +26,10 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
-        <!-- ✅ Tell Firebase Messaging to use your app icon for push notifications -->
+        <!-- ✅ Use custom notification icon -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@mipmap/ic_launcher" />
+            android:resource="@drawable/ic_stat_ummah_chat" />
 
         <activity
             android:name=".MainActivity"
