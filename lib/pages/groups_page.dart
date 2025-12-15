@@ -340,10 +340,13 @@ class _GroupsPageState extends State<GroupsPage> {
     if (trimmed.isEmpty) return '';
 
     final bool isMine = msg.senderId == currentUserId;
-    final String base = isMine ? 'You: $trimmed' : trimmed;
+
+    // 👇 Localized "You"
+    final String base = isMine ? '${"You".tr()}: $trimmed' : trimmed;
 
     const maxLen = 40;
     if (base.length <= maxLen) return base;
     return '${base.substring(0, maxLen)}…';
   }
+
 }

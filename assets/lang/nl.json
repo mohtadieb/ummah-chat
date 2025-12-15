@@ -445,6 +445,16 @@
   "group_typing_two": "{{name1}} en {{name2}} zijn aan het typen…",
   "group_typing_many": "{{name1}}, {{name2}} en anderen zijn aan het typen…",
 
+  "Group": "Groep",
+  "You must be logged in to view your groups": "Je moet ingelogd zijn om je groepen te bekijken",
+  "Error loading groups": "Fout bij het laden van groepen",
+  "No groups yet": "Nog geen groepen",
+  "Create a group to start chatting with multiple friends at once.": "Maak een groep aan om met meerdere vrienden tegelijk te chatten.",
+  "Search groups": "Groepen zoeken",
+  "Your groups": "Jouw groepen",
+  "No groups match your search": "Geen groepen komen overeen met je zoekopdracht"
+
+
 
 
 
