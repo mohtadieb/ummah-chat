@@ -202,7 +202,7 @@ class _ProfilePageState extends State<ProfilePage> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not play song: ${e.message}'.tr())),
+          SnackBar(content: Text('Could not play song: ${e.message}')),
         );
       }
     } on PlayerInterruptedException catch (e) {
@@ -493,9 +493,9 @@ class _ProfilePageState extends State<ProfilePage> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: intsCtrl,
-                  decoration: const InputDecoration(
-                    labelText: "Interests (comma separated)",
-                    hintText: "Qur’an, Psychology, Travel",
+                  decoration: InputDecoration(
+                    labelText: "Interests (comma separated)".tr(),
+                    hintText: "Qur’an, Psychology, Travel".tr(),
                   ),
                 ),
                 const SizedBox(height: 18),
@@ -601,7 +601,7 @@ class _ProfilePageState extends State<ProfilePage> {
         compressQuality: 85,
         uiSettings: [
           AndroidUiSettings(
-            toolbarTitle: 'Crop profile photo',
+            toolbarTitle: 'Crop profile photo'.tr(),
             toolbarColor: Theme.of(context).colorScheme.primary,
             toolbarWidgetColor: Colors.white,
             initAspectRatio: CropAspectRatioPreset.square,
@@ -610,7 +610,7 @@ class _ProfilePageState extends State<ProfilePage> {
             cropStyle: CropStyle.circle,
           ),
           IOSUiSettings(
-            title: 'Crop profile photo',
+            title: 'Crop profile photo'.tr(),
             aspectRatioLockEnabled: true,
             cropStyle: CropStyle.circle,
           ),
@@ -855,8 +855,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 const SizedBox(height: 6),
                 Text(
                   isOwn
-                      ? "Add friends to see them here."
-                      : "No friends to show yet.",
+                      ? "Add friends to see them here.".tr()
+                      : "No friends to show yet.".tr(),
                   style: TextStyle(
                     fontSize: 12,
                     color: colorScheme.primary.withValues(alpha: 0.7),
@@ -1060,7 +1060,7 @@ class _ProfilePageState extends State<ProfilePage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: colorScheme.surfaceVariant.withValues(alpha: 0.5),
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
@@ -1090,8 +1090,8 @@ class _ProfilePageState extends State<ProfilePage> {
                     hasSong
                         ? '${song!.title} • ${song.artist}'
                         : (_isOwnProfile
-                              ? "Choose a song that plays on your profile"
-                              : "No profile song set"),
+                              ? "Choose a song that plays on your profile".tr()
+                              : "No profile song set".tr()),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -1120,7 +1120,7 @@ class _ProfilePageState extends State<ProfilePage> {
               TextButton(
                 onPressed: _openSongPicker,
                 child: Text(
-                  hasSong ? "Change" : "Choose",
+                  hasSong ? "Change".tr() : "Choose".tr(),
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
@@ -1467,7 +1467,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28.0),
-              child: Text("Stories completed: ${sortedCompletedIds.length} / $totalStories".tr(),
+              child: Text("Stories completed: ${sortedCompletedIds.length} / $totalStories",
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.primary,
                   fontWeight: FontWeight.bold,
@@ -1726,7 +1726,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           const SizedBox(height: 2),
                           Text(
                             postCount == 0
-                                ? "Tap to view posts"
+                                ? "Tap to view posts".tr()
                                 : "$postCount post${postCount == 1 ? '' : 's'} • tap to view",
                             style: TextStyle(
                               fontSize: 12,
@@ -1754,7 +1754,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            _showPosts ? "Hide" : "Show",
+                            _showPosts ? "Hide".tr() : "Show".tr(),
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,

@@ -2,15 +2,14 @@
 POST PAGE
 
 This page displays:
-
 - individual's posts
 - comments on this post
-
 */
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../components/my_post_tile.dart';
 import '../components/my_comment_tile.dart';
 import '../models/post.dart';
@@ -21,9 +20,9 @@ class PostPage extends StatefulWidget {
   final Post post;
 
   // 🆕 Behavior flags
-  final bool scrollToComments;    // scroll down to comments on open
-  final bool highlightPost;       // briefly highlight the post area
-  final bool highlightComments;   // briefly highlight the comments area
+  final bool scrollToComments; // scroll down to comments on open
+  final bool highlightPost; // briefly highlight the post area
+  final bool highlightComments; // briefly highlight the comments area
 
   const PostPage({
     super.key,
@@ -76,9 +75,11 @@ class _PostPageState extends State<PostPage> {
     }
 
     // 🆕 optional scroll-to-comments on open (used for comment notifications)
+    // NOTE: comments load async, so we do a small delayed scroll after first frame.
     if (widget.scrollToComments) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!_scrollController.hasClients) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await Future.delayed(const Duration(milliseconds: 350));
+        if (!mounted || !_scrollController.hasClients) return;
 
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
@@ -96,23 +97,19 @@ class _PostPageState extends State<PostPage> {
     super.dispose();
   }
 
-  // BUILD UI
   @override
   Widget build(BuildContext context) {
     // listen to all comments for this post
     final allComments = listeningProvider.getComments(widget.post.id);
     final theme = Theme.of(context);
 
-    // SCAFFOLD
+    final highlightTint = theme.colorScheme.primary.withValues(alpha: 0.10);
+
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
-
-      // App bar
       appBar: AppBar(
         foregroundColor: theme.colorScheme.primary,
       ),
-
-      // Body
       body: ListView(
         controller: _scrollController,
         children: [
@@ -121,26 +118,24 @@ class _PostPageState extends State<PostPage> {
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeOut,
             decoration: BoxDecoration(
-              color: _highlightPost
-                  ? theme.colorScheme.primary
-                  : Colors.transparent,
+              color: _highlightPost ? highlightTint : Colors.transparent,
             ),
             child: MyPostTile(
               post: widget.post,
               onUserTap: () => goUserPage(context, widget.post.userId),
               onPostTap: () {}, // already on this post
               scaffoldContext: context,
-              isInPostPage:
-              true, // 👈 tells the tile we're on the PostPage (hide "view all comments")
+              isInPostPage: true,
             ),
           ),
 
           const SizedBox(height: 12),
 
-          // 🗨️ Comments header (optional – you can tweak or remove)
+          // 🗨️ Comments header
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12.0),
-            child: Text("Comments".tr(),
+            child: Text(
+              "Comments".tr(),
               style: TextStyle(
                 color: theme.colorScheme.primary,
                 fontWeight: FontWeight.w600,
@@ -154,14 +149,13 @@ class _PostPageState extends State<PostPage> {
           AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeOut,
-            color: _highlightComments
-                ? theme.colorScheme.primary
-                : Colors.transparent,
+            color: _highlightComments ? highlightTint : Colors.transparent,
             child: allComments.isEmpty
                 ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: Text("No comments yet...".tr(),
+                child: Text(
+                  "No comments yet...".tr(),
                   style: TextStyle(
                     color: theme.colorScheme.primary,
                   ),
@@ -175,11 +169,9 @@ class _PostPageState extends State<PostPage> {
               padding: const EdgeInsets.symmetric(horizontal: 8),
               itemBuilder: (context, index) {
                 final comment = allComments[index];
-
                 return MyCommentTile(
                   comment: comment,
-                  onUserTap: () =>
-                      goUserPage(context, comment.userId),
+                  onUserTap: () => goUserPage(context, comment.userId),
                   scaffoldContext: context,
                 );
               },

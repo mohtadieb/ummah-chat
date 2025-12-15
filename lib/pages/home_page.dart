@@ -1,15 +1,11 @@
 // lib/pages/home_page.dart
 
-import 'dart:io';
-
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../models/post.dart';
 import '../services/database/database_provider.dart';
-import '../components/my_input_alert_box.dart';
 import '../components/my_post_tile.dart';
 import '../helper/navigate_pages.dart';
 import 'create_post_page.dart';

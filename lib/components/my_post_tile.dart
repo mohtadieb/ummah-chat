@@ -336,7 +336,7 @@ class _MyPostTileState extends State<MyPostTile> {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text('@${widget.post.username}'.tr(),
+                    Text('@${widget.post.username}',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.primary,
                       ),

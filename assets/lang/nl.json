@@ -1,5 +1,4 @@
 {
-  "Login": "Inloggen",
   "Logout": "Uitloggen",
   "Settings": "Instellingen",
 
@@ -452,9 +451,34 @@
   "Create a group to start chatting with multiple friends at once.": "Maak een groep aan om met meerdere vrienden tegelijk te chatten.",
   "Search groups": "Groepen zoeken",
   "Your groups": "Jouw groepen",
-  "No groups match your search": "Geen groepen komen overeen met je zoekopdracht"
+  "No groups match your search": "Geen groepen komen overeen met je zoekopdracht",
+
+  "For You": "Voor jou",
+  "Nothing here..": "Hier is nog niks...",
+
+  "Welcome back! Login to your account": "Welkom terug! Log in op je account",
+  "Enter email": "E-mailadres invoeren",
+  "Enter password": "Wachtwoord invoeren",
+  "Login": "Inloggen",
+  "OR": "OF",
+  "Continue with Google": "Doorgaan met Google",
+  "Don't have an account? ": "Heb je nog geen account? ",
+  "Register here": "Registreer hier",
+  "Logging in...": "Bezig met inloggen...",
+  "Logged in successfully!": "Succesvol ingelogd!",
+  "Login Error": "Inlogfout",
+  "Google Login Error": "Google-inlogfout",
+  "login_failed_generic": "Inloggen mislukt. Probeer het opnieuw.",
+
+  "onboarding_welcome_title": "Welkom bij Ummah Chat",
+  "onboarding_welcome_subtitle": "Een rustige, geloofsgerichte plek om met moslims over de hele wereld te verbinden.",
+  "onboarding_dua_title": "Deel dua’s & zeg Ameen",
+  "onboarding_dua_subtitle": "Schrijf je dua’s op de Dua Muur en steun anderen door Ameen te zeggen 🤲.",
+  "onboarding_stories_title": "Verhalen, vrienden & communities",
+  "onboarding_stories_subtitle": "Lees verhalen van de profeten, volg vrienden en sluit je aan bij communities die als thuis voelen.",
 
 
+  "No comments yet...": "Nog geen reacties..."
 
 
 

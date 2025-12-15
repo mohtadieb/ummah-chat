@@ -10,6 +10,7 @@ import 'package:ummah_chat/pages/group_chat_page.dart'; // 👈 NEW
 import '../helper/navigate_pages.dart';
 import '../helper/time_ago_text.dart';
 import '../services/notifications/notification_service.dart';
+import 'package:intl/intl.dart';
 
 // Providers
 import 'package:provider/provider.dart';
@@ -105,14 +106,7 @@ class _NotificationPageState extends State<NotificationPage> {
 
   /// Format a date like "13 Dec 2025"
   String _formatDate(DateTime d) {
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
-    final day = d.day.toString().padLeft(2, '0');
-    final month = months[d.month - 1];
-    final year = d.year.toString();
-    return '$day $month $year';
+    return DateFormat('dd MMM yyyy', context.locale.toString()).format(d);
   }
 
   /// Build a flattened list of header + notification items grouped by date
@@ -133,10 +127,10 @@ class _NotificationPageState extends State<NotificationPage> {
       final d = DateTime(dt.year, dt.month, dt.day);
 
       if (d == today) {
-        return 'Today';
+        return 'Today'.tr();
       } else if (d == yesterday) {
         // Yesterday + formatted date
-        return 'Yesterday · ${_formatDate(d)}';
+        return 'Yesterday'.tr() + ' · ${_formatDate(d)}';
       } else {
         // Just the date for older notifications
         return _formatDate(d);
@@ -187,7 +181,7 @@ class _NotificationPageState extends State<NotificationPage> {
                   : colorScheme.primary,
             ),
             label: Text(
-              'Mark all',
+              'Mark all'.tr(),
               style: TextStyle(
                 color: _notifications.isEmpty
                     ? colorScheme.primary
@@ -226,7 +220,7 @@ class _NotificationPageState extends State<NotificationPage> {
               ),
               const SizedBox(height: 12),
               Text(
-                'No notifications yet',
+                'No notifications yet'.tr(),
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -451,7 +445,7 @@ class _NotificationPageState extends State<NotificationPage> {
                   await dbProvider.acceptFriendRequest(friendRequesterId!);
                 },
                 child: Text(
-                  'Accept',
+                  'Accept'.tr(),
                   style: TextStyle(fontSize: 12),
                 ),
               ),
@@ -478,7 +472,7 @@ class _NotificationPageState extends State<NotificationPage> {
                   await dbProvider.declineFriendRequest(friendRequesterId!);
                 },
                 child: Text(
-                  'Decline',
+                  'Decline'.tr(),
                   style: TextStyle(fontSize: 12),
                 ),
               ),
@@ -555,9 +549,9 @@ class _NotificationPageState extends State<NotificationPage> {
                   );
                 } else if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
+                    SnackBar(
                       content: Text(
-                        'This post is no longer available.',
+                        'This post is no longer available.'.tr(),
                       ),
                     ),
                   );
@@ -592,7 +586,7 @@ class _NotificationPageState extends State<NotificationPage> {
                       friendName:
                       (chatFriendName != null && chatFriendName!.isNotEmpty)
                           ? chatFriendName!
-                          : 'Chat',
+                          : 'Chat'.tr(),
                     ),
                   ),
                 );
@@ -647,7 +641,7 @@ class _NotificationPageState extends State<NotificationPage> {
                   MaterialPageRoute(
                     builder: (_) => GroupChatPage(
                       chatRoomId: groupChatRoomId!,
-                      groupName: groupName ?? 'Group',
+                      groupName: groupName ?? 'Group'.tr(),
                     ),
                   ),
                 );

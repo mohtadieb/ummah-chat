@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 class OnboardingPage extends StatefulWidget {
@@ -16,23 +17,26 @@ class _OnboardingPageState extends State<OnboardingPage> {
   final PageController _controller = PageController();
   int _currentIndex = 0;
 
-  final List<_OnboardingData> _pages = [
+  // ✅ IMPORTANT:
+  // Don't call `.tr()` here (field initializer), because:
+  // - it runs before build()
+  // - it won't react nicely if the user changes language during runtime
+  //
+  // Instead store translation KEYS and translate inside build().
+  final List<_OnboardingData> _pages = const [
     _OnboardingData(
-      title: 'Welcome to Ummah Chat',
-      subtitle:
-      'A calm, faith-centered space to connect with Muslims around the world.',
+      titleKey: 'onboarding_welcome_title',
+      subtitleKey: 'onboarding_welcome_subtitle',
       assetPath: 'assets/onboarding_ummah_chat_1.png',
     ),
     _OnboardingData(
-      title: 'Share duas & say Ameen',
-      subtitle:
-      'Write your duas on the Dua Wall and support others by saying Ameen 🤲.',
+      titleKey: 'onboarding_dua_title',
+      subtitleKey: 'onboarding_dua_subtitle',
       assetPath: 'assets/onboarding_dua_wall.png',
     ),
     _OnboardingData(
-      title: 'Stories, friends & communities',
-      subtitle:
-      'Read stories of the prophets, follow friends, and join communities that feel like home.',
+      titleKey: 'onboarding_stories_title',
+      subtitleKey: 'onboarding_stories_subtitle',
       assetPath: 'assets/onboarding_stories_communities.png',
     ),
   ];
@@ -75,7 +79,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
               child: TextButton(
                 onPressed: _skip,
                 child: Text(
-                  'Skip',
+                  'Skip'.tr(),
                   style: TextStyle(
                     color: colorScheme.primary.withValues(alpha: 0.8),
                     fontWeight: FontWeight.w500,
@@ -93,6 +97,11 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 },
                 itemBuilder: (context, index) {
                   final page = _pages[index];
+
+                  // ✅ Translate here so it always uses the CURRENT locale
+                  final title = page.titleKey.tr();
+                  final subtitle = page.subtitleKey.tr();
+
                   return Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 26,
@@ -113,7 +122,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
                         // TITLE
                         Text(
-                          page.title,
+                          title,
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 22,
@@ -125,13 +134,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
                         // SUBTITLE
                         Text(
-                          page.subtitle,
+                          subtitle,
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 14,
                             height: 1.4,
-                            color: colorScheme.primary
-                                .withValues(alpha: 0.80),
+                            color: colorScheme.primary.withValues(alpha: 0.80),
                           ),
                         ),
                       ],
@@ -145,8 +153,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
             // Dots + Next / Get started button
             Padding(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 26, vertical: 18),
+              padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 18),
               child: Row(
                 children: [
                   // Dots
@@ -163,8 +170,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                           decoration: BoxDecoration(
                             color: isActive
                                 ? colorScheme.primary
-                                : colorScheme.primary
-                                .withValues(alpha: 0.25),
+                                : colorScheme.primary.withValues(alpha: 0.25),
                             borderRadius: BorderRadius.circular(999),
                           ),
                         );
@@ -188,8 +194,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       ),
                     ),
                     child: Text(
-                      _isLastPage ? 'Get started' : 'Next',
-                      style: TextStyle(
+                      _isLastPage ? 'Get started'.tr() : 'Next'.tr(),
+                      style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
@@ -206,13 +212,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
 }
 
 class _OnboardingData {
-  final String title;
-  final String subtitle;
+  // ✅ Store translation keys, not translated strings
+  final String titleKey;
+  final String subtitleKey;
   final String assetPath;
 
-  _OnboardingData({
-    required this.title,
-    required this.subtitle,
+  const _OnboardingData({
+    required this.titleKey,
+    required this.subtitleKey,
     required this.assetPath,
   });
 }

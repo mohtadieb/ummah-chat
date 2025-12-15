@@ -38,18 +38,17 @@ class _LoginPageState extends State<LoginPage> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Logged in successfully!')),
+          SnackBar(content: Text('Logged in successfully!'.tr())),
         );
       }
       // Navigation is handled by your AuthGate
     } catch (e) {
-      if (mounted) {
-        showAppErrorDialog(
-          context,
-          title: 'Login Error',
-          message: e.toString(),
+      if (!mounted) return;
+      showAppErrorDialog(
+        context,
+        title: 'Login Error'.tr(),
+        message: 'login_failed_generic'.tr(),
         );
-      }
     } finally {
       if (mounted) {
         setState(() => _isLoggingIn = false);
@@ -72,7 +71,7 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) {
         showAppErrorDialog(
           context,
-          title: 'Google Login Error',
+          title: 'Google Login Error'.tr(),
           message: e.toString(),
         );
       }
@@ -130,7 +129,7 @@ class _LoginPageState extends State<LoginPage> {
 
                       MyTextField(
                         controller: emailController,
-                        hintText: "Enter email",
+                        hintText: "Enter email".tr(),
                         obscureText: false,
                       ),
 
@@ -138,14 +137,14 @@ class _LoginPageState extends State<LoginPage> {
 
                       MyTextField(
                         controller: pwController,
-                        hintText: "Enter password",
+                        hintText: "Enter password".tr(),
                         obscureText: true,
                       ),
 
                       const SizedBox(height: 28),
 
                       MyButton(
-                        text: "Login",
+                        text: "Login".tr(),
                         onTap: login,
                       ),
 
