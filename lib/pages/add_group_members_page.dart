@@ -1,8 +1,10 @@
+// lib/pages/add_group_members_page.dart
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/user_profile.dart';
-import '../services/chat/chat_service.dart';
+import '../services/chat/chat_provider.dart';
 import '../services/database/database_provider.dart';
 
 /// ADD GROUP MEMBERS PAGE
@@ -11,7 +13,7 @@ import '../services/database/database_provider.dart';
 /// extra members for an existing group chat.
 /// - Shows all friends
 /// - Friends that are already in the group are disabled with an "In group" label
-/// - Selected friends are added via ChatService.addUsersToGroup(...)
+/// - Selected friends are added via ChatProvider.addUsersToGroup(...)
 class AddGroupMembersPage extends StatefulWidget {
   final String chatRoomId;
   final Set<String> existingMemberIds;
@@ -29,8 +31,6 @@ class AddGroupMembersPage extends StatefulWidget {
 }
 
 class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
-  final ChatService _chatService = ChatService();
-
   // Locally selected friend IDs to add
   final Set<String> _selectedUserIds = {};
 
@@ -44,7 +44,10 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
     });
 
     try {
-      await _chatService.addUsersToGroup(
+      final chatProvider =
+      Provider.of<ChatProvider>(context, listen: false);
+
+      await chatProvider.addUsersToGroup(
         chatRoomId: widget.chatRoomId,
         userIds: _selectedUserIds.toList(),
       );
@@ -57,8 +60,8 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
       debugPrint('❌ AddGroupMembersPage _save error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to add members. Please try again.'),
+          SnackBar(
+            content: Text('Failed to add members. Please try again.'.tr()),
           ),
         );
       }
@@ -78,7 +81,7 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add members'),
+        title: Text('Add members'.tr()),
         elevation: 0,
         backgroundColor: colorScheme.surface,
         foregroundColor: colorScheme.primary,
@@ -88,8 +91,7 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return Center(
-              child: Text(
-                'Error loading friends',
+              child: Text('Error loading friends'.tr(),
                 style: TextStyle(color: colorScheme.primary),
               ),
             );
@@ -114,8 +116,7 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
                       color: colorScheme.primary.withValues(alpha: 0.6),
                     ),
                     const SizedBox(height: 12),
-                    Text(
-                      'No friends yet',
+                    Text('No friends yet'.tr(),
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
@@ -123,8 +124,7 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      'Add friends first before inviting them to a group.',
+                    Text('Add friends first before inviting them to a group.'.tr(),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 13,
@@ -168,15 +168,14 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
                   ),
                 ),
                 title: Text(
-                  displayName.isNotEmpty ? displayName : 'User',
+                  displayName.isNotEmpty ? displayName : 'User'.tr(),
                   style: TextStyle(
                     color: colorScheme.primary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 subtitle: user.username.isNotEmpty
-                    ? Text(
-                  '@${user.username}',
+                    ? Text('@${user.username}',
                   style: TextStyle(
                     color: colorScheme.primary.withValues(alpha: 0.7),
                   ),
@@ -192,11 +191,11 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
                     color: colorScheme.primary.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Text(
-                    'In group',
+                  child: Text('In group'.tr(),
                     style: TextStyle(
                       fontSize: 11,
-                      color: colorScheme.primary.withValues(alpha: 0.9),
+                      color:
+                      colorScheme.primary.withValues(alpha: 0.9),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -255,8 +254,7 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
                   AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
               )
-                  : const Text(
-                'Add to group',
+                  : Text('Add to group'.tr(),
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                 ),

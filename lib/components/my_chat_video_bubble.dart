@@ -1,6 +1,7 @@
 // lib/components/chat_video_bubble.dart
 import 'dart:typed_data';
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
@@ -102,7 +103,7 @@ class _MyChatVideoBubbleState extends State<MyChatVideoBubble> {
       context: context,
       barrierColor: Colors.black87,
       barrierDismissible: true,
-      barrierLabel: 'Close video',
+      barrierLabel: 'Close video'.tr(),
       transitionDuration: const Duration(milliseconds: 220),
       pageBuilder: (context, animation, secondaryAnimation) {
         return MyChatVideoFullscreenPlayer(
@@ -215,7 +216,7 @@ class _MyChatVideoBubbleState extends State<MyChatVideoBubble> {
                     ),
                     child: Text(
                       _formatDuration(_duration!),
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.white,
                         fontSize: 11,
                         fontWeight: FontWeight.w500,

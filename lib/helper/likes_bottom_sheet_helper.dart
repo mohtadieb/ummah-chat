@@ -1,4 +1,5 @@
 // lib/helper/likes_bottom_sheet_helper.dart
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 import '../models/user_profile.dart';
@@ -39,9 +40,9 @@ class LikesBottomSheetHelper {
             }
 
             if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return const SizedBox(
+              return SizedBox(
                 height: 220,
-                child: Center(child: Text('No likes yet')),
+                child: Center(child: Text('No likes yet'.tr())),
               );
             }
 
@@ -95,8 +96,7 @@ class LikesBottomSheetHelper {
                         ),
                         if (isYou) ...[
                           const SizedBox(width: 6),
-                          Text(
-                            '(You)',
+                          Text('(You)'.tr(),
                             style: TextStyle(
                               fontSize: 12,
                               color: colorScheme.primary.withValues(alpha: 0.7),
@@ -106,8 +106,7 @@ class LikesBottomSheetHelper {
                       ],
                     ),
                     subtitle: user.username.isNotEmpty
-                        ? Text(
-                      '@${user.username}',
+                        ? Text('@${user.username}',
                       style: TextStyle(
                         color: colorScheme.primary.withValues(alpha: 0.7),
                       ),

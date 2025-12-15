@@ -1,20 +1,19 @@
+// lib/pages/groups_page.dart
 import 'dart:async';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../services/auth/auth_service.dart';
-import '../services/chat/chat_service.dart';
+import '../services/chat/chat_provider.dart';
 import '../pages/group_chat_page.dart';
 import '../models/message.dart';
 import '../helper/last_message_time_formatter.dart';
 import '../components/my_search_bar.dart';
 import '../components/my_group_tile.dart';
+import '../services/notifications/notification_service.dart';
 
 /// GROUPS PAGE (content-only version)
-///
-/// - Shows all group chats where the current user is a member
-/// - Data comes from ChatService.groupRoomsForUserPollingStream(...)
-//  - Tapping a tile opens GroupChatPage
-/// - Shows last message + time + unread badge per group
 class GroupsPage extends StatefulWidget {
   const GroupsPage({super.key});
 
@@ -24,7 +23,6 @@ class GroupsPage extends StatefulWidget {
 
 class _GroupsPageState extends State<GroupsPage> {
   final AuthService _authService = AuthService();
-  final ChatService _chatService = ChatService();
 
   // Last message per group: { roomId: MessageModel }
   Map<String, MessageModel> _lastGroupMessages = {};
@@ -45,29 +43,48 @@ class _GroupsPageState extends State<GroupsPage> {
 
     final currentUserId = _authService.getCurrentUserId();
 
-    // Only start polling when a user is logged in
     if (currentUserId != null && currentUserId.isNotEmpty) {
-      // Poll last group messages
-      _lastMsgSub =
-          _chatService.lastGroupMessagesPollingStream().listen((map) {
-            if (!mounted) return;
-            setState(() {
-              _lastGroupMessages = map;
-            });
-          });
-
-      // Poll unread counts per group
-      _unreadSub =
-          _chatService.groupUnreadCountsPollingStream(currentUserId).listen(
-                (map) {
-              if (!mounted) return;
-              debugPrint('📥 GroupsPage: unread map from service: $map');
-              setState(() {
-                _groupUnreadCounts = map;
-              });
-            },
-          );
+      final chatProvider =
+      Provider.of<ChatProvider>(context, listen: false);
+      // (nothing else needed here for now)
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Start subscriptions here to safely use Provider.of(context)
+    _startSubscriptionsIfNeeded();
+  }
+
+  void _startSubscriptionsIfNeeded() {
+    if (_lastMsgSub != null || _unreadSub != null) return;
+
+    final currentUserId = _authService.getCurrentUserId();
+    if (currentUserId == null || currentUserId.isEmpty) return;
+
+    final chatProvider =
+    Provider.of<ChatProvider>(context, listen: false);
+
+    _lastMsgSub =
+        chatProvider.lastGroupMessagesPollingStream().listen((map) {
+          if (!mounted) return;
+          setState(() {
+            _lastGroupMessages = map;
+          });
+        });
+
+    _unreadSub =
+        chatProvider.groupUnreadCountsPollingStream(currentUserId).listen(
+              (map) {
+            if (!mounted) return;
+            debugPrint('📥 GroupsPage: unread map from provider: $map');
+            setState(() {
+              _groupUnreadCounts = map;
+            });
+          },
+        );
   }
 
   @override
@@ -86,20 +103,26 @@ class _GroupsPageState extends State<GroupsPage> {
     if (currentUserId == null || currentUserId.isEmpty) {
       return Center(
         child: Text(
-          'You must be logged in to view your groups',
+          'You must be logged in to view your groups'.tr(),
           style: TextStyle(color: colorScheme.primary),
         ),
       );
     }
 
-    // ⬇️ No Scaffold here; this is content-only inside ChatTabsPage.
+    final chatProvider =
+    Provider.of<ChatProvider>(context, listen: false);
+
+    // 🆕 Access NotificationService singleton
+    final notificationService = NotificationService();
+    final String? activeChatRoomId = notificationService.activeChatRoomId;
+
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: _chatService.groupRoomsForUserPollingStream(currentUserId),
+      stream: chatProvider.groupRoomsForUserPollingStream(currentUserId),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Center(
             child: Text(
-              'Error loading groups',
+              'Error loading groups'.tr(),
               style: TextStyle(color: colorScheme.primary),
             ),
           );
@@ -111,7 +134,6 @@ class _GroupsPageState extends State<GroupsPage> {
 
         final groups = snapshot.data ?? [];
 
-        // If there are literally no groups at all, show the empty state
         if (groups.isEmpty) {
           return Center(
             child: Padding(
@@ -126,7 +148,7 @@ class _GroupsPageState extends State<GroupsPage> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'No groups yet',
+                    'No groups yet'.tr(),
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
@@ -135,7 +157,7 @@ class _GroupsPageState extends State<GroupsPage> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Create a group to start chatting with multiple friends at once.',
+                    'Create a group to start chatting with multiple friends at once.'.tr(),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 13,
@@ -148,7 +170,6 @@ class _GroupsPageState extends State<GroupsPage> {
           );
         }
 
-        // 🎯 Apply local search filter on group name
         List<Map<String, dynamic>> filteredGroups = groups;
         if (_searchQuery.trim().isNotEmpty) {
           final q = _searchQuery.toLowerCase();
@@ -164,12 +185,12 @@ class _GroupsPageState extends State<GroupsPage> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 🔍 Local search bar for groups (same style as FriendsPage)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 4.0),
+              padding:
+              const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 4.0),
               child: MySearchBar(
                 controller: _searchController,
-                hintText: 'Search groups',
+                hintText: 'Search groups'.tr(),
                 onChanged: (value) {
                   setState(() {
                     _searchQuery = value;
@@ -182,10 +203,7 @@ class _GroupsPageState extends State<GroupsPage> {
                 },
               ),
             ),
-
             const SizedBox(height: 4),
-
-            // Header with total groups count
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: 16.0,
@@ -193,8 +211,7 @@ class _GroupsPageState extends State<GroupsPage> {
               ),
               child: Row(
                 children: [
-                  Text(
-                    "Your groups",
+                  Text("Your groups".tr(),
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
@@ -223,15 +240,12 @@ class _GroupsPageState extends State<GroupsPage> {
                 ],
               ),
             ),
-
             const SizedBox(height: 4),
-
-            // Groups list or "no matches" message
             Expanded(
               child: noMatches
                   ? Center(
                 child: Text(
-                  'No groups match your search',
+                  'No groups match your search'.tr(),
                   style: TextStyle(
                     color: colorScheme.primary
                         .withValues(alpha: 0.8),
@@ -239,38 +253,49 @@ class _GroupsPageState extends State<GroupsPage> {
                 ),
               )
                   : ScrollConfiguration(
-                // ✅ Disable stretch / weird independent text movement
                 behavior: ScrollConfiguration.of(context)
                     .copyWith(overscroll: false),
                 child: ListView.builder(
                   physics: const ClampingScrollPhysics(),
                   padding: EdgeInsets.only(
-                    bottom:
-                    MediaQuery.of(context).padding.bottom +
-                        96, // match FriendsPage padding / avoid FAB overlap
+                    bottom: MediaQuery.of(context)
+                        .padding
+                        .bottom +
+                        96,
                   ),
                   itemCount: filteredGroups.length,
                   itemBuilder: (context, index) {
                     final group = filteredGroups[index];
-                    final groupId = group['id']?.toString() ?? '';
+                    final groupId =
+                        group['id']?.toString() ?? '';
                     final groupName =
                     (group['name'] as String?)?.trim().isNotEmpty ==
                         true
                         ? group['name'] as String
-                        : 'Group';
-                    final avatarUrl = group['avatar_url'] as String?;
+                        : 'Group'.tr();
+                    final avatarUrl =
+                    group['avatar_url'] as String?;
 
                     final MessageModel? lastMsg =
                     _lastGroupMessages[groupId];
-                    final int unread =
+
+                    // Raw unread from DB
+                    final int rawUnread =
                         _groupUnreadCounts[groupId] ?? 0;
+
+                    // 🆕 If this group chat is currently active, hide unread count
+                    final int unread =
+                    (activeChatRoomId != null &&
+                        activeChatRoomId == groupId)
+                        ? 0
+                        : rawUnread;
 
                     final String subtitle = lastMsg != null
                         ? _buildLastMessagePreview(
                       msg: lastMsg,
                       currentUserId: currentUserId,
                     )
-                        : 'No messages yet';
+                        : 'No messages yet'.tr();
 
                     final String? lastTimeLabel = lastMsg != null
                         ? formatLastMessageTime(lastMsg.createdAt)
@@ -306,7 +331,6 @@ class _GroupsPageState extends State<GroupsPage> {
     );
   }
 
-  /// Build a short preview of the last message
   String _buildLastMessagePreview({
     required MessageModel msg,
     required String currentUserId,

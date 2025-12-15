@@ -1,5 +1,8 @@
+// lib/pages/communities/community_posts_page.dart
+
 import 'dart:io';
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -41,9 +44,6 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
   late final DatabaseProvider databaseProvider =
   Provider.of<DatabaseProvider>(context, listen: false);
 
-  File? _selectedImage;
-  File? _selectedVideo;
-
   bool _isLoadingMembers = false;
   List<UserProfile> _members = [];
 
@@ -53,17 +53,10 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
   void initState() {
     super.initState();
 
-    // Load posts
     databaseProvider.loadAllPosts();
-
-    // Load members
     _loadMembers();
     _loadMembershipState();
   }
-
-  // ---------------------------------------------------------------------------
-  // Load members
-  // ---------------------------------------------------------------------------
 
   Future<void> _loadMembers() async {
     setState(() => _isLoadingMembers = true);
@@ -121,9 +114,9 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
         }
 
         if (_members.isEmpty) {
-          return const SizedBox(
+          return SizedBox(
             height: 200,
-            child: Center(child: Text('No members yet')),
+            child: Center(child: Text('No members yet'.tr())),
           );
         }
 
@@ -143,10 +136,6 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Membership state
-  // ---------------------------------------------------------------------------
-
   Future<void> _loadMembershipState() async {
     try {
       final isJoined = await databaseProvider.isMember(widget.communityId);
@@ -165,15 +154,20 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('You joined "${widget.communityName}".')),
-      );
+          SnackBar(
+            content: Text(
+              "you_joined_community".tr(
+                namedArgs: {"name": widget.communityName},
+              ),
+            ),
+          ));
     } catch (e) {
       debugPrint('Error joining community: $e');
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to join community. Please try again.'),
+        SnackBar(
+          content: Text('Failed to join community. Please try again.'.tr()),
         ),
       );
     }
@@ -186,17 +180,18 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
     final bool? shouldLeave = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Leave community?'),
+        title: Text('Leave community?'.tr()),
         content: Text(
-            'You will no longer see posts or updates from "$communityName".'),
+            "leave_warning"
+                .tr(namedArgs: {"name": communityName})),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: TextStyle(color: colorScheme.primary)),
+            child: Text('Cancel'.tr(), style: TextStyle(color: colorScheme.primary)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text('Leave', style: TextStyle(color: Colors.red)),
+            child: Text('Leave'.tr(), style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -213,179 +208,21 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
       Navigator.pop(context);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('You left "$communityName".')),
+          SnackBar(
+            content: Text(
+              "you_left_community".tr(namedArgs: {"name": communityName}),
+            ),
+          )
       );
     } catch (e) {
       debugPrint('Error leaving community: $e');
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to leave community.')),
+        SnackBar(content: Text('Failed to leave community.'.tr())),
       );
     }
   }
-
-  // ---------------------------------------------------------------------------
-  // Post creation dialog
-  // ---------------------------------------------------------------------------
-
-  // void _openPostMessageBox() {
-  //   if (!_isJoined) {
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       const SnackBar(content: Text('Join this community to share a post.')),
-  //     );
-  //     return;
-  //   }
-  //
-  //   final messenger = ScaffoldMessenger.maybeOf(context);
-  //   final controller = TextEditingController();
-  //
-  //   showDialog(
-  //     context: context,
-  //     builder: (dialogContext) {
-  //       return StatefulBuilder(
-  //         builder: (ctx, setInnerState) => MyInputAlertBox(
-  //           textController: controller,
-  //           hintText: "Share something with ${widget.communityName}…",
-  //           onPressedText: "Post",
-  //           onPressed: () async {
-  //             final message = controller.text.trim();
-  //
-  //             if (message.replaceAll(RegExp(r'\s+'), '').length < 2) {
-  //               messenger?.showSnackBar(
-  //                 const SnackBar(
-  //                   content: Text("Your message must have at least 2 characters"),
-  //                 ),
-  //               );
-  //
-  //               setInnerState(() {
-  //                 _selectedImage = null;
-  //                 _selectedVideo = null; // ⭐ also clear video
-  //               });
-  //               return;
-  //             }
-  //
-  //             try {
-  //               // ⭐ SHOW TEMPORARY POST WHILE UPLOADING
-  //               databaseProvider.showLoadingPost(
-  //                 message: message,
-  //                 imageFile: _selectedImage,
-  //                 videoFile: _selectedVideo,
-  //               );
-  //
-  //               await _postMessage(
-  //                 message,
-  //                 communityId: widget.communityId,
-  //                 imageFile: _selectedImage,
-  //                 videoFile: _selectedVideo,
-  //               );
-  //
-  //               controller.clear();
-  //
-  //               messenger?.showSnackBar(
-  //                 const SnackBar(content: Text("Post uploaded successfully!")),
-  //               );
-  //             } catch (e) {
-  //               debugPrint('Error posting community message: $e');
-  //
-  //               messenger?.showSnackBar(
-  //                 const SnackBar(
-  //                   content: Text('Failed to post. Please try again.'),
-  //                 ),
-  //               );
-  //             }
-  //           },
-  //           extraWidget: Column(
-  //             children: [
-  //               if (_selectedImage != null)
-  //                 Image.file(_selectedImage!, height: 150, fit: BoxFit.cover)
-  //               else if (_selectedVideo != null)
-  //                 Container(
-  //                   height: 150,
-  //                   alignment: Alignment.center,
-  //                   decoration: BoxDecoration(
-  //                     borderRadius: BorderRadius.circular(12),
-  //                     color: Colors.black12,
-  //                   ),
-  //                   child: const Row(
-  //                     mainAxisSize: MainAxisSize.min,
-  //                     children: [
-  //                       Icon(Icons.videocam, size: 28),
-  //                       SizedBox(width: 8),
-  //                       Text("Video selected"),
-  //                     ],
-  //                   ),
-  //                 ),
-  //
-  //               Row(
-  //                 mainAxisAlignment: MainAxisAlignment.center,
-  //                 children: [
-  //                   TextButton.icon(
-  //                     icon: const Icon(Icons.image),
-  //                     label: const Text("Add Image"),
-  //                     onPressed: () async {
-  //                       final picked = await ImagePicker()
-  //                           .pickImage(source: ImageSource.gallery);
-  //                       if (picked != null) {
-  //                         setInnerState(() {
-  //                           _selectedVideo = null;
-  //                           _selectedImage = File(picked.path);
-  //                         });
-  //                       }
-  //                     },
-  //                   ),
-  //                   const SizedBox(width: 8),
-  //                   TextButton.icon(
-  //                     icon: const Icon(Icons.videocam),
-  //                     label: const Text("Add Video"),
-  //                     onPressed: () async {
-  //                       final picked = await ImagePicker()
-  //                           .pickVideo(source: ImageSource.gallery);
-  //                       if (picked != null) {
-  //                         setInnerState(() {
-  //                           _selectedImage = null;
-  //                           _selectedVideo = File(picked.path);
-  //                         });
-  //                       }
-  //                     },
-  //                   ),
-  //                 ],
-  //               ),
-  //             ],
-  //           ),
-  //         ),
-  //       );
-  //     },
-  //   );
-  // }
-
-  Future<void> _postMessage(
-      String message, {
-        required String communityId,
-        File? imageFile,
-        File? videoFile,
-      }) async {
-    await databaseProvider.postMessage(
-      message,
-      imageFile: imageFile,
-      videoFile: videoFile,
-      communityId: communityId,
-    );
-
-    // ⭐ remove temporary tile
-    databaseProvider.clearLoadingPost();
-
-    if (!mounted) return;
-
-    setState(() {
-      _selectedImage = null;
-      _selectedVideo = null;
-    });
-  }
-
-  // ---------------------------------------------------------------------------
-  // Build UI
-  // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -394,13 +231,12 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
     final listeningProvider = Provider.of<DatabaseProvider>(context);
 
     // Only posts for this community
-    final List<Post> communityPosts = listeningProvider.allPosts
+    final List<Post> communityPosts = listeningProvider.posts
         .where((p) => p.communityId == widget.communityId)
         .toList();
 
     final loadingPost = listeningProvider.loadingPost;
 
-    // ⭐ Insert temporary loading tile
     final postsToShow = [
       if (loadingPost != null) loadingPost,
       ...communityPosts,
@@ -408,12 +244,12 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
 
     final String membersSubtitle;
     if (_isLoadingMembers) {
-      membersSubtitle = 'Loading members…';
+      membersSubtitle = 'Loading members…'.tr();
     } else if (_members.isEmpty) {
-      membersSubtitle = 'No members yet';
+      membersSubtitle = 'No members yet'.tr();
     } else {
-      membersSubtitle =
-      '${_members.length} member${_members.length == 1 ? '' : 's'}';
+      membersSubtitle = "member_count"
+          .plural(_members.length, namedArgs: {"count": _members.length.toString()});
     }
 
     return Scaffold(
@@ -477,7 +313,7 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
                       Icon(Icons.group_outlined,
                           size: 20, color: colorScheme.primary),
                       const SizedBox(width: 12),
-                      const Text('View members'),
+                      Text('View members'.tr()),
                     ],
                   ),
                 ),
@@ -494,7 +330,7 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
                         Icon(Icons.logout,
                             size: 20, color: Colors.red.shade600),
                         const SizedBox(width: 12),
-                        const Text('Leave community'),
+                        Text('Leave community'.tr()),
                       ],
                     ),
                   ),
@@ -508,7 +344,7 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
                         Icon(Icons.login,
                             size: 20, color: colorScheme.primary),
                         const SizedBox(width: 12),
-                        const Text('Join community'),
+                        Text('Join community'.tr()),
                       ],
                     ),
                   ),
@@ -520,7 +356,6 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
           ),
         ],
       ),
-
       floatingActionButton: _isJoined
           ? FloatingActionButton(
         backgroundColor: colorScheme.primary,
@@ -538,13 +373,13 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
         },
       )
           : null,
-
       body: Column(
         children: [
           if (!_isJoined)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               color: colorScheme.primary.withValues(alpha: 0.05),
               child: Row(
                 children: [
@@ -552,8 +387,7 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
                       size: 20, color: colorScheme.primary),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      "Join this community to share posts.",
+                    child: Text("Join this community to share posts.".tr(),
                       style:
                       TextStyle(fontSize: 13, color: colorScheme.primary),
                     ),
@@ -561,20 +395,15 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
                 ],
               ),
             ),
-
           Expanded(child: _buildPostList(postsToShow)),
         ],
       ),
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Build list (with loading tile)
-  // ---------------------------------------------------------------------------
-
   Widget _buildPostList(List<Post> posts) {
     if (posts.isEmpty) {
-      return const Center(child: Text("Nothing here yet…"));
+      return Center(child: Text("Nothing here yet…".tr()));
     }
 
     return ListView.builder(
@@ -582,12 +411,12 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
       itemBuilder: (context, index) {
         final post = posts[index];
 
-        // ⭐ temporary tile
         if (post.id == 'loading') {
           return _buildLoadingPostTile();
         }
 
         return MyPostTile(
+          key: ValueKey(post.id),
           post: post,
           onUserTap: () => goUserPage(context, post.userId),
           onPostTap: () => goPostPage(context, post),
@@ -597,10 +426,6 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Loading tile
-  // ---------------------------------------------------------------------------
-
   Widget _buildLoadingPostTile() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -609,14 +434,13 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
         color: Colors.grey.shade900,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          CircularProgressIndicator(),
-          SizedBox(width: 16),
+          const CircularProgressIndicator(),
+          const SizedBox(width: 16),
           Expanded(
-            child: Text(
-              "Posting your content…",
-              style: TextStyle(fontSize: 14, color: Colors.white70),
+            child: Text("Posting your content…".tr(),
+              style: const TextStyle(fontSize: 14, color: Colors.white70),
             ),
           )
         ],

@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 /*
@@ -38,7 +39,7 @@ class MyBioBox extends StatelessWidget {
 
       // Text content
       child: Text(
-        text.isNotEmpty ? text : "Empty bio..", // fallback if bio is empty
+        text.isNotEmpty ? text : "Empty bio..".tr(), // fallback if bio is empty
         style: TextStyle(
           color: Theme.of(context).colorScheme.inversePrimary,
         ),

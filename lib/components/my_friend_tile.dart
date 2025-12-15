@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import '../models/user_profile.dart';
 import 'my_card_tile.dart';
@@ -109,8 +110,7 @@ class MyFriendTile extends StatelessWidget {
                 Row(
                   children: [
                     Flexible(
-                      child: Text(
-                        '@${user.username}',
+                      child: Text('@${user.username}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -131,8 +131,7 @@ class MyFriendTile extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 4),
-                      const Text(
-                        'Online',
+                      Text('Online'.tr(),
                         style: TextStyle(
                           color: Color(0xFF12B981),
                           fontSize: 11,
@@ -191,7 +190,7 @@ class MyFriendTile extends StatelessWidget {
                   ),
                   child: Text(
                     unreadCount > 9 ? '9+' : '$unreadCount',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
                       fontSize: 10,
                       fontWeight: FontWeight.bold,

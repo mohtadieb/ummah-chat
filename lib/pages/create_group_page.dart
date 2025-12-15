@@ -1,8 +1,10 @@
+// lib/pages/create_group_page.dart
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../services/auth/auth_service.dart';
-import '../services/chat/chat_service.dart';
+import '../services/chat/chat_provider.dart';
 import '../services/database/database_provider.dart';
 import '../models/user_profile.dart';
 import 'group_chat_page.dart';
@@ -12,7 +14,7 @@ import 'group_chat_page.dart';
 /// - Shows a TextField for group name
 /// - Shows list of your friends with checkboxes
 /// - On "Create group":
-///   - calls ChatService.createGroupRoom(...)
+///   - calls ChatProvider.createGroupRoom(...)
 ///   - navigates to GroupChatPage for that new room
 class CreateGroupPage extends StatefulWidget {
   const CreateGroupPage({super.key});
@@ -24,7 +26,6 @@ class CreateGroupPage extends StatefulWidget {
 class _CreateGroupPageState extends State<CreateGroupPage> {
   final _groupNameController = TextEditingController();
   final _authService = AuthService();
-  final _chatService = ChatService();
 
   // Keep track of selected friend IDs
   final Set<String> _selectedFriendIds = {};
@@ -44,14 +45,14 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
     final name = _groupNameController.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a group name')),
+        SnackBar(content: Text('Please enter a group name'.tr())),
       );
       return;
     }
 
     if (_selectedFriendIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select at least one member')),
+        SnackBar(content: Text('Please select at least one member'.tr())),
       );
       return;
     }
@@ -59,8 +60,11 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
     setState(() => _isCreating = true);
 
     try {
+      final chatProvider =
+      Provider.of<ChatProvider>(context, listen: false);
+
       // Creator + selected friends → initial members
-      final roomId = await _chatService.createGroupRoom(
+      final roomId = await chatProvider.createGroupRoom(
         name: name,
         creatorId: currentUserId,
         initialMemberIds: _selectedFriendIds.toList(),
@@ -81,7 +85,8 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to create group: $e')),
+          SnackBar(
+            content: Text('Failed to create group:'.tr() + ' $e'))
       );
     } finally {
       if (mounted) {
@@ -99,13 +104,13 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
     if (currentUserId.isEmpty) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('New group'),
+          title: Text('New group'.tr()),
           backgroundColor: colorScheme.surface,
           elevation: 0,
         ),
         body: Center(
           child: Text(
-            'You must be logged in to create a group',
+            'You must be logged in to create a group'.tr(),
             style: TextStyle(color: colorScheme.primary),
           ),
         ),
@@ -117,7 +122,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
       appBar: AppBar(
         backgroundColor: colorScheme.surface,
         elevation: 0,
-        title: const Text('New group'),
+        title: Text('New group'.tr()),
       ),
       body: Column(
         children: [
@@ -127,7 +132,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
             child: TextField(
               controller: _groupNameController,
               decoration: InputDecoration(
-                labelText: 'Group name',
+                labelText: 'Group name'.tr(),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -135,13 +140,13 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
             ),
           ),
 
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Select members',
-                style: TextStyle(
+                'Select members'.tr(),
+                style: const TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
                 ),
@@ -157,7 +162,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                 if (snapshot.hasError) {
                   return Center(
                     child: Text(
-                      'Error loading friends',
+                      'Error loading friends'.tr(),
                       style: TextStyle(color: colorScheme.primary),
                     ),
                   );
@@ -177,7 +182,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 32.0),
                       child: Text(
-                        'You have no friends yet. Add some friends before creating a group.',
+                        'You have no friends yet. Add some friends before creating a group.'.tr(),
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: colorScheme.primary.withValues(alpha: 0.8),
@@ -241,7 +246,8 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
                     : const Icon(Icons.check),
-                label: Text(_isCreating ? 'Creating...' : 'Create group'),
+                label:
+                Text(_isCreating ? 'Creating...'.tr() : 'Create group'.tr()),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   backgroundColor: const Color(0xFF0D6746),

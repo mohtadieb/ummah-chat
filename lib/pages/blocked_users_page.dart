@@ -5,6 +5,7 @@ Displays a list of users that have been blocked.
 Allows unblocking directly from the list.
 */
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ummah_chat/services/database/database_provider.dart';
@@ -40,13 +41,13 @@ class _BlockedUsersPageState extends State<BlockedUsersPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Unblock User"),
-        content: const Text("Are you sure you want to unblock this user?"),
+        title: Text("Unblock User".tr()),
+        content: Text("Are you sure you want to unblock this user?".tr()),
         actions: [
           // cancel Button
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
+            child: Text("Cancel".tr()),
           ),
 
           // Unblock button
@@ -60,10 +61,10 @@ class _BlockedUsersPageState extends State<BlockedUsersPage> {
 
               // let user know user was successfully unblocked
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("User unblocked!")),
+                SnackBar(content: Text("User unblocked!".tr())),
               );
             },
-            child: const Text("Unblock"),
+            child: Text("Unblock".tr()),
           ),
         ],
       ),
@@ -81,14 +82,13 @@ class _BlockedUsersPageState extends State<BlockedUsersPage> {
 
       // App bar
       appBar: AppBar(
-        title: const Text("Blocked Users"),
+        title: Text("Blocked Users".tr()),
         foregroundColor: Theme.of(context).colorScheme.primary,
       ),
       body: blockedUsers.isEmpty
-          ? const Center(
-        child: Text(
-          "No blocked users...",
-          style: TextStyle(fontSize: 14),
+          ? Center(
+        child: Text("No blocked users...".tr(),
+          style: const TextStyle(fontSize: 14),
         ),
       )
           : ListView.builder(

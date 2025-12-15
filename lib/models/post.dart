@@ -4,8 +4,6 @@ class Post {
   final String name;
   final String username;
   final String message;
-  final String? imageUrl;      // optional image
-  final String? videoUrl;      // 👈 NEW: optional video
   final String? communityId;   // optional community
   final DateTime createdAt;
   final int likeCount;
@@ -16,8 +14,6 @@ class Post {
     required this.name,
     required this.username,
     required this.message,
-    this.imageUrl,
-    this.videoUrl,             // 👈 NEW
     this.communityId,
     required this.createdAt,
     required this.likeCount,
@@ -30,8 +26,6 @@ class Post {
       name: map['name'] ?? '',
       username: map['username'] ?? '',
       message: map['message'] ?? '',
-      imageUrl: map['image_url'],
-      videoUrl: map['video_url'],                     // 👈 NEW
       communityId: map['community_id']?.toString(),
       createdAt: DateTime.parse(map['created_at']).toLocal(),
       likeCount: map['like_count'] ?? 0,
@@ -44,8 +38,6 @@ class Post {
       'name': name,
       'username': username,
       'message': message,
-      'image_url': imageUrl,
-      'video_url': videoUrl,                         // 👈 NEW
       'community_id': communityId,
       'created_at': createdAt.toIso8601String(),
       'like_count': likeCount,
@@ -58,8 +50,6 @@ class Post {
   Post copyWith({
     String? id,
     String? message,
-    String? imageUrl,
-    String? videoUrl,                                // 👈 NEW
     String? communityId,
     int? likeCount,
   }) {
@@ -69,8 +59,6 @@ class Post {
       name: name,
       username: username,
       message: message ?? this.message,
-      imageUrl: imageUrl ?? this.imageUrl,
-      videoUrl: videoUrl ?? this.videoUrl,          // 👈 NEW
       communityId: communityId ?? this.communityId,
       createdAt: createdAt,
       likeCount: likeCount ?? this.likeCount,

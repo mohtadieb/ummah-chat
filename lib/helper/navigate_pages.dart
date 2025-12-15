@@ -23,16 +23,33 @@ Future<void> goPostPage(
       bool scrollToComments = false,
       bool highlightPost = false,
       bool highlightComments = false,
-    }) {
-  return Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => PostPage(
+    }) async {
+  Navigator.of(context).push(
+    PageRouteBuilder(
+      pageBuilder: (context, animation, secondaryAnimation) => PostPage(
         post: post,
         scrollToComments: scrollToComments,
         highlightPost: highlightPost,
         highlightComments: highlightComments,
       ),
+      transitionDuration: const Duration(milliseconds: 400),
+      reverseTransitionDuration: const Duration(milliseconds: 400),
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        // ✅ One tween, used forward and reverse:
+        // - push:  value 0→1 → moves from bottom (0,1) to center (0,0)
+        // - pop:   value 1→0 → moves from center (0,0) to bottom (0,1)
+        final offsetTween = Tween<Offset>(
+          begin: const Offset(0, 1),
+          end: Offset.zero,
+        ).chain(
+          CurveTween(curve: Curves.easeInOutCubic),
+        );
+
+        return SlideTransition(
+          position: animation.drive(offsetTween),
+          child: child,
+        );
+      },
     ),
   );
 }

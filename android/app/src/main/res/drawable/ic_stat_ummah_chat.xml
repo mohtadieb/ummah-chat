@@ -5,8 +5,13 @@
     android:viewportWidth="24"
     android:viewportHeight="24">
 
-    <!-- Simple filled circle as white icon -->
+    <!-- Chat bubble -->
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z"/>
+        android:pathData="M4,5h16v9h-6l-3.5,3.5L10,14H4z" />
+
+    <!-- Small heart inside bubble -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,9.5c-0.6,-0.7 -1.7,-0.7 -2.3,0c-0.5,0.6 -0.5,1.6 0.1,2.2l2.2,2.1l2.2,-2.1c0.6,-0.6 0.6,-1.6 0.1,-2.2c-0.6,-0.7 -1.7,-0.7 -2.3,0z" />
 </vector>

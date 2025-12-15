@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 import '../pages/fullscreen_image_page.dart';
@@ -216,7 +217,7 @@ class MyChatBubble extends StatelessWidget {
                 const SizedBox(width: 4),
                 Text(
                   likeCount.toString(),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
                     color: Colors.black87,
@@ -344,8 +345,8 @@ class MyChatBubble extends StatelessWidget {
     }
 
     final deletedText = isCurrentUser
-        ? 'You deleted this message'
-        : 'This message was deleted';
+        ? 'You deleted this message'.tr()
+        : 'This message was deleted'.tr();
 
     // ---------- FULL BUBBLE ----------
 
@@ -503,7 +504,7 @@ class MyChatBubble extends StatelessWidget {
                       replyAuthorName!.trim().isNotEmpty)
                     Text(
                       replyAuthorName!,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: Color(0xFF128C7E),

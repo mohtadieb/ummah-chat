@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 class MyInputAlertBox extends StatelessWidget {
@@ -66,7 +67,7 @@ class MyInputAlertBox extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        title,
+                        title.tr(),
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
@@ -153,8 +154,7 @@ class MyInputAlertBox extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 10),
                       ),
-                      child: const Text(
-                        "Cancel",
+                      child: Text("Cancel".tr(),
                         style: TextStyle(fontSize: 15),
                       ),
                     ),
@@ -178,8 +178,8 @@ class MyInputAlertBox extends StatelessWidget {
                         ),
                       ),
                       child: Text(
-                        onPressedText,
-                        style: const TextStyle(
+                        onPressedText.tr(),
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
                         ),

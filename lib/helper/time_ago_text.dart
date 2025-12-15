@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 /*
@@ -50,16 +51,34 @@ class _TimeAgoTextState extends State<TimeAgoText> {
 
   String getTimeAgo() {
     final now = DateTime.now().toUtc();
-    final diff = now.difference(widget.createdAt.toUtc());
+    final created = widget.createdAt.toUtc();
+    final diff = now.difference(created);
 
-    if (diff.inSeconds < 5) return 'Just now';
-    if (diff.inSeconds < 60) return '${diff.inSeconds}s ago';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    if (diff.inSeconds < 5) {
+      return 'Just now'.tr();
+    }
 
-    // Older than a week, show full date
-    return '${widget.createdAt.day}/${widget.createdAt.month}/${widget.createdAt.year}';
+    if (diff.inSeconds < 60) {
+      return 'seconds_ago'.tr(args: ['${diff.inSeconds}']);
+    }
+
+    if (diff.inMinutes < 60) {
+      return 'minutes_ago'.tr(args: ['${diff.inMinutes}']);
+    }
+
+    if (diff.inHours < 24) {
+      return 'hours_ago'.tr(args: ['${diff.inHours}']);
+    }
+
+    if (diff.inDays < 7) {
+      return 'days_ago'.tr(args: ['${diff.inDays}']);
+    }
+
+    // Older than a week, show full date (non-localized numeric format)
+    final d = widget.createdAt.day.toString().padLeft(2, '0');
+    final m = widget.createdAt.month.toString().padLeft(2, '0');
+    final y = widget.createdAt.year.toString();
+    return '$d/$m/$y';
   }
 
   @override

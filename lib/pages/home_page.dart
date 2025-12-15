@@ -1,5 +1,8 @@
+// lib/pages/home_page.dart
+
 import 'dart:io';
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -11,12 +14,6 @@ import '../components/my_post_tile.dart';
 import '../helper/navigate_pages.dart';
 import 'create_post_page.dart';
 
-/*
-HOME PAGE
-
-This is the main page of the app, it displays a list of all the posts.
-*/
-
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -24,7 +21,8 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
+class _HomePageState extends State<HomePage>
+    with SingleTickerProviderStateMixin {
   @override
   void setState(VoidCallback fn) {
     if (!mounted) return;
@@ -38,9 +36,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   final TextEditingController _messageController = TextEditingController();
   late final TabController _tabController;
-
-  File? _selectedImage;
-  File? _selectedVideo;
 
   @override
   void initState() {
@@ -71,180 +66,27 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     super.dispose();
   }
 
-  // -------------------------------
-  // Create Post
-  // -------------------------------
-  // void _openPostMessageBox() {
-  //   final messenger = ScaffoldMessenger.maybeOf(context);
-  //   final TextEditingController messageController = TextEditingController();
-  //
-  //   showDialog(
-  //     context: context,
-  //     builder: (dialogContext) {
-  //       return StatefulBuilder(
-  //         builder: (innerContext, setInnerState) => MyInputAlertBox(
-  //           textController: messageController,
-  //           hintText: "What's on your mind?",
-  //           onPressedText: "Post",
-  //           onPressed: () async {
-  //             final message = messageController.text.trim();
-  //             if (message.replaceAll(RegExp(r'\s+'), '').length < 2) {
-  //               messenger?.showSnackBar(
-  //                 const SnackBar(
-  //                   content: Text("Your message must have at least 2 characters"),
-  //                 ),
-  //               );
-  //               setInnerState(() {
-  //                 _selectedImage = null;
-  //                 _selectedVideo = null;
-  //               });
-  //               return;
-  //             }
-  //
-  //             try {
-  //               await _postMessage(
-  //                 message,
-  //                 imageFile: _selectedImage,
-  //                 videoFile: _selectedVideo,
-  //               );
-  //
-  //               messageController.clear();
-  //
-  //               messenger?.showSnackBar(
-  //                 const SnackBar(
-  //                   content: Text("Post uploaded successfully!"),
-  //                 ),
-  //               );
-  //             } catch (e) {
-  //               debugPrint('Error posting home message: $e');
-  //               messenger?.showSnackBar(
-  //                 const SnackBar(
-  //                   content: Text("Failed to post. Please try again."),
-  //                 ),
-  //               );
-  //             }
-  //           },
-  //           extraWidget: Column(
-  //             children: [
-  //               if (_selectedImage != null)
-  //                 Image.file(
-  //                   _selectedImage!,
-  //                   height: 150,
-  //                   fit: BoxFit.cover,
-  //                 )
-  //               else if (_selectedVideo != null)
-  //                 Container(
-  //                   height: 150,
-  //                   alignment: Alignment.center,
-  //                   decoration: BoxDecoration(
-  //                     borderRadius: BorderRadius.circular(12),
-  //                     color: Colors.black12,
-  //                   ),
-  //                   child: const Row(
-  //                     mainAxisSize: MainAxisSize.min,
-  //                     children: [
-  //                       Icon(Icons.videocam, size: 28),
-  //                       SizedBox(width: 8),
-  //                       Text("Video selected"),
-  //                     ],
-  //                   ),
-  //                 ),
-  //               Row(
-  //                 mainAxisAlignment: MainAxisAlignment.center,
-  //                 children: [
-  //                   TextButton.icon(
-  //                     icon: const Icon(Icons.image),
-  //                     label: const Text("Add Image"),
-  //                     onPressed: () async {
-  //                       final picker = ImagePicker();
-  //                       final picked = await picker.pickImage(
-  //                         source: ImageSource.gallery,
-  //                       );
-  //                       if (picked != null) {
-  //                         setInnerState(() {
-  //                           _selectedVideo = null;
-  //                           _selectedImage = File(picked.path);
-  //                         });
-  //                       }
-  //                     },
-  //                   ),
-  //                   const SizedBox(width: 8),
-  //                   TextButton.icon(
-  //                     icon: const Icon(Icons.videocam),
-  //                     label: const Text("Add Video"),
-  //                     onPressed: () async {
-  //                       final picker = ImagePicker();
-  //                       final picked = await picker.pickVideo(
-  //                         source: ImageSource.gallery,
-  //                       );
-  //                       if (picked != null) {
-  //                         setInnerState(() {
-  //                           _selectedImage = null;
-  //                           _selectedVideo = File(picked.path);
-  //                         });
-  //                       }
-  //                     },
-  //                   ),
-  //                 ],
-  //               ),
-  //             ],
-  //           ),
-  //         ),
-  //       );
-  //     },
-  //   );
-  // }
-
-  Future<void> _postMessage(
-      String message, {
-        File? imageFile,
-        File? videoFile,
-      }) async {
-    // Show temporary post
-    databaseProvider.showLoadingPost(
-      message: message,
-      imageFile: imageFile,
-      videoFile: videoFile,
-    );
-
-    // Upload
-    await databaseProvider.postMessage(
-      message,
-      imageFile: imageFile,
-      videoFile: videoFile,
-    );
-
-    // Remove temporary tile
-    databaseProvider.clearLoadingPost();
-
-    if (!mounted) return;
-
-    setState(() {
-      _selectedImage = null;
-      _selectedVideo = null;
-    });
-  }
-
-  // -------------------------------
-  // Build UI
-  // -------------------------------
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
+    // 🔁 all non-community posts
     final List<Post> forYouPosts =
-    listeningProvider.allPosts.where((p) => p.communityId == null).toList();
+    listeningProvider.posts.where((p) => p.communityId == null).toList();
 
+    // 🔁 following posts without community
     final List<Post> followingGlobalPosts = listeningProvider.followingPosts
         .where((p) => p.communityId == null)
         .toList();
 
+    // joined community IDs
     final joinedCommunityIds = listeningProvider.allCommunities
         .where((c) => c['is_joined'] == true)
         .map<String>((c) => c['id'] as String)
         .toSet();
 
-    final List<Post> communityPosts = listeningProvider.allPosts
+    // 🔁 posts from communities the user joined
+    final List<Post> communityPosts = listeningProvider.posts
         .where(
           (p) =>
       p.communityId != null &&
@@ -275,28 +117,27 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               labelColor: colorScheme.inversePrimary,
               unselectedLabelColor: colorScheme.primary,
               indicatorColor: colorScheme.secondary,
-              // optional but helps on small phones
-              labelStyle: const TextStyle(
+              labelStyle: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 13,
               ),
-              tabs: const [
+              tabs: [
                 Tab(
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
-                    child: Text("For You"),
+                    child: Text("For You".tr()),
                   ),
                 ),
                 Tab(
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
-                    child: Text("Following"),
+                    child: Text("Following".tr()),
                   ),
                 ),
                 Tab(
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
-                    child: Text("Communities"),
+                    child: Text("Communities".tr()),
                   ),
                 ),
               ],
@@ -338,8 +179,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               constraints: BoxConstraints(
                 minHeight: constraints.maxHeight,
               ),
-              child: const Center(
-                child: Text("Nothing here.."),
+              child: Center(
+                child: Text("Nothing here..".tr()),
               ),
             ),
           );
@@ -356,6 +197,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           }
 
           return MyPostTile(
+            key: ValueKey(post.id),
             post: post,
             onUserTap: () => goUserPage(context, post.userId),
             onPostTap: () => goPostPage(context, post),
@@ -374,14 +216,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         color: Colors.grey.shade900,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          CircularProgressIndicator(),
-          SizedBox(width: 16),
+          const CircularProgressIndicator(),
+          const SizedBox(width: 16),
           Expanded(
-            child: Text(
-              "Posting your content…",
-              style: TextStyle(fontSize: 14, color: Colors.white70),
+            child: Text("Posting your content…".tr(),
+              style: const TextStyle(fontSize: 14, color: Colors.white70),
             ),
           )
         ],

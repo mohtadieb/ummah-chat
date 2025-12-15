@@ -43,7 +43,7 @@ class _FullscreenImagePageState extends State<FullscreenImagePage> {
         iconTheme: const IconThemeData(color: Colors.white),
         title: Text(
           '${_currentIndex + 1} / ${widget.imageUrls.length}',
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: Colors.white),
         ),
       ),
       body: PageView.builder(

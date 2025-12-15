@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -45,8 +46,7 @@ class _ChatTabsPageState extends State<ChatTabsPage>
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         centerTitle: true,
-        title: Text(
-          "Chats",
+        title: Text("Chats".tr(),
           style: TextStyle(
             color: colorScheme.primary,
             fontWeight: FontWeight.w600,
@@ -80,31 +80,31 @@ class _ChatTabsPageState extends State<ChatTabsPage>
                   // no splash / overlay highlight
                   splashFactory: NoSplash.splashFactory,
                   overlayColor:
-                  MaterialStateProperty.all(Colors.transparent),
+                  WidgetStateProperty.all(Colors.transparent),
 
                   labelColor: colorScheme.onPrimary,
                   unselectedLabelColor: colorScheme.primary,
-                  labelStyle: const TextStyle(
+                  labelStyle: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
                   ),
-                  tabs: const [
+                  tabs: [
                     Tab(
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
-                        child: Text("Friends"),
+                        child: Text("Friends".tr()),
                       ),
                     ),
                     Tab(
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
-                        child: Text("Groups"),
+                        child: Text("Groups".tr()),
                       ),
                     ),
                     Tab(
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
-                        child: Text("Communities"),
+                        child: Text("Communities".tr()),
                       ),
                     ),
                   ],
@@ -142,7 +142,7 @@ class _ChatTabsPageState extends State<ChatTabsPage>
                 );
               },
               icon: const Icon(Icons.person_search),
-              label: const Text("Find people"),
+              label: Text("Find people".tr()),
               backgroundColor: colorScheme.primary,
               foregroundColor: colorScheme.onPrimary,
             );
@@ -160,7 +160,7 @@ class _ChatTabsPageState extends State<ChatTabsPage>
                 );
               },
               icon: const Icon(Icons.group_add),
-              label: const Text("New group"),
+              label: Text("New group".tr()),
               backgroundColor: colorScheme.primary,
               foregroundColor: colorScheme.onPrimary,
             );
@@ -173,7 +173,7 @@ class _ChatTabsPageState extends State<ChatTabsPage>
                 await _showAddCommunityDialog(context);
               },
               icon: const Icon(Icons.group_add),
-              label: const Text("Add community"),
+              label: Text("Add community".tr()),
               backgroundColor: colorScheme.primary,
               foregroundColor: colorScheme.onPrimary,
             );
@@ -204,7 +204,7 @@ class _ChatTabsPageState extends State<ChatTabsPage>
           borderRadius: BorderRadius.circular(18),
         ),
         title: Text(
-          'Create community',
+          'Create community'.tr(),
           style: TextStyle(
             fontWeight: FontWeight.w600,
             color: colorScheme.primary,
@@ -216,26 +216,26 @@ class _ChatTabsPageState extends State<ChatTabsPage>
             children: [
               TextField(
                 controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Name',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: 'Name'.tr(),
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: descController,
                 maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Description',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: 'Description'.tr(),
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: countryController,
-                decoration: const InputDecoration(
-                  labelText: 'Country',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: 'Country'.tr(),
+                  border: const OutlineInputBorder(),
                 ),
               ),
             ],
@@ -244,7 +244,7 @@ class _ChatTabsPageState extends State<ChatTabsPage>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text('Cancel'.tr()),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -254,9 +254,9 @@ class _ChatTabsPageState extends State<ChatTabsPage>
 
               if (name.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
+                  SnackBar(
                     content: Text(
-                      'Please enter a name for your community.',
+                      'Please enter a name for your community.'.tr(),
                     ),
                   ),
                 );
@@ -273,7 +273,7 @@ class _ChatTabsPageState extends State<ChatTabsPage>
                 Navigator.pop(context);
               }
             },
-            child: const Text('Create'),
+            child: Text('Create'.tr()),
           ),
         ],
       ),

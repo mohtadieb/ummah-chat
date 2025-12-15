@@ -8,6 +8,7 @@ This page displays:
 
 */
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../components/my_post_tile.dart';
@@ -139,8 +140,7 @@ class _PostPageState extends State<PostPage> {
           // 🗨️ Comments header (optional – you can tweak or remove)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12.0),
-            child: Text(
-              "Comments",
+            child: Text("Comments".tr(),
               style: TextStyle(
                 color: theme.colorScheme.primary,
                 fontWeight: FontWeight.w600,
@@ -161,8 +161,7 @@ class _PostPageState extends State<PostPage> {
                 ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  "No comments yet...",
+                child: Text("No comments yet...".tr(),
                   style: TextStyle(
                     color: theme.colorScheme.primary,
                   ),

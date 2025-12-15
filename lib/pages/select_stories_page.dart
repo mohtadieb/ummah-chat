@@ -1,7 +1,9 @@
 // lib/pages/select_stories_page.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:ummah_chat/stories/adam_story.dart';
 import 'package:ummah_chat/stories/ayyub_story.dart';
+import 'package:ummah_chat/stories/dawud_story.dart';
 import 'package:ummah_chat/stories/harun_story.dart';
 import 'package:ummah_chat/stories/ibrahim_story.dart';
 import 'package:ummah_chat/stories/idris_story.dart';
@@ -15,16 +17,19 @@ import 'package:ummah_chat/stories/zakariya_story.dart';
 import '../models/story_data.dart';
 import '../services/database/database_provider.dart';
 import '../services/auth/auth_service.dart';
-import 'muhammad_story_part_2.dart';
-import 'muhammad_story_part_3.dart';
-import 'muhammad_story_part_4.dart';
-import 'muhammad_story_part_5.dart';
-import 'muhammad_story_part_6.dart';
-import 'muhammad_story_part_7.dart';
+import '../stories/hud_story.dart';
+import '../stories/isa_story.dart';
+import '../stories/muhammad_story_part_2.dart';
+import '../stories/muhammad_story_part_3.dart';
+import '../stories/muhammad_story_part_4.dart';
+import '../stories/muhammad_story_part_5.dart';
+import '../stories/muhammad_story_part_6.dart';
+import '../stories/muhammad_story_part_7.dart';
+import '../stories/shuayb_story.dart';
 import 'stories_page.dart';
-import 'yunus_story.dart';
-import 'yusuf_story.dart';
-import 'musa_story.dart';
+import '../stories/yunus_story.dart';
+import '../stories/yusuf_story.dart';
+import '../stories/musa_story.dart';
 
 class SelectStoriesPage extends StatefulWidget {
   const SelectStoriesPage({super.key});
@@ -44,6 +49,11 @@ class _SelectStoriesPageState extends State<SelectStoriesPage> {
   void initState() {
     super.initState();
     _stories = [
+      adamStory,
+      dawudStory,
+      isaStory,
+      shuaybStory,
+      hudStory,
       yunusStory,
       yusufStory,
       musaStory,

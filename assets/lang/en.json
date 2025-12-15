@@ -1,0 +1,96 @@
+{
+  "Login": "Login",
+  "Logout": "Logout",
+  "Settings": "Settings",
+
+  "Dark_mode": "Dark Mode",
+  "Dark Mode": "Dark Mode",
+
+  "Appearance": "Appearance",
+
+  "Language": "Language",
+
+  "Privacy_safety": "Privacy & Safety",
+  "Privacy & Safety": "Privacy & Safety",
+
+  "Blocked_users": "Blocked Users",
+  "Blocked Users": "Blocked Users",
+
+  "Account": "Account",
+
+  "Account_settings": "Account Settings",
+  "Account Settings": "Account Settings",
+
+  "Support": "Support",
+  "Donate": "Donate",
+
+  "Danger_zone": "Danger Zone",
+  "Danger Zone": "Danger Zone",
+
+  "Logout_success": "Logged out successfully!",
+  "Logged out successfully!": "Logged out successfully!",
+
+  "Logging out...": "Logging out...",
+  "Logout Error": "Logout Error",
+
+  "Support_ummah_chat": "Support Ummah Chat",
+  "Support Ummah Chat": "Support Ummah Chat",
+
+  "Redirect_paypal": "You will be redirected to PayPal to complete your donation.",
+  "You’ll be redirected to PayPal to make a donation.": "You’ll be redirected to PayPal to make a donation.",
+
+  "Cancel": "Cancel",
+  "Continue": "Continue",
+
+  "Home": "Home",
+  "Stories": "Stories",
+  "Chats": "Chats",
+  "Communities": "Communities",
+  "Profile": "Profile",
+  "Dua_wall": "Dua Wall",
+
+  "Search": "Search",
+  "Search_users": "Search Users",
+
+  "Edit_profile": "Edit Profile",
+  "Save_changes": "Save Changes",
+
+  "Email": "Email",
+  "Password": "Password",
+  "Forgot_password": "Forgot password?",
+  "Register": "Create Account",
+
+  "Notifications": "Notifications",
+  "Test_push": "Test push notification",
+
+  "Confirm": "Confirm",
+
+  "Error": "Error",
+  "Error_loading": "Error loading data",
+  "Error_loading_friends": "Error loading friends",
+
+  "Loading": "Loading...",
+  "No_data": "No data available",
+
+  "Post": "Post",
+  "Write_caption": "Write a caption...",
+  "Select_photo": "Select a photo",
+  "Crop_image": "Crop image",
+
+  "Add_dua": "Add Dua",
+  "Ameen": "Ameen",
+  "Delete": "Delete",
+
+  "Send_message": "Send Message",
+  "Type_message": "Type a message...",
+  "Voice_message": "Voice Message",
+  "Recording": "Recording...",
+  "Stop": "Stop",
+
+  "Onboarding_1_title": "Welcome to Ummah Chat",
+  "Onboarding_1_sub": "A safe space for the Ummah.",
+  "Onboarding_2_title": "Stories & Communities",
+  "Onboarding_2_sub": "Share and connect with others.",
+  "Onboarding_3_title": "Dua Wall",
+  "Onboarding_3_sub": "Make dua for your brothers and sisters."
+}

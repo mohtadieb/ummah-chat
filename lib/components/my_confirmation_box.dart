@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 class MyConfirmationBox extends StatelessWidget {
@@ -22,7 +23,7 @@ class MyConfirmationBox extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text("Cancel"),
+          child: Text("Cancel".tr()),
         ),
         TextButton(
           onPressed: () async {

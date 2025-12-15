@@ -7,6 +7,7 @@ This page displays a tab bar for a given uid:
 - a list of all following
 */
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../components/my_user_tile.dart';
@@ -97,9 +98,9 @@ class _FollowListPageState extends State<FollowListPage> {
             indicatorColor: Theme.of(context).colorScheme.secondary,
 
             // Tabs
-            tabs: const [
-              Tab(text: "Followers"),
-              Tab(text: "Following"),
+            tabs: [
+              Tab(text: "Followers".tr()),
+              Tab(text: "Following".tr()),
             ],
           ),
         ),
@@ -107,8 +108,8 @@ class _FollowListPageState extends State<FollowListPage> {
         // Tab bar view
         body: TabBarView(
           children: [
-            _buildUserList(followers, "No followers.."),
-            _buildUserList(following, "No following.."),
+            _buildUserList(followers, "No followers..".tr()),
+            _buildUserList(following, "No following..".tr()),
           ],
         ),
       ),

@@ -12,6 +12,8 @@ import 'services/database/database_provider.dart';
 import 'services/chat/chat_provider.dart';
 import 'themes/theme_provider.dart';
 import 'services/navigation/bottom_nav_provider.dart';
+import 'package:easy_localization/easy_localization.dart';
+
 
 // 🔔 Push notification utilities
 import 'services/notifications/push_notification_service.dart';
@@ -68,6 +70,9 @@ Future<void> setupPushNotifications() async {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // 🟢 Initialize Easy Localization
+  await EasyLocalization.ensureInitialized();
+
   await Firebase.initializeApp();
 
   // Register background handler BEFORE runApp
@@ -80,14 +85,23 @@ Future<void> main() async {
   );
 
   runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(create: (_) => DatabaseProvider()),
-        ChangeNotifierProvider(create: (_) => ChatProvider()),
-        ChangeNotifierProvider(create: (_) => BottomNavProvider()),
+    EasyLocalization(
+      supportedLocales: const [
+        Locale('en'),
+        Locale('nl'),
+        Locale('ar'), // later if you add Arabic
       ],
-      child: const MyApp(),
+      path: 'assets/lang', // folder where en.json / nl.json live
+      fallbackLocale: const Locale('en'),
+      child: MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => ThemeProvider()),
+          ChangeNotifierProvider(create: (_) => DatabaseProvider()),
+          ChangeNotifierProvider(create: (_) => ChatProvider()),
+          ChangeNotifierProvider(create: (_) => BottomNavProvider()),
+        ],
+        child: const MyApp(),
+      ),
     ),
   );
 }
@@ -104,7 +118,6 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    // 🚀 Now there *is* an Activity, so this is safe
     setupPushNotifications();
   }
 
@@ -115,6 +128,12 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: themeProvider.themeData,
+
+      // 🟢 Add these three lines:
+      localizationsDelegates: context.localizationDelegates,
+      supportedLocales: context.supportedLocales,
+      locale: context.locale,
+
       initialRoute: '/',
       routes: {
         '/': (context) => const StartupGate(),
@@ -125,3 +144,4 @@ class _MyAppState extends State<MyApp> {
     );
   }
 }
+

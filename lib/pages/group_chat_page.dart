@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -9,7 +10,6 @@ import '../models/message.dart';
 import '../models/user_profile.dart';
 import '../services/auth/auth_service.dart';
 import '../services/chat/chat_provider.dart';
-import '../services/chat/chat_service.dart';
 import '../services/database/database_service.dart';
 import '../components/my_chat_bubble.dart';
 import '../components/my_chat_text_field.dart';
@@ -22,6 +22,7 @@ import '../helper/message_grouping.dart';
 import '../helper/voice_recorder_helper.dart';
 import '../helper/likes_bottom_sheet_helper.dart';
 import 'add_group_members_page.dart';
+import '../services/notifications/notification_service.dart';
 
 enum _GroupMenuAction { viewMembers, addMembers, leaveGroup, deleteGroup }
 
@@ -45,8 +46,9 @@ class _GroupChatPageState extends State<GroupChatPage> {
   final FocusNode _focusNode = FocusNode();
 
   final AuthService _authService = AuthService();
-  final ChatService _chatService = ChatService();
   final DatabaseService _dbService = DatabaseService();
+  late final ChatProvider _chatProvider;
+  final NotificationService _notifService = NotificationService();
 
   late final String _currentUserId;
 
@@ -58,6 +60,12 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
   int _lastMessageCount = 0;
 
+  // 🆕 Unread separator behavior for groups
+  int? _initialUnreadGroupIndex;
+  int? _initialUnreadCount;
+  bool _hasCapturedInitialUnreadIndex = false;
+  bool _hideUnreadSeparatorForNewMessages = false;
+
   Timer? _presenceTimer;
 
   bool _isCurrentUserAdmin = false;
@@ -65,12 +73,18 @@ class _GroupChatPageState extends State<GroupChatPage> {
   // current reply target
   MessageModel? _replyTo;
 
-  // 🎙 Voice recorder controller (extracted)
+  // 🎙 Voice recorder controller
   late final VoiceRecorderController _voiceRecorder;
 
   // 🧹 Multi-select delete
   bool _isSelectionMode = false;
   final Set<String> _selectedMessageIds = {};
+
+  // 🟢 NEW: Typing indicator state for group
+  List<String> _typingUserIds = [];
+  StreamSubscription<List<String>>? _groupTypingSub;
+  Timer? _typingDebounce;
+  bool _sentTypingTrue = false;
 
   @override
   void initState() {
@@ -80,6 +94,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
     debugPrint(
       '🟢 GroupChatPage opened for room=${widget.chatRoomId}, user=$_currentUserId',
     );
+    _chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
     _voiceRecorder = VoiceRecorderController(
       debugTag: 'Group',
@@ -92,12 +107,26 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
     _loadMembers();
 
-    final provider = Provider.of<ChatProvider>(context, listen: false);
+    final provider = _chatProvider;
     provider.listenToRoom(widget.chatRoomId);
 
     if (_currentUserId.isNotEmpty) {
-      _chatService.markGroupMessagesAsRead(widget.chatRoomId, _currentUserId);
+      provider.markGroupMessagesAsRead(widget.chatRoomId, _currentUserId);
+
+      // Mark that this user is currently viewing this group chat
+      provider.setActiveChatRoom(
+        userId: _currentUserId,
+        chatRoomId: widget.chatRoomId,
+      );
+      // Also mark chat notifications for this group room as read
+      _notifService.markChatNotificationsAsRead(
+        chatRoomId: widget.chatRoomId,
+        userId: _currentUserId,
+      );
     }
+
+    // Tell NotificationService that this chat is active
+    _notifService.setActiveChatRoomId(widget.chatRoomId);
 
     _focusNode.addListener(() {
       if (_focusNode.hasFocus) {
@@ -105,11 +134,17 @@ class _GroupChatPageState extends State<GroupChatPage> {
       }
     });
 
+    // 🟢 NEW: Watch the textfield to update typing status (like DM)
+    _messageController.addListener(_handleTypingChange);
+
     _presenceTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
       if (_currentUserId.isNotEmpty) {
-        await _chatService.updateLastSeen(_currentUserId);
+        await provider.updateLastSeen(_currentUserId);
       }
     });
+
+    // 🟢 NEW: Subscribe to group typing users
+    _subscribeToGroupTyping(widget.chatRoomId);
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollDown());
   }
@@ -119,11 +154,131 @@ class _GroupChatPageState extends State<GroupChatPage> {
     _presenceTimer?.cancel();
     _voiceRecorder.dispose();
 
+    // 🟢 NEW: typing subscriptions + debounce
+    _groupTypingSub?.cancel();
+    _typingDebounce?.cancel();
+
+    // Clear active chat presence for group
+    if (_currentUserId.isNotEmpty) {
+      _chatProvider.setActiveChatRoom(
+        userId: _currentUserId,
+        chatRoomId: null,
+      );
+
+      // 🟢 NEW: ensure our typing flag is cleared for this room
+      _chatProvider.setTypingStatus(
+        chatRoomId: widget.chatRoomId,
+        userId: _currentUserId,
+        isTyping: false,
+      );
+    }
+
+    // Clear active chat id for notification UI
+    _notifService.setActiveChatRoomId(null);
+
     _focusNode.dispose();
+    _messageController.removeListener(_handleTypingChange); // 🟢 NEW
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
+
+  // ---------------------------------------------------------------------------
+  // 🟢 NEW: Typing handling (group)
+  // ---------------------------------------------------------------------------
+
+  void _subscribeToGroupTyping(String chatRoomId) {
+    _groupTypingSub?.cancel();
+
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
+    // 👉 This expects a method like:
+    // Stream<List<String>> groupTypingStream({
+    //   required String chatRoomId,
+    //   required String currentUserId,
+    // })
+    _groupTypingSub = chatProvider
+        .groupTypingStream(
+      chatRoomId: chatRoomId,
+      currentUserId: _currentUserId,
+    )
+        .listen((userIds) {
+      if (!mounted) return;
+      setState(() {
+        _typingUserIds = userIds;
+      });
+    });
+  }
+
+  void _handleTypingChange() async {
+    if (_currentUserId.isEmpty) return;
+
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    final hasText = _messageController.text.trim().isNotEmpty;
+
+    if (hasText && !_sentTypingTrue) {
+      _sentTypingTrue = true;
+      await chatProvider.setTypingStatus(
+        chatRoomId: widget.chatRoomId,
+        userId: _currentUserId,
+        isTyping: true,
+      );
+    }
+
+    if (!hasText && _sentTypingTrue) {
+      _sentTypingTrue = false;
+      await chatProvider.setTypingStatus(
+        chatRoomId: widget.chatRoomId,
+        userId: _currentUserId,
+        isTyping: false,
+      );
+    }
+
+    _typingDebounce?.cancel();
+    if (hasText) {
+      _typingDebounce = Timer(const Duration(seconds: 4), () async {
+        if (!mounted) return;
+        if (_currentUserId.isEmpty) return;
+
+        _sentTypingTrue = false;
+        final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+        await chatProvider.setTypingStatus(
+          chatRoomId: widget.chatRoomId,
+          userId: _currentUserId,
+          isTyping: false,
+        );
+      });
+    }
+  }
+
+  String? _buildTypingLabel() {
+    // Exclude ourselves from the label if backend still includes us
+    final others = _typingUserIds.where((id) => id != _currentUserId).toList();
+    if (others.isEmpty) return null;
+
+    final names = others.map(_displayNameForSender).toList();
+
+    if (names.length == 1) {
+      // Reuse your existing "typing_indicator" key: "{{name}} is aan het typen…"
+      return 'typing_indicator'.tr(
+        namedArgs: {'name': names.first},
+      );
+    }
+
+    if (names.length == 2) {
+      // New key: group_typing_two
+      return 'group_typing_two'.tr(
+        namedArgs: {'name1': names[0], 'name2': names[1]},
+      );
+    }
+
+    // 3+ users
+    // New key: group_typing_many
+    return 'group_typing_many'.tr(
+      namedArgs: {'name1': names[0], 'name2': names[1]},
+    );
+  }
+
 
   // ---------------------------------------------------------------------------
   // Members & admin
@@ -135,7 +290,9 @@ class _GroupChatPageState extends State<GroupChatPage> {
     });
 
     try {
-      final links = await _chatService.fetchGroupMemberLinks(widget.chatRoomId);
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
+      final links = await chatProvider.fetchGroupMemberLinks(widget.chatRoomId);
 
       final List<UserProfile> profiles = [];
       bool isAdmin = false;
@@ -192,9 +349,9 @@ class _GroupChatPageState extends State<GroupChatPage> {
         }
 
         if (_members.isEmpty) {
-          return const SizedBox(
+          return SizedBox(
             height: 200,
-            child: Center(child: Text('No members found')),
+            child: Center(child: Text('No members found'.tr())),
           );
         }
 
@@ -214,7 +371,8 @@ class _GroupChatPageState extends State<GroupChatPage> {
               return ListTile(
                 leading: CircleAvatar(
                   radius: 20,
-                  backgroundColor: colorScheme.primary.withValues(alpha: 0.12),
+                  backgroundColor:
+                  colorScheme.primary.withValues(alpha: 0.12),
                   child: Text(
                     name.isNotEmpty ? name[0].toUpperCase() : '?',
                     style: TextStyle(
@@ -234,8 +392,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
                     ? Text(
                   '@${user.username}',
                   style: TextStyle(
-                    color:
-                    colorScheme.primary.withValues(alpha: 0.7),
+                    color: colorScheme.primary.withValues(alpha: 0.7),
                   ),
                 )
                     : null,
@@ -256,23 +413,22 @@ class _GroupChatPageState extends State<GroupChatPage> {
       context: context,
       builder: (_) {
         return AlertDialog(
-          title: const Text('Leave group?'),
-          content: Text(
-            'You will no longer receive messages from "${widget.groupName}".',
-          ),
+          title: Text('Leave group?'.tr()),
+        content: Text(
+        'leave_group_warning'.tr(
+        namedArgs: {'name': widget.groupName},
+        ),
+        ),
           actions: [
             TextButton(
               child: Text(
-                'Cancel',
+                'Cancel'.tr(),
                 style: TextStyle(color: colorScheme.primary),
               ),
               onPressed: () => Navigator.of(context).pop(false),
             ),
             TextButton(
-              child: Text(
-                'Leave',
-                style: TextStyle(color: Colors.red[600]),
-              ),
+              child: Text('Leave'.tr(), style: TextStyle(color: Colors.red[600])),
               onPressed: () => Navigator.of(context).pop(true),
             ),
           ],
@@ -283,7 +439,9 @@ class _GroupChatPageState extends State<GroupChatPage> {
     if (shouldLeave != true) return;
 
     try {
-      await _chatService.leaveGroup(
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
+      await chatProvider.leaveGroup(
         chatRoomId: widget.chatRoomId,
         userId: _currentUserId,
       );
@@ -296,8 +454,8 @@ class _GroupChatPageState extends State<GroupChatPage> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to leave group. Please try again.'),
+        SnackBar(
+          content: Text('Failed to leave group. Please try again.'.tr()),
         ),
       );
     }
@@ -312,24 +470,22 @@ class _GroupChatPageState extends State<GroupChatPage> {
       context: context,
       builder: (_) {
         return AlertDialog(
-          title: const Text('Delete group?'),
+          title: Text('Delete group?'.tr()),
           content: Text(
-            'This will permanently delete "${widget.groupName}" '
-                'for all members, including all messages.',
+            'delete_group_warning'.tr(
+              namedArgs: {'name': widget.groupName},
+            ),
           ),
           actions: [
             TextButton(
               child: Text(
-                'Cancel',
+                'Cancel'.tr(),
                 style: TextStyle(color: colorScheme.primary),
               ),
               onPressed: () => Navigator.of(context).pop(false),
             ),
             TextButton(
-              child: Text(
-                'Delete',
-                style: TextStyle(color: Colors.red[600]),
-              ),
+              child: Text('Delete'.tr(), style: TextStyle(color: Colors.red[600])),
               onPressed: () => Navigator.of(context).pop(true),
             ),
           ],
@@ -340,7 +496,9 @@ class _GroupChatPageState extends State<GroupChatPage> {
     if (shouldDelete != true) return;
 
     try {
-      await _chatService.deleteGroupAsAdmin(chatRoomId: widget.chatRoomId);
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
+      await chatProvider.deleteGroupAsAdmin(chatRoomId: widget.chatRoomId);
 
       if (!mounted) return;
 
@@ -350,8 +508,8 @@ class _GroupChatPageState extends State<GroupChatPage> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to delete group. Please try again.'),
+        SnackBar(
+          content: Text('Failed to delete group. Please try again.'.tr()),
         ),
       );
     }
@@ -422,7 +580,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
   }
 
   // ---------------------------------------------------------------------------
-  // Voice recording (group) using VoiceRecorderController
+  // Voice recording (group)
   // ---------------------------------------------------------------------------
 
   void _handleMicLongPressStart() {
@@ -456,22 +614,23 @@ class _GroupChatPageState extends State<GroupChatPage> {
   Future<void> _stopRecordingAndSend() async {
     final recorded = await _voiceRecorder.stop();
     if (recorded == null) {
-      // too short or failed
       return;
     }
 
     if (_currentUserId.isEmpty) return;
 
     try {
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
       final messageId = const Uuid().v4();
 
-      final audioUrl = await _chatService.uploadVoiceFile(
+      final audioUrl = await chatProvider.uploadVoiceFile(
         chatRoomId: widget.chatRoomId,
         messageId: messageId,
         filePath: recorded.filePath,
       );
 
-      await _chatService.sendVoiceMessageGroup(
+      await chatProvider.sendVoiceMessageGroup(
         chatRoomId: widget.chatRoomId,
         senderId: _currentUserId,
         audioUrl: audioUrl,
@@ -483,7 +642,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
         _replyTo = null;
       });
 
-      await _chatService.updateLastSeen(_currentUserId);
+      await chatProvider.updateLastSeen(_currentUserId);
 
       debugPrint('✅ Group voice message sent');
     } catch (e) {
@@ -501,7 +660,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
     if (_currentUserId.isEmpty) return;
 
     final provider = Provider.of<ChatProvider>(context, listen: false);
-
     final replyId = _replyTo?.id;
 
     _messageController.clear();
@@ -518,11 +676,19 @@ class _GroupChatPageState extends State<GroupChatPage> {
       _replyTo = null;
     });
 
-    await _chatService.updateLastSeen(_currentUserId);
+    await provider.updateLastSeen(_currentUserId);
+
+    // 🟢 NEW: clear our typing flag after sending
+    await provider.setTypingStatus(
+      chatRoomId: widget.chatRoomId,
+      userId: _currentUserId,
+      isTyping: false,
+    );
+    _sentTypingTrue = false;
   }
 
   // ---------------------------------------------------------------------------
-  // Helpers (display name, colors, likes, delete, reply previews)
+  // Helpers
   // ---------------------------------------------------------------------------
 
   String _displayNameForSender(String senderId) {
@@ -543,7 +709,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
     if (profile.name.isNotEmpty) return profile.name;
     if (profile.username.isNotEmpty) return profile.username;
-    return 'User';
+    return 'User'.tr();
   }
 
   Color _colorForSender(String senderId, ColorScheme colorScheme) {
@@ -618,24 +784,21 @@ class _GroupChatPageState extends State<GroupChatPage> {
       context: context,
       builder: (_) {
         return AlertDialog(
-          title: const Text('Delete message?'),
-          content: const Text(
-            'This message will be deleted for everyone in the group.',
+          title: Text('Delete message?'.tr()),
+          content: Text(
+            'This message will be deleted for everyone in the group.'.tr(),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
               child: Text(
-                'Cancel',
+                'Cancel'.tr(),
                 style: TextStyle(color: colorScheme.primary),
               ),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text(
-                'Delete',
-                style: TextStyle(color: Colors.red),
-              ),
+              child: Text('Delete'.tr(), style: TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -644,7 +807,9 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
     if (shouldDelete != true) return;
 
-    await _chatService.deleteMessageForEveryone(
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
+    await chatProvider.deleteMessageForEveryone(
       messageId: messageId,
       userId: _currentUserId,
     );
@@ -692,24 +857,26 @@ class _GroupChatPageState extends State<GroupChatPage> {
       context: context,
       builder: (_) {
         return AlertDialog(
-          title: Text('Delete $count message${count == 1 ? '' : 's'}?'),
-          content: const Text(
-            'Selected messages will be deleted for everyone in the group.',
+          title: Text(
+            'Delete messages'.plural(
+              count,
+              namedArgs: {'count': count.toString()},
+            ),
+          ),
+          content: Text(
+            'Selected messages will be deleted for everyone in the group.'.tr(),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
               child: Text(
-                'Cancel',
+                'Cancel'.tr(),
                 style: TextStyle(color: colorScheme.primary),
               ),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text(
-                'Delete',
-                style: TextStyle(color: Colors.red),
-              ),
+              child: Text('Delete'.tr(), style: TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -718,9 +885,11 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
     if (shouldDelete != true) return;
 
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
     final ids = List<String>.from(_selectedMessageIds);
     for (final id in ids) {
-      await _chatService.deleteMessageForEveryone(
+      await chatProvider.deleteMessageForEveryone(
         messageId: id,
         userId: _currentUserId,
       );
@@ -784,11 +953,8 @@ class _GroupChatPageState extends State<GroupChatPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: Icon(
-                  Icons.reply,
-                  color: colorScheme.primary,
-                ),
-                title: const Text('Reply'),
+                leading: Icon(Icons.reply, color: colorScheme.primary),
+                title: Text('Reply'.tr()),
                 onTap: () {
                   Navigator.of(context).pop();
                   _startReplyToGroupMessage(msg);
@@ -798,7 +964,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
                 const Divider(height: 0),
                 ListTile(
                   leading: const Icon(Icons.delete, color: Colors.red),
-                  title: const Text('Delete'),
+                  title: Text('Delete'.tr()),
                   onTap: () {
                     Navigator.of(context).pop();
                     _confirmDeleteGroupMessage(msg.id);
@@ -812,7 +978,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
     );
   }
 
-  // Unified handler: selection vs normal long-press
+  // Unified handler
   void _handleGroupBubbleLongPress(MessageModel msg, bool isCurrentUser) {
     if (msg.isDeleted) return;
 
@@ -836,13 +1002,13 @@ class _GroupChatPageState extends State<GroupChatPage> {
     if (msg.message.trim().isNotEmpty) {
       label = msg.message.trim();
     } else if ((msg.imageUrl ?? '').trim().isNotEmpty) {
-      label = 'Photo';
+      label = 'Photo'.tr();
     } else if ((msg.videoUrl ?? '').trim().isNotEmpty) {
-      label = 'Video';
+      label = 'Video'.tr();
     } else if ((msg.audioUrl ?? '').trim().isNotEmpty || msg.isAudio) {
-      label = 'Voice message';
+      label = 'Voice message'.tr();
     } else {
-      label = 'Message';
+      label = 'Message'.tr();
     }
 
     return MyReplyPreviewBar(
@@ -862,10 +1028,18 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
     final memberCount = _members.length;
     final subtitleText = _isLoadingMembers
-        ? 'Loading members...'
+        ? 'Loading members…'.tr()
         : memberCount == 0
-        ? 'No members'
-        : '$memberCount member${memberCount == 1 ? '' : 's'}';
+        ? 'No members'.tr()
+        : 'member_count'.plural(
+      memberCount,
+      namedArgs: {
+        'count': memberCount.toString(),
+      },
+    );
+
+
+    final typingLabel = _buildTypingLabel();
 
     return PopScope(
       canPop: !_isSelectionMode,
@@ -888,7 +1062,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
           centerTitle: false,
           title: _isSelectionMode
               ? Text(
-            '${_selectedMessageIds.length} selected',
+            '${_selectedMessageIds.length} ${"selected".tr()}',
             style: const TextStyle(fontWeight: FontWeight.w600),
           )
               : Column(
@@ -896,14 +1070,13 @@ class _GroupChatPageState extends State<GroupChatPage> {
             children: [
               Text(
                 widget.groupName,
-                style: const TextStyle(fontWeight: FontWeight.w600),
+                style: TextStyle(fontWeight: FontWeight.w600),
               ),
               Text(
                 subtitleText,
                 style: TextStyle(
                   fontSize: 12,
-                  color:
-                  colorScheme.primary.withValues(alpha: 0.7),
+                  color: colorScheme.primary.withValues(alpha: 0.7),
                 ),
               ),
             ],
@@ -956,7 +1129,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
                           color: colorScheme.primary,
                         ),
                         const SizedBox(width: 12),
-                        const Text('View members'),
+                        Text('View members'.tr()),
                       ],
                     ),
                   ),
@@ -974,7 +1147,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
                             color: colorScheme.primary,
                           ),
                           const SizedBox(width: 12),
-                          const Text('Add members'),
+                          Text('Add members'.tr()),
                         ],
                       ),
                     ),
@@ -991,7 +1164,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
                             color: Colors.red.shade600,
                           ),
                           const SizedBox(width: 12),
-                          const Text('Delete group'),
+                          Text('Delete group'.tr()),
                         ],
                       ),
                     ),
@@ -1005,11 +1178,13 @@ class _GroupChatPageState extends State<GroupChatPage> {
                     value: _GroupMenuAction.leaveGroup,
                     child: Row(
                       children: [
-                        Icon(Icons.logout,
-                            size: 20,
-                            color: Colors.red.shade600),
+                        Icon(
+                          Icons.logout,
+                          size: 20,
+                          color: Colors.red.shade600,
+                        ),
                         const SizedBox(width: 12),
-                        const Text('Leave group'),
+                        Text('Leave group'.tr()),
                       ],
                     ),
                   ),
@@ -1031,14 +1206,15 @@ class _GroupChatPageState extends State<GroupChatPage> {
                     provider.getMessages(widget.chatRoomId);
 
                     if (rawMessages.isEmpty) {
-                      return const Center(child: Text("No messages yet"));
+                      return Center(child: Text("No messages yet".tr()));
                     }
 
                     final messages = rawMessages
                         .map((m) => MessageModel.fromMap(m))
                         .toList()
-                      ..sort((a, b) =>
-                          a.createdAt.compareTo(b.createdAt)); // chronological
+                      ..sort(
+                            (a, b) => a.createdAt.compareTo(b.createdAt),
+                      );
 
                     int unreadCount = 0;
                     int? firstUnreadIndexFromStart;
@@ -1073,26 +1249,37 @@ class _GroupChatPageState extends State<GroupChatPage> {
                       messageIndexToGroupIndex[firstUnreadIndexFromStart];
                     }
 
-                    if (messages.length != _lastMessageCount) {
+                    // Capture initial unread index + count once
+                    if (!_hasCapturedInitialUnreadIndex) {
+                      _initialUnreadGroupIndex = firstUnreadGroupIndex;
+                      _initialUnreadCount = unreadCount;
+                      _hasCapturedInitialUnreadIndex = true;
+                    }
+
+                    // Detect new messages while open
+                    if (_currentUserId.isNotEmpty &&
+                        messages.length != _lastMessageCount) {
+                      if (_lastMessageCount > 0 &&
+                          messages.length > _lastMessageCount) {
+                        _hideUnreadSeparatorForNewMessages = true;
+                      }
+
                       if (_isNearBottom()) {
                         _scrollDown();
                       }
 
                       _lastMessageCount = messages.length;
 
-                      if (_currentUserId.isNotEmpty) {
-                        _chatService.markGroupMessagesAsRead(
-                          widget.chatRoomId,
-                          _currentUserId,
-                        );
-                      }
+                      provider.markGroupMessagesAsRead(
+                        widget.chatRoomId,
+                        _currentUserId,
+                      );
                     }
 
                     return ListView.builder(
                       controller: _scrollController,
                       reverse: true,
-                      padding:
-                      const EdgeInsets.symmetric(vertical: 8),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
                       itemCount: groups.length,
                       itemBuilder: (context, index) {
                         final groupIndex = groups.length - 1 - index;
@@ -1104,8 +1291,9 @@ class _GroupChatPageState extends State<GroupChatPage> {
                         final bool isCurrentUser =
                             firstMsg.senderId == _currentUserId;
 
-                        final String senderName =
-                        _displayNameForSender(firstMsg.senderId);
+                        final String senderName = _displayNameForSender(
+                          firstMsg.senderId,
+                        );
 
                         final Color senderColor = _colorForSender(
                           firstMsg.senderId,
@@ -1132,8 +1320,9 @@ class _GroupChatPageState extends State<GroupChatPage> {
                             : null;
 
                         final List<String> likedBy = lastMsg.likedBy;
-                        final bool isLikedByMe = _currentUserId.isNotEmpty &&
-                            likedBy.contains(_currentUserId);
+                        final bool isLikedByMe =
+                            _currentUserId.isNotEmpty &&
+                                likedBy.contains(_currentUserId);
                         final int likeCount = likedBy.length;
 
                         final msgDate = firstMsg.createdAt;
@@ -1146,9 +1335,9 @@ class _GroupChatPageState extends State<GroupChatPage> {
                             prevDate == null || !isSameDay(msgDate, prevDate);
 
                         final showUnreadSeparator =
-                            unreadCount > 0 &&
-                                firstUnreadGroupIndex != null &&
-                                groupIndex == firstUnreadGroupIndex;
+                            _initialUnreadGroupIndex != null &&
+                                groupIndex == _initialUnreadGroupIndex &&
+                                !_hideUnreadSeparatorForNewMessages;
 
                         MessageModel? repliedTo;
                         if (lastMsg.replyToMessageId != null &&
@@ -1169,51 +1358,52 @@ class _GroupChatPageState extends State<GroupChatPage> {
                         bool replyHasMedia = false;
 
                         if (repliedTo != null) {
-                          replyAuthorName =
-                              _displayNameForSender(repliedTo.senderId);
+                          replyAuthorName = _displayNameForSender(
+                            repliedTo.senderId,
+                          );
 
                           if (repliedTo.message.trim().isNotEmpty) {
                             replySnippet = repliedTo.message.trim();
                           } else if ((repliedTo.imageUrl ?? '')
                               .trim()
                               .isNotEmpty) {
-                            replySnippet = 'Photo';
+                            replySnippet = 'Photo'.tr();
                             replyHasMedia = true;
                           } else if ((repliedTo.videoUrl ?? '')
                               .trim()
                               .isNotEmpty) {
-                            replySnippet = 'Video';
+                            replySnippet = 'Video'.tr();
                             replyHasMedia = true;
                           } else if ((repliedTo.audioUrl ?? '')
                               .trim()
                               .isNotEmpty ||
                               repliedTo.isAudio) {
-                            replySnippet = 'Voice message';
+                            replySnippet = 'Voice message'.tr();
                             replyHasMedia = true;
                           } else {
-                            replySnippet = 'Message';
+                            replySnippet = 'Message'.tr();
                           }
                         }
 
                         // Inner bubble
                         Widget innerBubble;
                         if (lastMsg.isAudio &&
-                            (lastMsg.audioUrl ?? '')
-                                .trim()
-                                .isNotEmpty) {
+                            (lastMsg.audioUrl ?? '').trim().isNotEmpty) {
                           innerBubble = MyVoiceMessageBubble(
                             key: ValueKey(lastMsg.id),
                             audioUrl: lastMsg.audioUrl!,
                             isCurrentUser: isCurrentUser,
-                            durationSeconds: lastMsg.audioDurationSeconds,
+                            durationSeconds:
+                            lastMsg.audioDurationSeconds,
                           );
                         } else {
                           innerBubble = MyChatBubble(
                             key: ValueKey(lastMsg.id),
                             message: lastMsg.message,
                             imageUrls: imageUrls,
-                            imageUrl:
-                            imageUrls.isNotEmpty ? imageUrls.first : null,
+                            imageUrl: imageUrls.isNotEmpty
+                                ? imageUrls.first
+                                : null,
                             videoUrl: effectiveVideoUrl,
                             isCurrentUser: isCurrentUser,
                             createdAt: lastMsg.createdAt,
@@ -1227,7 +1417,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
                               if (_isSelectionMode) return;
                               if (_currentUserId.isEmpty) return;
 
-                              await _chatService.toggleLikeMessage(
+                              await provider.toggleLikeMessage(
                                 messageId: lastMsg.id,
                                 userId: _currentUserId,
                               );
@@ -1277,11 +1467,14 @@ class _GroupChatPageState extends State<GroupChatPage> {
                           children: [
                             if (showDayDivider)
                               buildDayBubble(
-                                  context: context, date: msgDate),
+                                context: context,
+                                date: msgDate,
+                              ),
                             if (showUnreadSeparator)
                               buildUnreadBubble(
                                 context: context,
-                                unreadCount: unreadCount,
+                                unreadCount:
+                                _initialUnreadCount ?? unreadCount,
                               ),
                             Padding(
                               padding: const EdgeInsets.symmetric(
@@ -1307,6 +1500,29 @@ class _GroupChatPageState extends State<GroupChatPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // 🟢 NEW: bottom typing indicator (same style as DM)
+                    if (typingLabel != null)
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          left: 16,
+                          right: 16,
+                          bottom: 4,
+                        ),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            typingLabel,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withOpacity(0.7),
+                            ),
+                          ),
+                        ),
+                      ),
                     if (_replyTo != null) _buildReplyPreviewBar(_replyTo!),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
@@ -1319,8 +1535,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
                         onAttachmentPressed: () async {
                           if (_currentUserId.isEmpty) return;
 
-                          await ChatMediaHelper
-                              .openAttachmentSheetForGroup(
+                          await ChatMediaHelper.openAttachmentSheetForGroup(
                             context: context,
                             chatRoomId: widget.chatRoomId,
                             currentUserId: _currentUserId,
@@ -1329,7 +1544,9 @@ class _GroupChatPageState extends State<GroupChatPage> {
                         hasPendingAttachment: false,
                         isRecording: _voiceRecorder.isRecording,
                         recordingLabel: _voiceRecorder.isRecording
-                            ? 'Recording… ${_voiceRecorder.formattedDuration}'
+                            ? 'recording_label'.tr(
+                          namedArgs: {'time': _voiceRecorder.formattedDuration},
+                        )
                             : null,
                         onMicLongPressStart: _handleMicLongPressStart,
                         onMicLongPressEnd: _handleMicLongPressEnd,

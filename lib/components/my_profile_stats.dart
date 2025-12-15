@@ -14,6 +14,7 @@ Number of
 
  */
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 class MyProfileStats extends StatelessWidget {
@@ -45,6 +46,14 @@ class MyProfileStats extends StatelessWidget {
       color: Theme.of(context).colorScheme.primary,
     );
 
+    // Proper pluralization
+    final postsLabel =
+    postCount == 1 ? "Post".tr() : "Posts".tr();
+    final followersLabel =
+    followerCount == 1 ? "Follower".tr() : "Followers".tr();
+    final followingLabel =
+    followingCount == 1 ? "Following".tr() : "Following".tr();
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -60,10 +69,11 @@ class MyProfileStats extends StatelessWidget {
                 children: [
                   Text(postCount.toString(), style: textStyleForCount),
                   const SizedBox(height: 3),
-                  Text("Posts", style: textStyleForText),
+                  Text(postsLabel, style: textStyleForText),
                 ],
               ),
             ),
+
             // Followers
             SizedBox(
               width: 100,
@@ -72,10 +82,11 @@ class MyProfileStats extends StatelessWidget {
                 children: [
                   Text(followerCount.toString(), style: textStyleForCount),
                   const SizedBox(height: 3),
-                  Text("Followers", style: textStyleForText),
+                  Text(followersLabel, style: textStyleForText),
                 ],
               ),
             ),
+
             // Following
             SizedBox(
               width: 100,
@@ -84,7 +95,7 @@ class MyProfileStats extends StatelessWidget {
                 children: [
                   Text(followingCount.toString(), style: textStyleForCount),
                   const SizedBox(height: 3),
-                  Text("Following", style: textStyleForText),
+                  Text(followingLabel, style: textStyleForText),
                 ],
               ),
             ),

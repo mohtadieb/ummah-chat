@@ -1,4 +1,5 @@
 // lib/pages/profile_page.dart
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:just_audio/just_audio.dart'; // 🆕 audio player
@@ -166,7 +167,7 @@ class _ProfilePageState extends State<ProfilePage> {
         debugPrint('❌ Unable to load asset ${song.assetPath}: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Asset not found: ${song.assetPath}')),
+            SnackBar(content: Text('Asset not found: ${song.assetPath}'.tr())),
           );
         }
         return;
@@ -201,7 +202,7 @@ class _ProfilePageState extends State<ProfilePage> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not play song: ${e.message}')),
+          SnackBar(content: Text('Could not play song: ${e.message}'.tr())),
         );
       }
     } on PlayerInterruptedException catch (e) {
@@ -354,9 +355,9 @@ class _ProfilePageState extends State<ProfilePage> {
       context: context,
       builder: (context) => MyInputAlertBox(
         textController: bioTextController,
-        hintText: "Edit bio...",
+        hintText: "Edit bio...".tr(),
         onPressed: _saveBio,
-        onPressedText: "Save",
+        onPressedText: "Save".tr(),
       ),
     );
   }
@@ -466,8 +467,7 @@ class _ProfilePageState extends State<ProfilePage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  "About me",
+                Text("About me".tr(),
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -477,17 +477,17 @@ class _ProfilePageState extends State<ProfilePage> {
                 const SizedBox(height: 16),
                 TextField(
                   controller: cityCtrl,
-                  decoration: const InputDecoration(
-                    labelText: "City",
-                    hintText: "e.g. Rotterdam",
+                  decoration: InputDecoration(
+                    labelText: "City".tr(),
+                    hintText: "e.g. Rotterdam".tr(),
                   ),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: langsCtrl,
-                  decoration: const InputDecoration(
-                    labelText: "Languages (comma separated)",
-                    hintText: "Dutch, Arabic, English",
+                  decoration: InputDecoration(
+                    labelText: "Languages (comma separated)".tr(),
+                    hintText: "Dutch, Arabic, English".tr(),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -529,7 +529,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
                       if (mounted) Navigator.pop(context);
                     },
-                    child: const Text("Save"),
+                    child: Text("Save".tr()),
                   ),
                 ),
               ],
@@ -549,7 +549,7 @@ class _ProfilePageState extends State<ProfilePage> {
         alignment: Alignment.centerRight,
         child: TextButton(
           onPressed: _editAboutMe,
-          child: const Text("Edit about me", style: TextStyle(fontSize: 12)),
+          child: Text("Edit about me".tr(), style: TextStyle(fontSize: 12)),
         ),
       ),
     );
@@ -560,16 +560,16 @@ class _ProfilePageState extends State<ProfilePage> {
       final confirm = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text("Unfollow"),
-          content: const Text("Are you sure you want to unfollow?"),
+          title: Text("Unfollow".tr()),
+          content: Text("Are you sure you want to unfollow?".tr()),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text("Cancel"),
+              child: Text("Cancel".tr()),
             ),
             TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text("Yes"),
+              child: Text("Yes".tr()),
             ),
           ],
         ),
@@ -627,7 +627,7 @@ class _ProfilePageState extends State<ProfilePage> {
       debugPrint('❌ Error in _pickProfilePhoto: $e\n$st');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not update profile picture')),
+        SnackBar(content: Text('Could not update profile picture'.tr())),
       );
     }
   }
@@ -667,18 +667,17 @@ class _ProfilePageState extends State<ProfilePage> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("Unfriend"),
-        content: const Text(
-          "Are you sure you want to remove this person from your friends?",
+        title: Text("Unfriend".tr()),
+        content: Text("Are you sure you want to remove this person from your friends?".tr(),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text("Cancel"),
+            child: Text("Cancel".tr()),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text("Yes, unfriend"),
+            child: Text("Yes, unfriend".tr()),
           ),
         ],
       ),
@@ -708,7 +707,7 @@ class _ProfilePageState extends State<ProfilePage> {
           builder: (ctx) => Scaffold(
             backgroundColor: Theme.of(ctx).colorScheme.surface,
             appBar: AppBar(
-              title: const Text("Friends"),
+              title: Text("Friends".tr()),
               centerTitle: true,
               backgroundColor: Theme.of(ctx).colorScheme.surface,
               foregroundColor: Theme.of(ctx).colorScheme.primary,
@@ -740,8 +739,7 @@ class _ProfilePageState extends State<ProfilePage> {
               children: [
                 Row(
                   children: [
-                    Text(
-                      "Friends",
+                    Text("Friends".tr(),
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -771,8 +769,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       const Spacer(),
                       TextButton(
                         onPressed: _openFriendsFullScreen,
-                        child: Text(
-                          "View all",
+                        child: Text("View all".tr(),
                           style: TextStyle(
                             fontSize: 12,
                             color: colorScheme.primary,
@@ -815,8 +812,7 @@ class _ProfilePageState extends State<ProfilePage> {
               children: [
                 Row(
                   children: [
-                    Text(
-                      "Friends",
+                    Text("Friends".tr(),
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -846,8 +842,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       const Spacer(),
                       TextButton(
                         onPressed: _openFriendsFullScreen,
-                        child: Text(
-                          "View all",
+                        child: Text("View all".tr(),
                           style: TextStyle(
                             fontSize: 12,
                             color: colorScheme.primary,
@@ -878,8 +873,7 @@ class _ProfilePageState extends State<ProfilePage> {
             children: [
               Row(
                 children: [
-                  Text(
-                    "Friends",
+                  Text("Friends".tr(),
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
@@ -909,8 +903,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     const Spacer(),
                     TextButton(
                       onPressed: _openFriendsFullScreen,
-                      child: Text(
-                        "View all",
+                      child: Text("View all".tr(),
                         style: TextStyle(
                           fontSize: 12,
                           color: colorScheme.primary,
@@ -1085,8 +1078,7 @@ class _ProfilePageState extends State<ProfilePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    "Profile song",
+                  Text("Profile song".tr(),
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
@@ -1155,7 +1147,7 @@ class _ProfilePageState extends State<ProfilePage> {
           children: [
             ListTile(
               leading: const Icon(Icons.photo_library),
-              title: const Text("Choose from gallery"),
+              title: Text("Choose from gallery".tr()),
               onTap: () async {
                 Navigator.pop(context);
                 await _pickProfilePhoto();
@@ -1164,7 +1156,7 @@ class _ProfilePageState extends State<ProfilePage> {
             if (user!.profilePhotoUrl.isNotEmpty)
               ListTile(
                 leading: const Icon(Icons.delete),
-                title: const Text("Remove profile picture"),
+                title: Text("Remove profile picture".tr()),
                 onTap: () async {
                   Navigator.pop(context);
                   await _removeProfilePhoto();
@@ -1290,8 +1282,7 @@ class _ProfilePageState extends State<ProfilePage> {
       bodyChild = Center(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Text(
-            "Profile not found yet.\nPlease try again in a moment.",
+          child: Text("Profile not found yet.\nPlease try again in a moment.".tr(),
             textAlign: TextAlign.center,
             style: TextStyle(color: Theme.of(context).colorScheme.primary),
           ),
@@ -1440,8 +1431,7 @@ class _ProfilePageState extends State<ProfilePage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  "Bio",
+                Text("Bio".tr(),
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.primary,
                   ),
@@ -1477,8 +1467,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28.0),
-              child: Text(
-                "Stories completed: ${sortedCompletedIds.length} / $totalStories",
+              child: Text("Stories completed: ${sortedCompletedIds.length} / $totalStories".tr(),
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.primary,
                   fontWeight: FontWeight.bold,
@@ -1607,18 +1596,17 @@ class _ProfilePageState extends State<ProfilePage> {
                         color: const Color(0xFFE0B95A).withValues(alpha: 0.7),
                       ),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.emoji_events_rounded,
                           size: 18,
                           color: Color(0xFFE0B95A),
                         ),
-                        SizedBox(width: 8),
-                        Text(
-                          "Muhammad (ﷺ) series completed",
-                          style: TextStyle(
+                        const SizedBox(width: 8),
+                        Text("Muhammad (ﷺ) series completed".tr(),
+                          style: const TextStyle(
                             color: Color(0xFF8C6B24),
                             fontSize: 12.5,
                             fontWeight: FontWeight.w700,
@@ -1656,9 +1644,8 @@ class _ProfilePageState extends State<ProfilePage> {
                           color: Color(0xFF0F8254),
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          "Prophets Stories Level $levelsCompleted",
-                          style: const TextStyle(
+                        Text("Prophets Stories Level $levelsCompleted".tr(),
+                          style: TextStyle(
                             color: Color(0xFF0F8254),
                             fontSize: 12.5,
                             fontWeight: FontWeight.w600,
@@ -1706,7 +1693,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 decoration: BoxDecoration(
                   color: Theme.of(
                     context,
-                  ).colorScheme.surfaceVariant.withValues(alpha: 0.55),
+                  ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Row(
@@ -1730,8 +1717,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            "Posts",
+                          Text("Posts".tr(),
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.primary,
                               fontWeight: FontWeight.w700,
@@ -1799,8 +1785,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ? Center(
                     child: Padding(
                       padding: const EdgeInsets.all(14.0),
-                      child: Text(
-                        "No posts yet..",
+                      child: Text("No posts yet..".tr(),
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.primary,
                         ),

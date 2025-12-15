@@ -1,7 +1,11 @@
+// lib/pages/notification_page.dart
 import 'dart:async';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:ummah_chat/models/notification.dart' as models;
 import 'package:ummah_chat/pages/profile_page.dart';
+import 'package:ummah_chat/pages/chat_page.dart';
+import 'package:ummah_chat/pages/group_chat_page.dart'; // 👈 NEW
 
 import '../helper/navigate_pages.dart';
 import '../helper/time_ago_text.dart';
@@ -10,6 +14,19 @@ import '../services/notifications/notification_service.dart';
 // Providers
 import 'package:provider/provider.dart';
 import '../services/database/database_provider.dart';
+import '../services/auth/auth_service.dart'; // DM / group helpers
+import '../services/chat/chat_provider.dart'; // DM / group helpers
+
+/// Helper model so we can mix "header rows" (Today, Yesterday, etc.) and real notifications in one list.
+class _NotificationListItem {
+  final models.Notification? notification;
+  final String? headerLabel;
+
+  _NotificationListItem.header(this.headerLabel) : notification = null;
+  _NotificationListItem.notification(this.notification) : headerLabel = null;
+
+  bool get isHeader => headerLabel != null;
+}
 
 class NotificationPage extends StatefulWidget {
   const NotificationPage({super.key});
@@ -86,6 +103,60 @@ class _NotificationPageState extends State<NotificationPage> {
     }
   }
 
+  /// Format a date like "13 Dec 2025"
+  String _formatDate(DateTime d) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    final day = d.day.toString().padLeft(2, '0');
+    final month = months[d.month - 1];
+    final year = d.year.toString();
+    return '$day $month $year';
+  }
+
+  /// Build a flattened list of header + notification items grouped by date
+  List<_NotificationListItem> _buildGroupedItems() {
+    // Clone and sort newest → oldest
+    final sorted = [..._notifications]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    final List<_NotificationListItem> items = [];
+
+    String? lastHeader;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+
+    String headerForDate(DateTime dt) {
+      final d = DateTime(dt.year, dt.month, dt.day);
+
+      if (d == today) {
+        return 'Today';
+      } else if (d == yesterday) {
+        // Yesterday + formatted date
+        return 'Yesterday · ${_formatDate(d)}';
+      } else {
+        // Just the date for older notifications
+        return _formatDate(d);
+      }
+    }
+
+    for (final n in sorted) {
+      final h = headerForDate(n.createdAt);
+
+      if (h != lastHeader) {
+        items.add(_NotificationListItem.header(h));
+        lastHeader = h;
+      }
+
+      items.add(_NotificationListItem.notification(n));
+    }
+
+    return items;
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -97,7 +168,7 @@ class _NotificationPageState extends State<NotificationPage> {
         elevation: 0,
         backgroundColor: colorScheme.surface,
         title: Text(
-          'Notifications',
+          'Notifications'.tr(),
           style: TextStyle(
             color: colorScheme.primary,
             fontWeight: FontWeight.w600,
@@ -163,8 +234,7 @@ class _NotificationPageState extends State<NotificationPage> {
                 ),
               ),
               const SizedBox(height: 6),
-              Text(
-                "When something happens — likes, comments, or new followers — you'll see it here.",
+              Text("When something happens — likes, comments, or new followers — you'll see it here.".tr(),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13,
@@ -177,12 +247,32 @@ class _NotificationPageState extends State<NotificationPage> {
       );
     }
 
+    final groupedItems = _buildGroupedItems();
+
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
-      itemCount: _notifications.length,
+      itemCount: groupedItems.length,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
-        final n = _notifications[index];
+        final item = groupedItems[index];
+
+        // ---- DATE HEADER ROW ----
+        if (item.isHeader) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(4, 8, 4, 4),
+            child: Text(
+              item.headerLabel!,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.primary.withValues(alpha: 0.8),
+              ),
+            ),
+          );
+        }
+
+        // ---- NORMAL NOTIFICATION TILE ----
+        final n = item.notification!;
 
         final rawBody = n.body ?? '';
         final body = rawBody.trim();
@@ -193,8 +283,10 @@ class _NotificationPageState extends State<NotificationPage> {
         final isFriendAccepted = body.startsWith('FRIEND_ACCEPTED:');
         final isLike = body.startsWith('LIKE_POST:');
         final isComment = body.startsWith('COMMENT_POST:');
-        final isCommentReply = body.startsWith('COMMENT_REPLY:'); // 👈 NEW
+        final isCommentReply = body.startsWith('COMMENT_REPLY:');
         final isFollow = body.startsWith('FOLLOW_USER:');
+        final isChatMessage = body.startsWith('CHAT_MESSAGE:'); // DM
+        final isGroupMessage = body.startsWith('GROUP_MESSAGE:'); // 👈 NEW
 
         String? friendRequesterId;
         String? friendAcceptedUserId;
@@ -202,10 +294,18 @@ class _NotificationPageState extends State<NotificationPage> {
         String? likePreview;
         String? commentPostId;
         String? commentPreview;
-        String? commentReplyPostId;      // 👈 NEW
-        String? commentReplyCommentId;   // 👈 NEW
-        String? commentReplyPreview;     // 👈 NEW
+        String? commentReplyPostId;
+        String? commentReplyCommentId;
+        String? commentReplyPreview;
         String? followUserId;
+
+        // DM chat fields
+        String? chatFriendId;
+        String? chatFriendName;
+
+        // GROUP chat fields 👇
+        String? groupChatRoomId;
+        String? groupName;
 
         // 🧑‍🤝‍🧑 Friend request → sender
         if (isFriendRequest) {
@@ -248,12 +348,29 @@ class _NotificationPageState extends State<NotificationPage> {
           if (parts.length > 2) commentReplyPreview = parts[2];
         }
 
-        // 👤 Follow (new-style with encoded userId in body)
+        // 👤 Follow
         if (isFollow) {
           final parts = body.split(':');
           if (parts.length > 1) {
             followUserId = parts[1].trim();
           }
+        }
+
+        // 💬 Chat message (DM) – parse `CHAT_MESSAGE:<senderId>::<senderName>`
+        if (isChatMessage) {
+          final rest = body.substring('CHAT_MESSAGE:'.length);
+          final parts = rest.split('::');
+          if (parts.isNotEmpty) chatFriendId = parts[0].trim();
+          if (parts.length > 1) chatFriendName = parts[1].trim();
+        }
+
+        // 👥 Group message – `GROUP_MESSAGE:<chatRoomId>::<groupName>`
+        // Make sure NotificationService writes body in exactly this format.
+        if (isGroupMessage) {
+          final rest = body.substring('GROUP_MESSAGE:'.length);
+          final parts = rest.split('::');
+          if (parts.isNotEmpty) groupChatRoomId = parts[0].trim();
+          if (parts.length > 1) groupName = parts[1].trim();
         }
 
         // ----- SUBTITLE (preview) -----
@@ -267,19 +384,23 @@ class _NotificationPageState extends State<NotificationPage> {
         } else if (!isFriendRequest &&
             !isFriendAccepted &&
             !isFollow &&
+            !isChatMessage &&
+            !isGroupMessage && // 👈 exclude group bodies here too
             rawBody.isNotEmpty &&
             !rawBody.contains(':')) {
-          // legacy / generic text-only notifications (no routing codes)
+          // legacy / generic
           subtitleText = rawBody;
         }
 
-        // ----- LEADING ICON (per type) -----
+        // ----- LEADING ICON -----
         final leadingIconData = _iconForNotificationType(
           isFriendRequest: isFriendRequest,
           isFriendAccepted: isFriendAccepted,
+          isChatMessage: isChatMessage,
+          isGroupMessage: isGroupMessage, // 👈 NEW
           isLike: isLike,
           isComment: isComment,
-          isCommentReply: isCommentReply, // 👈 NEW
+          isCommentReply: isCommentReply,
           isFollow: isFollow,
         );
 
@@ -288,7 +409,10 @@ class _NotificationPageState extends State<NotificationPage> {
           height: 40,
           decoration: BoxDecoration(
             color: isUnread
-                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.15)
+                ? Theme.of(context)
+                .colorScheme
+                .primary
+                .withValues(alpha: 0.15)
                 : Theme.of(context).colorScheme.secondary,
             shape: BoxShape.circle,
           ),
@@ -300,11 +424,11 @@ class _NotificationPageState extends State<NotificationPage> {
           ),
         );
 
-        // ----- TRAILING WIDGET (dot / buttons) -----
+        // ----- TRAILING -----
         Widget? trailing;
 
         if (isFriendRequest && friendRequesterId != null && isUnread) {
-          // ✅ Only show Accept / Decline while unread
+          // Accept / Decline
           trailing = Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -323,12 +447,10 @@ class _NotificationPageState extends State<NotificationPage> {
                   ),
                 ),
                 onPressed: () async {
-                  // 1) mark this notification as read
                   _optimisticMarkOneAsRead(n);
-                  // 2) accept friend request from this user
                   await dbProvider.acceptFriendRequest(friendRequesterId!);
                 },
-                child: const Text(
+                child: Text(
                   'Accept',
                   style: TextStyle(fontSize: 12),
                 ),
@@ -352,12 +474,10 @@ class _NotificationPageState extends State<NotificationPage> {
                   ),
                 ),
                 onPressed: () async {
-                  // 1) mark this notification as read
                   _optimisticMarkOneAsRead(n);
-                  // 2) decline (delete pending row)
                   await dbProvider.declineFriendRequest(friendRequesterId!);
                 },
-                child: const Text(
+                child: Text(
                   'Decline',
                   style: TextStyle(fontSize: 12),
                 ),
@@ -365,14 +485,13 @@ class _NotificationPageState extends State<NotificationPage> {
             ],
           );
         } else if (!n.isRead && !isFollow) {
-          // 🔵 Generic unread dot (but not for follow, per your change)
-          trailing =
-              _UnreadDot(colorScheme: Theme.of(context).colorScheme);
+          trailing = _UnreadDot(
+            colorScheme: Theme.of(context).colorScheme,
+          );
         } else {
           trailing = null;
         }
 
-        // ----- ROW CONTAINER (card-style) -----
         return Material(
           color: Colors.transparent,
           child: InkWell(
@@ -384,7 +503,7 @@ class _NotificationPageState extends State<NotificationPage> {
 
               // 🔗 NAVIGATION BEHAVIOR
 
-              // 1) Friend request → go to sender profile
+              // 1) Friend request → sender profile
               if (isFriendRequest && friendRequesterId != null) {
                 if (!mounted) return;
 
@@ -401,7 +520,7 @@ class _NotificationPageState extends State<NotificationPage> {
                 setState(() {});
               }
 
-              // 2) "accepted your friend request" → go to accepter's profile
+              // 2) Friend accepted → accepter profile
               else if (isFriendAccepted && friendAcceptedUserId != null) {
                 if (!mounted) return;
                 Navigator.push(
@@ -414,7 +533,7 @@ class _NotificationPageState extends State<NotificationPage> {
                 );
               }
 
-              // 3) Like / Comment / Comment reply → go to post
+              // 3) Likes / comments → post
               else if ((isLike || isComment || isCommentReply) &&
                   (likePostId != null ||
                       commentPostId != null ||
@@ -433,7 +552,6 @@ class _NotificationPageState extends State<NotificationPage> {
                     scrollToComments: isComment || isCommentReply,
                     highlightPost: true,
                     highlightComments: isComment || isCommentReply,
-                    // Later you can add: scrollToCommentId: commentReplyCommentId
                   );
                 } else if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -446,7 +564,7 @@ class _NotificationPageState extends State<NotificationPage> {
                 }
               }
 
-              // 4) Follow → go to follower profile (only for new-style FOLLOW_USER:... bodies)
+              // 4) Follow → follower profile
               else if (isFollow && followUserId != null) {
                 if (!mounted) return;
                 Navigator.push(
@@ -457,6 +575,92 @@ class _NotificationPageState extends State<NotificationPage> {
                     ),
                   ),
                 );
+              }
+
+              // 5) Chat message → open DM ChatPage + FORCE mark read
+              else if (isChatMessage &&
+                  chatFriendId != null &&
+                  chatFriendId!.isNotEmpty) {
+                if (!mounted) return;
+
+                // Open chat
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ChatPage(
+                      friendId: chatFriendId!,
+                      friendName:
+                      (chatFriendName != null && chatFriendName!.isNotEmpty)
+                          ? chatFriendName!
+                          : 'Chat',
+                    ),
+                  ),
+                );
+
+                if (!mounted) return;
+
+                // 🔁 After returning, force mark room messages as read
+                final currentUserId = AuthService().getCurrentUserId();
+                if (currentUserId.isNotEmpty) {
+                  final chatProvider =
+                  Provider.of<ChatProvider>(context, listen: false);
+
+                  final chatRoomId = await chatProvider.getOrCreateChatRoomId(
+                    currentUserId,
+                    chatFriendId!,
+                  );
+
+                  await chatProvider.markRoomMessagesAsRead(
+                    chatRoomId,
+                    currentUserId,
+                  );
+                }
+              }
+
+              // 6) Group message → open GroupChatPage + mark group as read
+              else if (isGroupMessage &&
+                  groupChatRoomId != null &&
+                  groupChatRoomId!.isNotEmpty) {
+                if (!mounted) return;
+
+                final currentUserId = AuthService().getCurrentUserId();
+                final chatProvider =
+                Provider.of<ChatProvider>(context, listen: false);
+
+                if (currentUserId.isNotEmpty) {
+                  // ✅ Mark messages as read so group badge clears even when opened via notifications
+                  await chatProvider.markGroupMessagesAsRead(
+                    groupChatRoomId!,
+                    currentUserId,
+                  );
+
+                  // Optional: mark presence so you don't get duplicate group pushes while inside
+                  await chatProvider.setActiveChatRoom(
+                    userId: currentUserId,
+                    chatRoomId: groupChatRoomId!,
+                  );
+                }
+
+                // Navigate to the group chat page
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => GroupChatPage(
+                      chatRoomId: groupChatRoomId!,
+                      groupName: groupName ?? 'Group',
+                    ),
+                  ),
+                );
+
+                if (!mounted) return;
+
+                // Optional: clear active chat room when you come back
+                if (currentUserId.isNotEmpty) {
+                  await chatProvider.setActiveChatRoom(
+                    userId: currentUserId,
+                    chatRoomId: null,
+                  );
+                }
               }
             },
             child: Ink(
@@ -477,7 +681,6 @@ class _NotificationPageState extends State<NotificationPage> {
                   children: [
                     leading,
                     const SizedBox(width: 10),
-                    // Texts
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -530,7 +733,6 @@ class _NotificationPageState extends State<NotificationPage> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // Trailing (buttons or dot)
                     trailing ?? const SizedBox.shrink(),
                   ],
                 ),
@@ -545,13 +747,17 @@ class _NotificationPageState extends State<NotificationPage> {
   IconData _iconForNotificationType({
     required bool isFriendRequest,
     required bool isFriendAccepted,
+    required bool isChatMessage,
+    required bool isGroupMessage, // 👈 NEW
     required bool isLike,
     required bool isComment,
-    required bool isCommentReply, // 👈 NEW
+    required bool isCommentReply,
     required bool isFollow,
   }) {
     if (isFriendRequest) return Icons.person_add_alt_1;
     if (isFriendAccepted) return Icons.handshake;
+    if (isGroupMessage) return Icons.groups; // 👈 NEW
+    if (isChatMessage) return Icons.chat_bubble_outline;
     if (isLike) return Icons.favorite;
     if (isComment || isCommentReply) return Icons.mode_comment_outlined;
     if (isFollow) return Icons.person;

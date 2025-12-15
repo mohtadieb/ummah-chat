@@ -1,5 +1,7 @@
+// lib/pages/chat_page.dart
 import 'dart:async';
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -22,14 +24,18 @@ import '../helper/likes_bottom_sheet_helper.dart';
 import '../models/message.dart';
 import '../models/user_profile.dart';
 import '../services/chat/chat_provider.dart';
-import '../services/chat/chat_service.dart';
 import '../services/database/database_service.dart';
+import '../services/notifications/notification_service.dart';
 
 class ChatPage extends StatefulWidget {
   final String friendId;
   final String friendName;
 
-  const ChatPage({super.key, required this.friendId, required this.friendName});
+  const ChatPage({
+    super.key,
+    required this.friendId,
+    required this.friendName,
+  });
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -41,8 +47,9 @@ class _ChatPageState extends State<ChatPage> {
   final FocusNode _focusNode = FocusNode();
 
   final AuthService _authService = AuthService();
-  final ChatService _chatService = ChatService();
   final DatabaseService _dbService = DatabaseService();
+  late final ChatProvider _chatProvider;
+  final NotificationService _notifService = NotificationService();
 
   String? _chatRoomId;
 
@@ -63,11 +70,17 @@ class _ChatPageState extends State<ChatPage> {
   Timer? _typingDebounce;
   bool _sentTypingTrue = false;
 
-  // Track last message count (for auto-scroll)
+  // Track last message count (for auto-scroll & unread separator behavior)
   int _lastMessageCount = 0;
 
   // Reply target
   MessageModel? _replyTo;
+
+  // 🆕 Unread separator behavior
+  int? _initialUnreadGroupIndex;
+  int? _initialUnreadCount; // store count at first open
+  bool _hasCapturedInitialUnreadIndex = false;
+  bool _hideUnreadSeparatorForNewMessages = false;
 
   // 🎙 Voice recorder controller (extracted)
   late final VoiceRecorderController _voiceRecorder;
@@ -79,6 +92,8 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
+
+    _chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
     _voiceRecorder = VoiceRecorderController(
       debugTag: 'DM',
@@ -110,9 +125,11 @@ class _ChatPageState extends State<ChatPage> {
 
     // Periodically refresh *our* last_seen_at while chat is open
     _presenceTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
+      if (!mounted) return;
       final currentUserId = _authService.getCurrentUserId();
       if (currentUserId != null && currentUserId.isNotEmpty) {
-        await _chatService.updateLastSeen(currentUserId);
+        final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+        await chatProvider.updateLastSeen(currentUserId);
       }
     });
   }
@@ -125,6 +142,28 @@ class _ChatPageState extends State<ChatPage> {
     _typingDebounce?.cancel();
 
     _voiceRecorder.dispose();
+
+    // Clear active chat presence (no Provider.of in dispose)
+    final currentUserId = _authService.getCurrentUserId();
+    if (currentUserId != null && currentUserId.isNotEmpty) {
+      _chatProvider.setActiveChatRoom(
+        userId: currentUserId,
+        chatRoomId: null,
+      );
+
+      // ✅ Ensure typing status is cleared when leaving the chat
+      if (_chatRoomId != null) {
+        _chatProvider.setTypingStatus(
+          chatRoomId: _chatRoomId!,
+          userId: currentUserId,
+          isTyping: false,
+        );
+      }
+    }
+
+    // Clear active chat for notification UI
+    _notifService.setActiveChatRoomId(null);
+    _notifService.setActiveDmFriendId(null);
 
     _focusNode.dispose();
     _messageController.removeListener(_handleTypingChange);
@@ -141,7 +180,9 @@ class _ChatPageState extends State<ChatPage> {
     final currentUserId = _authService.getCurrentUserId();
     if (currentUserId == null || currentUserId.isEmpty) return;
 
-    final chatRoomId = await _chatService.getOrCreateChatRoomId(
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
+    final chatRoomId = await chatProvider.getOrCreateChatRoomId(
       currentUserId,
       widget.friendId,
     );
@@ -152,22 +193,45 @@ class _ChatPageState extends State<ChatPage> {
       _chatRoomId = chatRoomId;
     });
 
-    final provider = Provider.of<ChatProvider>(context, listen: false);
-    await provider.listenToRoom(chatRoomId);
+    // Let NotificationService know which chat is currently active
+    _notifService.setActiveChatRoomId(chatRoomId);
+    _notifService.setActiveDmFriendId(widget.friendId);
+
+    // Mark that this user is currently viewing this chat (presence)
+    await chatProvider.setActiveChatRoom(
+      userId: currentUserId,
+      chatRoomId: chatRoomId,
+    );
+
+    await chatProvider.listenToRoom(chatRoomId);
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollDown());
 
-    await _chatService.markRoomMessagesAsRead(chatRoomId, currentUserId);
-    await _chatService.updateLastSeen(currentUserId);
+    await chatProvider.markRoomMessagesAsRead(chatRoomId, currentUserId);
+
+    // Also mark chat notifications for this room as read
+    await _notifService.markChatNotificationsAsRead(
+      chatRoomId: chatRoomId,
+      userId: currentUserId,
+    );
+
+    await chatProvider.updateLastSeen(currentUserId);
 
     _subscribeToFriendTyping(chatRoomId);
   }
 
   void _subscribeToFriendTyping(String chatRoomId) {
     _friendTypingSub?.cancel();
-    _friendTypingSub = _chatService
-        .friendTypingStream(chatRoomId: chatRoomId, friendId: widget.friendId)
+
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
+    _friendTypingSub = chatProvider
+        .friendTypingStream(
+      chatRoomId: chatRoomId,
+      friendId: widget.friendId,
+    )
         .listen((isTyping) {
+      debugPrint('👀 friendTypingStream emitted: $isTyping');
       if (!mounted) return;
       setState(() {
         _isFriendTyping = isTyping;
@@ -189,11 +253,12 @@ class _ChatPageState extends State<ChatPage> {
     final currentUserId = _authService.getCurrentUserId();
     if (currentUserId == null || currentUserId.isEmpty) return;
 
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
     final hasText = _messageController.text.trim().isNotEmpty;
 
     if (hasText && !_sentTypingTrue) {
       _sentTypingTrue = true;
-      await _chatService.setTypingStatus(
+      await chatProvider.setTypingStatus(
         chatRoomId: _chatRoomId!,
         userId: currentUserId,
         isTyping: true,
@@ -202,7 +267,7 @@ class _ChatPageState extends State<ChatPage> {
 
     if (!hasText && _sentTypingTrue) {
       _sentTypingTrue = false;
-      await _chatService.setTypingStatus(
+      await chatProvider.setTypingStatus(
         chatRoomId: _chatRoomId!,
         userId: currentUserId,
         isTyping: false,
@@ -212,12 +277,13 @@ class _ChatPageState extends State<ChatPage> {
     _typingDebounce?.cancel();
     if (hasText) {
       _typingDebounce = Timer(const Duration(seconds: 4), () async {
-        if (_chatRoomId == null) return;
+        if (_chatRoomId == null || !mounted) return;
         final uid = _authService.getCurrentUserId();
         if (uid == null || uid.isEmpty) return;
 
         _sentTypingTrue = false;
-        await _chatService.setTypingStatus(
+        final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+        await chatProvider.setTypingStatus(
           chatRoomId: _chatRoomId!,
           userId: uid,
           isTyping: false,
@@ -312,16 +378,18 @@ class _ChatPageState extends State<ChatPage> {
       return;
     }
 
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
     try {
       final messageId = const Uuid().v4();
 
-      final audioUrl = await _chatService.uploadVoiceFile(
+      final audioUrl = await chatProvider.uploadVoiceFile(
         chatRoomId: _chatRoomId!,
         messageId: messageId,
         filePath: recorded.filePath,
       );
 
-      await _chatService.sendVoiceMessageDM(
+      await chatProvider.sendVoiceMessageDM(
         chatRoomId: _chatRoomId!,
         senderId: currentUserId,
         receiverId: widget.friendId,
@@ -334,7 +402,7 @@ class _ChatPageState extends State<ChatPage> {
         _replyTo = null; // clear reply target after sending voice
       });
 
-      await _chatService.updateLastSeen(currentUserId);
+      await chatProvider.updateLastSeen(currentUserId);
 
       debugPrint('✅ Voice message sent');
     } catch (e) {
@@ -372,10 +440,10 @@ class _ChatPageState extends State<ChatPage> {
       _replyTo = null;
     });
 
-    await _chatService.updateLastSeen(currentUserId);
+    await provider.updateLastSeen(currentUserId);
 
     if (_chatRoomId != null) {
-      await _chatService.setTypingStatus(
+      await provider.setTypingStatus(
         chatRoomId: _chatRoomId!,
         userId: currentUserId,
         isTyping: false,
@@ -434,34 +502,41 @@ class _ChatPageState extends State<ChatPage> {
     final bool? shouldDelete = await showDialog<bool>(
       context: context,
       builder: (_) {
+        final deleteLabel = "Delete messages".plural(
+          count,
+          namedArgs: {"count": count.toString()},
+        );
+
         return AlertDialog(
-          title: Text('Delete $count message${count == 1 ? '' : 's'}?'),
-          content: const Text(
-            'Selected messages will be deleted for everyone in this chat.',
+          title: Text(deleteLabel),
+          content: Text(
+            'Selected messages will be deleted for everyone in this chat.'.tr(),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
               child: Text(
-                'Cancel',
+                'Cancel'.tr(),
                 style: TextStyle(color: colorScheme.primary),
               ),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+              child: Text('Delete'.tr(), style: const TextStyle(color: Colors.red)),
             ),
           ],
         );
+
       },
     );
 
     if (shouldDelete != true) return;
 
     final ids = List<String>.from(_selectedMessageIds);
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
     for (final id in ids) {
-      await _chatService.deleteMessageForEveryone(
+      await chatProvider.deleteMessageForEveryone(
         messageId: id,
         userId: currentUserId,
       );
@@ -503,7 +578,7 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   // ---------------------------------------------------------------------------
-  // Likes bottom sheet (uses LikesBottomSheetHelper)
+  // Likes bottom sheet
   // ---------------------------------------------------------------------------
 
   Future<void> _openLikesBottomSheet(List<String> userIds) async {
@@ -529,32 +604,22 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   // ---------------------------------------------------------------------------
-  // UI helpers (subtitle, reply bar, delete)
+  // UI helpers
   // ---------------------------------------------------------------------------
 
+  // AppBar subtitle: only online / last seen (typing is shown at bottom)
   Widget? _buildSubtitle(ColorScheme colorScheme) {
-    if (_isFriendTyping) {
-      return Text(
-        'Typing...',
-        style: TextStyle(
-          fontSize: 12,
-          color: colorScheme.primary.withValues(alpha: 0.7),
-          fontStyle: FontStyle.italic,
-        ),
-      );
-    }
-
     final profile = _friendProfile;
     if (profile == null) return null;
 
     final baseStyle = TextStyle(
       fontSize: 12,
-      color: colorScheme.primary.withValues(alpha: 0.7),
+      color: colorScheme.onSurface.withOpacity(0.7),
     );
 
     if (profile.isOnline) {
       return Text(
-        'Online',
+        'Online'.tr(),
         style: baseStyle.copyWith(
           color: const Color(0xFF12B981),
           fontWeight: FontWeight.w500,
@@ -569,7 +634,7 @@ class _ChatPageState extends State<ChatPage> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text('Last seen ', style: baseStyle),
+        Text('${"Last seen".tr()} ', style: baseStyle),
         TimeAgoText(createdAt: profile.lastSeenAt!, style: baseStyle),
       ],
     );
@@ -580,19 +645,19 @@ class _ChatPageState extends State<ChatPage> {
       String currentUserId,
       ) {
     final isMine = msg.senderId == currentUserId;
-    final author = isMine ? 'You' : widget.friendName;
+    final author = isMine ? 'You'.tr() : widget.friendName;
 
     String label;
     if (msg.message.trim().isNotEmpty) {
       label = msg.message.trim();
     } else if ((msg.imageUrl ?? '').trim().isNotEmpty) {
-      label = 'Photo';
+      label = 'Photo'.tr();
     } else if ((msg.videoUrl ?? '').trim().isNotEmpty) {
-      label = 'Video';
+      label = 'Video'.tr();
     } else if ((msg.audioUrl ?? '').trim().isNotEmpty || msg.isAudio) {
-      label = 'Voice message';
+      label = 'Voice message'.tr();
     } else {
-      label = 'Message';
+      label = 'Message'.tr();
     }
 
     return MyReplyPreviewBar(
@@ -601,6 +666,7 @@ class _ChatPageState extends State<ChatPage> {
       onCancel: _cancelReply,
     );
   }
+
 
   Future<void> _confirmDeleteMessage(String messageId) async {
     final colorScheme = Theme.of(context).colorScheme;
@@ -611,21 +677,21 @@ class _ChatPageState extends State<ChatPage> {
       context: context,
       builder: (_) {
         return AlertDialog(
-          title: const Text('Delete message?'),
-          content: const Text(
-            'This message will be deleted for everyone in this chat.',
+          title: Text('Delete message?'.tr()),
+          content: Text(
+            'This message will be deleted for everyone in this chat.'.tr(),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
               child: Text(
-                'Cancel',
+                'Cancel'.tr(),
                 style: TextStyle(color: colorScheme.primary),
               ),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+              child: Text('Delete'.tr(), style: TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -634,14 +700,18 @@ class _ChatPageState extends State<ChatPage> {
 
     if (shouldDelete != true) return;
 
-    await _chatService.deleteMessageForEveryone(
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
+    await chatProvider.deleteMessageForEveryone(
       messageId: messageId,
       userId: currentUserId,
     );
   }
 
-  // Long press handler for NON-selection scenarios (other user's message)
-  Future<void> _onBubbleLongPress(MessageModel msg, bool isCurrentUser) async {
+  Future<void> _onBubbleLongPress(
+      MessageModel msg,
+      bool isCurrentUser,
+      ) async {
     if (msg.isDeleted) return;
 
     HapticFeedback.mediumImpact();
@@ -662,7 +732,7 @@ class _ChatPageState extends State<ChatPage> {
             children: [
               ListTile(
                 leading: Icon(Icons.reply, color: colorScheme.primary),
-                title: const Text('Reply'),
+                title: Text('Reply'.tr()),
                 onTap: () {
                   Navigator.of(context).pop();
                   _startReplyTo(msg);
@@ -672,7 +742,7 @@ class _ChatPageState extends State<ChatPage> {
                 const Divider(height: 0),
                 ListTile(
                   leading: const Icon(Icons.delete, color: Colors.red),
-                  title: const Text('Delete'),
+                  title: Text('Delete'.tr()),
                   onTap: () {
                     Navigator.of(context).pop();
                     _confirmDeleteMessage(msg.id);
@@ -686,7 +756,6 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  // Unified long-press entry point used by bubbles
   void _handleBubbleLongPress(MessageModel msg, bool isCurrentUser) {
     if (msg.isDeleted) return;
 
@@ -739,8 +808,13 @@ class _ChatPageState extends State<ChatPage> {
           centerTitle: false,
           title: _isSelectionMode
               ? Text(
-            '${_selectedMessageIds.length} selected',
-            style: const TextStyle(fontWeight: FontWeight.w600),
+            "selected_messages".plural(
+              _selectedMessageIds.length,
+              namedArgs: {
+                "count": _selectedMessageIds.length.toString(),
+              },
+            ),
+            style: TextStyle(fontWeight: FontWeight.w600),
           )
               : Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -748,7 +822,6 @@ class _ChatPageState extends State<ChatPage> {
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () {
-                  // 👤 Open friend's profile when tapping the name
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -760,7 +833,7 @@ class _ChatPageState extends State<ChatPage> {
                 },
                 child: Text(
                   widget.friendName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -799,8 +872,9 @@ class _ChatPageState extends State<ChatPage> {
                     );
 
                     if (rawMessages.isEmpty) {
-                      return const Center(
-                          child: Text("No messages yet"));
+                      return Center(
+                        child: Text("No messages yet".tr()),
+                      );
                     }
 
                     final messages = rawMessages
@@ -808,7 +882,7 @@ class _ChatPageState extends State<ChatPage> {
                         .toList()
                       ..sort(
                             (a, b) => a.createdAt.compareTo(b.createdAt),
-                      ); // force chronological
+                      );
 
                     int unreadCount = 0;
                     int? firstUnreadIndexFromStart;
@@ -825,10 +899,8 @@ class _ChatPageState extends State<ChatPage> {
 
                     final groups = MessageGrouping.build(messages);
 
-                    final messageIndexToGroupIndex = List<int>.filled(
-                      messages.length,
-                      0,
-                    );
+                    final messageIndexToGroupIndex =
+                    List<int>.filled(messages.length, 0);
                     for (int gi = 0; gi < groups.length; gi++) {
                       final g = groups[gi];
                       for (final m in g.messages) {
@@ -842,22 +914,45 @@ class _ChatPageState extends State<ChatPage> {
                     int? firstUnreadGroupIndex;
                     if (firstUnreadIndexFromStart != null) {
                       firstUnreadGroupIndex =
-                      messageIndexToGroupIndex[
-                      firstUnreadIndexFromStart];
+                      messageIndexToGroupIndex[firstUnreadIndexFromStart];
                     }
 
-                    if (messages.length != _lastMessageCount) {
+                    // Capture initial unread index + count once
+                    if (!_hasCapturedInitialUnreadIndex) {
+                      _initialUnreadGroupIndex = firstUnreadGroupIndex;
+                      _initialUnreadCount = unreadCount;
+                      _hasCapturedInitialUnreadIndex = true;
+                    }
+
+                    // Detect new messages while chat is open
+                    if (currentUserId != null &&
+                        currentUserId.isNotEmpty &&
+                        messages.length != _lastMessageCount) {
+                      if (_lastMessageCount > 0 &&
+                          messages.length > _lastMessageCount) {
+                        // New messages after initial load → hide separator from now on
+                        _hideUnreadSeparatorForNewMessages = true;
+                      }
+
                       if (_isNearBottom()) {
                         _scrollDown();
                       }
+
                       _lastMessageCount = messages.length;
+
+                      // Mark as read whenever messages change while open
+                      provider.markRoomMessagesAsRead(
+                        _chatRoomId!,
+                        currentUserId,
+                      );
                     }
 
                     return ListView.builder(
                       controller: _scrollController,
                       reverse: true,
-                      padding:
-                      const EdgeInsets.symmetric(vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                      ),
                       itemCount: groups.length,
                       itemBuilder: (context, index) {
                         final groupIndex = groups.length - 1 - index;
@@ -872,7 +967,9 @@ class _ChatPageState extends State<ChatPage> {
                         final imageUrls = group.messages
                             .map((m) => m.imageUrl)
                             .whereType<String>()
-                            .where((u) => u.trim().isNotEmpty)
+                            .where(
+                              (u) => u.trim().isNotEmpty,
+                        )
                             .toList();
 
                         final String? groupVideoUrl = group.messages
@@ -902,9 +999,10 @@ class _ChatPageState extends State<ChatPage> {
                         final showDayDivider = prevDate == null ||
                             !isSameDay(msgDate, prevDate);
 
-                        final showUnreadSeparator = unreadCount > 0 &&
-                            firstUnreadGroupIndex != null &&
-                            groupIndex == firstUnreadGroupIndex;
+                        final showUnreadSeparator =
+                            _initialUnreadGroupIndex != null &&
+                                groupIndex == _initialUnreadGroupIndex &&
+                                !_hideUnreadSeparatorForNewMessages;
 
                         MessageModel? repliedTo;
                         if (lastMsg.replyToMessageId != null &&
@@ -913,8 +1011,7 @@ class _ChatPageState extends State<ChatPage> {
                                 .isNotEmpty) {
                           try {
                             repliedTo = messages.firstWhere(
-                                  (m) =>
-                              m.id == lastMsg.replyToMessageId,
+                                  (m) => m.id == lastMsg.replyToMessageId,
                             );
                           } catch (_) {
                             repliedTo = null;
@@ -929,37 +1026,35 @@ class _ChatPageState extends State<ChatPage> {
                           final isMineReply = currentUserId != null &&
                               repliedTo.senderId == currentUserId;
                           replyAuthorName =
-                          isMineReply ? 'You' : widget.friendName;
+                          isMineReply ? 'You'.tr() : widget.friendName;
 
                           if (repliedTo.message.trim().isNotEmpty) {
                             replySnippet = repliedTo.message.trim();
                           } else if ((repliedTo.imageUrl ?? '')
                               .trim()
                               .isNotEmpty) {
-                            replySnippet = 'Photo';
+                            replySnippet = 'Photo'.tr();
                             replyHasMedia = true;
                           } else if ((repliedTo.videoUrl ?? '')
                               .trim()
                               .isNotEmpty) {
-                            replySnippet = 'Video';
+                            replySnippet = 'Video'.tr();
                             replyHasMedia = true;
                           } else if ((repliedTo.audioUrl ?? '')
                               .trim()
                               .isNotEmpty ||
                               repliedTo.isAudio) {
-                            replySnippet = 'Voice message';
+                            replySnippet = 'Voice message'.tr();
                             replyHasMedia = true;
                           } else {
-                            replySnippet = 'Message';
+                            replySnippet = 'Message'.tr();
                           }
                         }
 
-                        // 👉 build inner bubble (voice or text/media)
+                        // Inner bubble
                         Widget innerBubble;
                         if (lastMsg.isAudio &&
-                            (lastMsg.audioUrl ?? '')
-                                .trim()
-                                .isNotEmpty) {
+                            (lastMsg.audioUrl ?? '').trim().isNotEmpty) {
                           innerBubble = MyVoiceMessageBubble(
                             key: ValueKey(lastMsg.id),
                             audioUrl: lastMsg.audioUrl!,
@@ -985,7 +1080,7 @@ class _ChatPageState extends State<ChatPage> {
                             isUploading: lastMsg.isUploading,
                             isDeleted: lastMsg.isDeleted,
                             senderName: isCurrentUser
-                                ? 'You'
+                                ? 'You'.tr()
                                 : widget.friendName,
                             onDoubleTap: () async {
                               if (_isSelectionMode) return;
@@ -996,7 +1091,13 @@ class _ChatPageState extends State<ChatPage> {
                                 return;
                               }
 
-                              await _chatService.toggleLikeMessage(
+                              final chatProvider =
+                              Provider.of<ChatProvider>(
+                                context,
+                                listen: false,
+                              );
+
+                              await chatProvider.toggleLikeMessage(
                                 messageId: lastMsg.id,
                                 userId: uid,
                               );
@@ -1014,7 +1115,9 @@ class _ChatPageState extends State<ChatPage> {
                               if (_isSelectionMode) return;
                               _openLikesBottomSheet(
                                 likedBy
-                                    .map((e) => e.toString())
+                                    .map(
+                                      (e) => e.toString(),
+                                )
                                     .toList(),
                               );
                             },
@@ -1029,11 +1132,10 @@ class _ChatPageState extends State<ChatPage> {
 
                         final selectableBubble = MySelectableBubble(
                           isSelected: isSelected,
-                          onLongPress: () =>
-                              _handleBubbleLongPress(
-                                lastMsg,
-                                isCurrentUser,
-                              ),
+                          onLongPress: () => _handleBubbleLongPress(
+                            lastMsg,
+                            isCurrentUser,
+                          ),
                           onTap: () {
                             if (_isSelectionMode &&
                                 currentUserId != null &&
@@ -1054,7 +1156,8 @@ class _ChatPageState extends State<ChatPage> {
                             if (showUnreadSeparator)
                               buildUnreadBubble(
                                 context: context,
-                                unreadCount: unreadCount,
+                                unreadCount:
+                                _initialUnreadCount ?? unreadCount,
                               ),
                             Padding(
                               padding: const EdgeInsets.symmetric(
@@ -1076,7 +1179,7 @@ class _ChatPageState extends State<ChatPage> {
                 ),
               ),
 
-              // Input
+              // Input + bottom typing indicator
               SafeArea(
                 top: false,
                 child: Column(
@@ -1089,6 +1192,34 @@ class _ChatPageState extends State<ChatPage> {
                         _replyTo!,
                         currentUserId,
                       ),
+
+                    // 👇 Typing indicator at the bottom of the chat
+                    if (_isFriendTyping)
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          left: 16,
+                          right: 16,
+                          bottom: 4,
+                        ),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'typing_indicator'.tr(
+                              namedArgs: {"name": widget.friendName},
+                            ),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withValues(alpha: 0.7),
+                            ),
+                          ),
+
+                        ),
+                      ),
+
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
                       child: MyChatTextField(
@@ -1106,8 +1237,7 @@ class _ChatPageState extends State<ChatPage> {
                             return;
                           }
 
-                          await ChatMediaHelper
-                              .openAttachmentSheetForDM(
+                          await ChatMediaHelper.openAttachmentSheetForDM(
                             context: context,
                             chatRoomId: _chatRoomId!,
                             currentUserId: currentUserId,
@@ -1117,7 +1247,11 @@ class _ChatPageState extends State<ChatPage> {
                         hasPendingAttachment: false,
                         isRecording: _voiceRecorder.isRecording,
                         recordingLabel: _voiceRecorder.isRecording
-                            ? 'Recording… ${_voiceRecorder.formattedDuration}'
+                            ? 'recording_label'.tr(
+                          namedArgs: {
+                            "time": _voiceRecorder.formattedDuration,
+                          },
+                        )
                             : null,
                         onMicLongPressStart: _handleMicLongPressStart,
                         onMicLongPressEnd: _handleMicLongPressEnd,

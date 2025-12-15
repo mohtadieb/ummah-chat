@@ -1,21 +1,28 @@
+// lib/components/my_post_tile.dart
+
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../helper/time_ago_text.dart';
 import '../models/post.dart';
+import '../models/post_media.dart';
 import '../services/database/database_provider.dart';
 import '../components/my_input_alert_box.dart';
 import '../services/auth/auth_service.dart';
 import 'my_confirmation_box.dart';
-import '../pages/profile_page.dart'; // 👈 NEW
-import '../services/navigation/bottom_nav_provider.dart'; // 👈 ADD
+import '../pages/profile_page.dart'; // existing
+import '../services/navigation/bottom_nav_provider.dart';
 import 'package:video_player/video_player.dart';
-import 'package:visibility_detector/visibility_detector.dart'; // 👈 NEW
+import 'package:visibility_detector/visibility_detector.dart';
+
+// 👇 adjust this path if your fullscreen page lives somewhere else
+import '../pages/fullscreen_image_page.dart';
 
 class MyPostTile extends StatefulWidget {
   final Post post;
   final void Function()? onUserTap;
-  final void Function()? onPostTap;
+  final void Function()? onPostTap; // used for "View all comments", share, etc.
   final BuildContext scaffoldContext;
   final bool isInPostPage;
 
@@ -39,10 +46,29 @@ class _MyPostTileState extends State<MyPostTile> {
 
   final _commentController = TextEditingController();
 
+  // media state
+  List<PostMedia> _media = [];
+  bool _mediaLoading = true;
+  int _currentMediaIndex = 0;
+
   @override
   void initState() {
     super.initState();
     _loadComments();
+    _loadMedia();
+  }
+
+  @override
+  void didUpdateWidget(covariant MyPostTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // 👇 if this tile is now showing a *different* post, reset media
+    if (oldWidget.post.id != widget.post.id) {
+      _media = [];
+      _mediaLoading = true;
+      _currentMediaIndex = 0;
+      _loadMedia();
+    }
   }
 
   @override
@@ -53,6 +79,24 @@ class _MyPostTileState extends State<MyPostTile> {
 
   Future<void> _loadComments() async {
     await databaseProvider.loadComments(widget.post.id);
+  }
+
+  Future<void> _loadMedia() async {
+    try {
+      final items = await databaseProvider.getPostMedia(widget.post.id);
+      if (!mounted) return;
+      setState(() {
+        _media = items;
+        _mediaLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading post media: $e');
+      if (!mounted) return;
+      setState(() {
+        _media = [];
+        _mediaLoading = false;
+      });
+    }
   }
 
   void _toggleLikePost() async {
@@ -70,14 +114,14 @@ class _MyPostTileState extends State<MyPostTile> {
       context: context,
       builder: (dialogContext) => MyInputAlertBox(
         textController: _commentController,
-        hintText: "Type a comment",
+        hintText: "Type a comment".tr(),
         onPressed: () async {
           final comment = _commentController.text.trim();
 
-          if (comment.replaceAll(RegExp(r'\s+'), '').length < 2) {
+          if (comment.replaceAll(RegExp(r'\s+'), '').length < 5) {
             messenger?.showSnackBar(
-              const SnackBar(
-                content: Text("Comment must be at least 2 characters"),
+              SnackBar(
+                content: Text("Comment must be at least 5 characters".tr()),
               ),
             );
             return;
@@ -85,7 +129,7 @@ class _MyPostTileState extends State<MyPostTile> {
 
           await _addComment();
         },
-        onPressedText: "Post",
+        onPressedText: "Post".tr(),
       ),
     );
   }
@@ -120,7 +164,7 @@ class _MyPostTileState extends State<MyPostTile> {
             if (isOwnPost)
               ListTile(
                 leading: const Icon(Icons.delete_outline),
-                title: const Text("Delete"),
+                title: Text("Delete".tr()),
                 onTap: () async {
                   Navigator.pop(sheetContext);
                   final messenger =
@@ -132,20 +176,19 @@ class _MyPostTileState extends State<MyPostTile> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      title: const Text("Delete Post"),
-                      content: const Text(
-                        "Are you sure you want to delete this post?",
+                      title: Text("Delete Post".tr()),
+                      content: Text("Are you sure you want to delete this post?".tr(),
                       ),
                       actions: [
                         TextButton(
                           onPressed: () =>
                               Navigator.pop(dialogContext, false),
-                          child: const Text("Cancel"),
+                          child: Text("Cancel".tr()),
                         ),
                         TextButton(
                           onPressed: () =>
                               Navigator.pop(dialogContext, true),
-                          child: const Text("Delete"),
+                          child: Text("Delete".tr()),
                         ),
                       ],
                     ),
@@ -157,7 +200,7 @@ class _MyPostTileState extends State<MyPostTile> {
                     if (!mounted) return;
 
                     messenger?.showSnackBar(
-                      const SnackBar(content: Text("Post deleted")),
+                      SnackBar(content: Text("Post deleted".tr())),
                     );
                   }
                 },
@@ -168,7 +211,7 @@ class _MyPostTileState extends State<MyPostTile> {
                 children: [
                   ListTile(
                     leading: const Icon(Icons.report_outlined),
-                    title: const Text("Report"),
+                    title: Text("Report".tr()),
                     onTap: () {
                       Navigator.pop(sheetContext);
                       _reportPostConfirmationBox();
@@ -176,7 +219,7 @@ class _MyPostTileState extends State<MyPostTile> {
                   ),
                   ListTile(
                     leading: const Icon(Icons.block),
-                    title: const Text("Block user"),
+                    title: Text("Block user".tr()),
                     onTap: () {
                       Navigator.pop(sheetContext);
                       _blockUserConfirmationBox();
@@ -186,7 +229,7 @@ class _MyPostTileState extends State<MyPostTile> {
               ),
             ListTile(
               leading: const Icon(Icons.close),
-              title: const Text("Cancel"),
+              title: Text("Cancel".tr()),
               onTap: () => Navigator.pop(sheetContext),
             ),
           ],
@@ -199,9 +242,9 @@ class _MyPostTileState extends State<MyPostTile> {
     showDialog(
       context: context,
       builder: (dialogContext) => MyConfirmationBox(
-        title: "Report Message",
-        content: "Are you sure you want to report this message?",
-        confirmText: "Report",
+        title: "Report Message".tr(),
+        content: "Are you sure you want to report this message?".tr(),
+        confirmText: "Report".tr(),
         onConfirm: () async {
           await databaseProvider.reportUser(
             widget.post.id,
@@ -210,7 +253,7 @@ class _MyPostTileState extends State<MyPostTile> {
           final messenger =
           ScaffoldMessenger.maybeOf(widget.scaffoldContext);
           messenger?.showSnackBar(
-            const SnackBar(content: Text("Message reported")),
+            SnackBar(content: Text("Message reported".tr())),
           );
         },
       ),
@@ -221,15 +264,15 @@ class _MyPostTileState extends State<MyPostTile> {
     showDialog(
       context: context,
       builder: (dialogContext) => MyConfirmationBox(
-        title: "Block User",
-        content: "Are you sure you want to block this user?",
-        confirmText: "Block",
+        title: "Block User".tr(),
+        content: "Are you sure you want to block this user?".tr(),
+        confirmText: "Block".tr(),
         onConfirm: () async {
           await databaseProvider.blockUser(widget.post.userId);
           final messenger =
           ScaffoldMessenger.maybeOf(widget.scaffoldContext);
           messenger?.showSnackBar(
-            const SnackBar(content: Text("User blocked")),
+            SnackBar(content: Text("User blocked".tr())),
           );
         },
       ),
@@ -254,7 +297,6 @@ class _MyPostTileState extends State<MyPostTile> {
 
     // 4 = index of Profile tab in MainLayout's BottomNavigationBar
     bottomNav.setIndex(4);
-    // No push, no new ProfilePage → it will reuse the existing tab instance
   }
 
   Widget _buildHeader(BuildContext context) {
@@ -265,12 +307,13 @@ class _MyPostTileState extends State<MyPostTile> {
       child: Row(
         children: [
           GestureDetector(
-            onTap: _handleUserTap, // 👈 changed
+            onTap: _handleUserTap,
             child: Row(
               children: [
                 CircleAvatar(
                   radius: 18,
-                  backgroundColor: theme.colorScheme.secondary.withValues(alpha: 0.2),
+                  backgroundColor:
+                  theme.colorScheme.secondary.withValues(alpha: 0.2),
                   child: Text(
                     widget.post.name.isNotEmpty
                         ? widget.post.name[0].toUpperCase()
@@ -293,8 +336,7 @@ class _MyPostTileState extends State<MyPostTile> {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      '@${widget.post.username}',
+                    Text('@${widget.post.username}'.tr(),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.primary,
                       ),
@@ -316,43 +358,74 @@ class _MyPostTileState extends State<MyPostTile> {
     );
   }
 
+  // Open fullscreen gallery for images in _media
+  void _openFullscreenForMedia(PostMedia media) {
+    final imageMedias =
+    _media.where((m) => m.type == 'image').toList(growable: false);
+    if (imageMedias.isEmpty) return;
+
+    final imageUrls = imageMedias.map((m) => m.url).toList();
+    final initialIndex =
+    imageMedias.indexWhere((m) => m.id == media.id).clamp(0, imageUrls.length - 1);
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FullscreenImagePage(
+          imageUrls: imageUrls,
+          initialIndex: initialIndex,
+        ),
+      ),
+    );
+  }
+
+  // swipable media (images + videos) OR text-only
   Widget _buildImageOrText(BuildContext context) {
     final theme = Theme.of(context);
 
-    // 🎥 Video post
-    if (widget.post.videoUrl != null && widget.post.videoUrl!.isNotEmpty) {
+    // 1️⃣ If we have media items → show PageView
+    if (!_mediaLoading && _media.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(18),
         child: AspectRatio(
           aspectRatio: 4 / 5,
-          child: _VideoPostPlayer(videoUrl: widget.post.videoUrl!),
-        ),
-      );
-    }
-
-    // 🖼️ Image post
-    if (widget.post.imageUrl != null) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: AspectRatio(
-          aspectRatio: 4 / 5,
-          child: Image.network(
-            widget.post.imageUrl!,
-            fit: BoxFit.cover,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: CircularProgressIndicator(),
-                ),
-              );
+          child: PageView.builder(
+            itemCount: _media.length,
+            onPageChanged: (index) {
+              setState(() {
+                _currentMediaIndex = index;
+              });
             },
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                color: theme.colorScheme.surfaceContainerHighest,
-                alignment: Alignment.center,
-                child: const Text('Failed to load image'),
+            itemBuilder: (context, index) {
+              final media = _media[index];
+
+              if (media.type == 'video') {
+                // keep current behavior: tap = play/pause only
+                return _VideoPostPlayer(videoUrl: media.url);
+              }
+
+              // default = image (tap → fullscreen, not post page)
+              return GestureDetector(
+                onTap: () => _openFullscreenForMedia(media),
+                child: Image.network(
+                  media.url,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      alignment: Alignment.center,
+                      child: Text('Failed to load media'.tr()),
+                    );
+                  },
+                ),
               );
             },
           ),
@@ -360,12 +433,12 @@ class _MyPostTileState extends State<MyPostTile> {
       );
     }
 
-    // 📝 Text-only post
+    // 2️⃣ Text-only post (no media rows)
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withValues(alpha: 0.5),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Text(
@@ -374,6 +447,35 @@ class _MyPostTileState extends State<MyPostTile> {
           color: theme.colorScheme.onSurface,
           height: 1.4,
         ),
+      ),
+    );
+  }
+
+  // dots indicator under the media
+  Widget _buildMediaIndicator(BuildContext context) {
+    if (_media.length <= 1) return const SizedBox.shrink();
+
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 6, bottom: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(_media.length, (index) {
+          final isActive = index == _currentMediaIndex;
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            margin: const EdgeInsets.symmetric(horizontal: 3),
+            height: 6,
+            width: isActive ? 14 : 6,
+            decoration: BoxDecoration(
+              color: isActive
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurface.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          );
+        }),
       ),
     );
   }
@@ -427,64 +529,68 @@ class _MyPostTileState extends State<MyPostTile> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final likeCount = listeningProvider.getLikeCount(widget.post.id);
-    final commentCount = listeningProvider.getComments(widget.post.id).length;
+    final commentCount =
+        listeningProvider.getComments(widget.post.id).length;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(22),
-        onTap: widget.onPostTap, // 👈 still opens post page when tapping outside video
-        child: Card(
-          elevation: theme.brightness == Brightness.dark ? 0.5 : 1.5,
-          shadowColor: theme.colorScheme.shadow
-              .withValues(alpha: theme.brightness == Brightness.dark ? 0.25 : 0.18),
-          color: theme.colorScheme.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(22),
+      child: Card(
+        elevation: theme.brightness == Brightness.dark ? 0.5 : 1.5,
+        shadowColor: theme.colorScheme.shadow
+            .withValues(alpha: theme.brightness == Brightness.dark ? 0.25 : 0.18),
+        color: theme.colorScheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.only(
+            left: 10,
+            right: 10,
+            top: 8,
+            bottom: 10,
           ),
-          child: Padding(
-            padding: const EdgeInsets.only(
-              left: 10,
-              right: 10,
-              top: 8,
-              bottom: 10,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(context),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(context),
+              const SizedBox(height: 4),
 
-                const SizedBox(height: 4),
+              // image / video / text content
+              _buildImageOrText(context),
 
-                // image / video / text content
-                _buildImageOrText(context),
+              // dots indicator if multiple media
+              _buildMediaIndicator(context),
 
-                const SizedBox(height: 6),
+              const SizedBox(height: 6),
 
-                // actions
-                _buildActionsRow(context),
+              // actions
+              _buildActionsRow(context),
 
-                // likes
-                if (likeCount > 0)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    child: Text(
-                      likeCount == 1 ? '1 like' : '$likeCount likes',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: theme.colorScheme.onSurface,
-                      ),
+              // likes
+              if (likeCount > 0)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Text(
+                    "likes".plural(
+                      likeCount,
+                      namedArgs: {"count": likeCount.toString()},
+                    ),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
+                ),
 
-                const SizedBox(height: 4),
+              const SizedBox(height: 4),
 
-                // caption for IMAGE *or VIDEO* posts
-                if ((widget.post.imageUrl != null ||
-                    widget.post.videoUrl != null) &&
-                    widget.post.message.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
+              // caption ONLY when there is media (to avoid double text on text-only posts)
+              if (_media.isNotEmpty && widget.post.message.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: GestureDetector(
+                    onTap: widget.onPostTap, // 👈 go to PostPage
+                    behavior: HitTestBehavior.opaque,
                     child: RichText(
                       text: TextSpan(
                         children: [
@@ -505,42 +611,46 @@ class _MyPostTileState extends State<MyPostTile> {
                       ),
                     ),
                   ),
+                ),
 
-                const SizedBox(height: 4),
 
-                // view all comments
-                if (!widget.isInPostPage && commentCount > 0)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    child: GestureDetector(
-                      onTap: widget.onPostTap,
-                      child: Text(
-                        'View all $commentCount comments',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.w500,
-                        ),
+              const SizedBox(height: 4),
+
+              // view all comments → ONLY place that opens post page
+              if (!widget.isInPostPage && commentCount > 0)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: GestureDetector(
+                    onTap: widget.onPostTap,
+                    child: Text(
+                      "View all comments".plural(
+                        commentCount,
+                        namedArgs: {"count": commentCount.toString()},
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
+                ),
 
-                const SizedBox(height: 4),
+              const SizedBox(height: 4),
 
-                // time ago
-                Padding(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  child: TimeAgoText(
-                    createdAt: widget.post.createdAt,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color:
-                      theme.colorScheme.primary.withValues(alpha: 0.8),
-                      letterSpacing: 0.2,
-                    ),
+              // time ago
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 4),
+                child: TimeAgoText(
+                  createdAt: widget.post.createdAt,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.primary
+                        .withValues(alpha: 0.8),
+                    letterSpacing: 0.2,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -630,17 +740,17 @@ class _VideoPostPlayerState extends State<_VideoPostPlayer> {
         // ▶️ Auto-play when mostly visible
         if (visibleFraction >= 0.6 && !_controller.value.isPlaying) {
           _controller.play();
-          setState(() {}); // hide play icon
+          setState(() {});
         }
 
         // ⏸️ Pause when mostly off-screen
         if (visibleFraction < 0.3 && _controller.value.isPlaying) {
           _controller.pause();
-          setState(() {}); // show play icon again if needed
+          setState(() {});
         }
       },
       child: GestureDetector(
-        // 👇 tapping anywhere on the video only plays/pauses, no navigation
+        // tapping anywhere on the video only plays/pauses, no navigation
         onTap: _togglePlay,
         behavior: HitTestBehavior.opaque,
         child: Stack(

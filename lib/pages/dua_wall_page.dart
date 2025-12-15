@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -7,6 +8,8 @@ import '../components/my_input_alert_box.dart';
 
 // You’ll need to create this model in ../models/dua.dart
 import '../models/dua.dart';
+import '../helper/time_ago_text.dart'; // 👈 ADD THIS
+
 
 class DuaWallPage extends StatefulWidget {
   const DuaWallPage({super.key});
@@ -65,16 +68,15 @@ class _DuaWallPageState extends State<DuaWallPage> {
             builder: (innerContext, setInnerState) {
               return MyInputAlertBox(
                 textController: duaController,
-                hintText: "Write your dua here...",
-                onPressedText: "Post",
+                hintText: "Write your dua here...".tr(),
+                onPressedText: "Post".tr(),
                 onPressed: () async {
                   final text = duaController.text.trim();
 
                   if (text.replaceAll(RegExp(r'\s+'), '').length < 5) {
                     messenger?.showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          "Your dua should be at least 5 characters.",
+                      SnackBar(
+                        content: Text("Your dua should be at least 5 characters.".tr(),
                         ),
                       ),
                     );
@@ -90,8 +92,8 @@ class _DuaWallPageState extends State<DuaWallPage> {
 
                     duaController.clear();
                     messenger?.showSnackBar(
-                      const SnackBar(
-                        content: Text("Your dua has been shared."),
+                      SnackBar(
+                        content: Text("Your dua has been shared.".tr()),
                       ),
                     );
 
@@ -100,9 +102,9 @@ class _DuaWallPageState extends State<DuaWallPage> {
                   } catch (e) {
                     debugPrint('Error creating dua: $e');
                     messenger?.showSnackBar(
-                      const SnackBar(
+                      SnackBar(
                         content:
-                        Text("Could not share dua. Please try again."),
+                        Text("Could not share dua. Please try again.".tr()),
                       ),
                     );
                   }
@@ -112,8 +114,7 @@ class _DuaWallPageState extends State<DuaWallPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const SizedBox(height: 12),
-                    Text(
-                      "Visibility",
+                    Text("Visibility".tr(),
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -126,7 +127,7 @@ class _DuaWallPageState extends State<DuaWallPage> {
                       runSpacing: 8, // a bit of vertical spacing when wrapped
                       children: [
                         FilterChip(
-                          label: const Text("Show my name"),
+                          label: Text("Show my name".tr()),
                           selected: !isAnonymous && !isPrivate,
                           onSelected: (_) {
                             setInnerState(() {
@@ -136,7 +137,7 @@ class _DuaWallPageState extends State<DuaWallPage> {
                           },
                         ),
                         FilterChip(
-                          label: const Text("Anonymous"),
+                          label: Text("Anonymous".tr()),
                           selected: isAnonymous,
                           onSelected: (value) {
                             setInnerState(() {
@@ -146,7 +147,7 @@ class _DuaWallPageState extends State<DuaWallPage> {
                           },
                         ),
                         FilterChip(
-                          label: const Text("Private (only me)"),
+                          label: Text("Private (only me)".tr()),
                           selected: isPrivate,
                           onSelected: (value) {
                             setInnerState(() {
@@ -159,8 +160,7 @@ class _DuaWallPageState extends State<DuaWallPage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      "• Anonymous: others see “Anonymous” instead of your name.\n"
-                          "• Private: only you can see this dua in your Dua Wall.",
+                      'visibility_help'.tr(),
                       style: TextStyle(
                         fontSize: 11,
                         color: Theme.of(context)
@@ -193,20 +193,6 @@ class _DuaWallPageState extends State<DuaWallPage> {
   // ---------------------------
   // Helpers
   // ---------------------------
-  String _formatTimeAgo(DateTime createdAt) {
-    final now = DateTime.now();
-    final diff = now.difference(createdAt);
-
-    if (diff.inSeconds < 60) return "Just now";
-    if (diff.inMinutes < 60) return "${diff.inMinutes} min ago";
-    if (diff.inHours < 24) return "${diff.inHours} h ago";
-    if (diff.inDays < 7) return "${diff.inDays} d ago";
-
-    // fallback: simple date
-    return "${createdAt.day.toString().padLeft(2, '0')}-"
-        "${createdAt.month.toString().padLeft(2, '0')}-"
-        "${createdAt.year}";
-  }
 
   Future<void> _confirmDeleteDua(Dua dua) async {
     final messenger = ScaffoldMessenger.maybeOf(context);
@@ -215,20 +201,20 @@ class _DuaWallPageState extends State<DuaWallPage> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Delete dua?'),
-          content: const Text(
-              'Are you sure you want to delete this dua? This cannot be undone.'),
+          title: Text('Delete dua?'.tr()),
+          content: Text(
+              'Are you sure you want to delete this dua? This cannot be undone.'.tr()),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
+              child: Text('Cancel'.tr()),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
               style: TextButton.styleFrom(
                 foregroundColor: Colors.red,
               ),
-              child: const Text('Delete'),
+              child: Text('Delete'.tr()),
             ),
           ],
         );
@@ -240,13 +226,13 @@ class _DuaWallPageState extends State<DuaWallPage> {
     try {
       await databaseProvider.deleteDua(dua.id);
       messenger?.showSnackBar(
-        const SnackBar(content: Text('Dua deleted.')),
+        SnackBar(content: Text('Dua deleted.'.tr())),
       );
     } catch (e) {
       debugPrint('Error deleting dua: $e');
       messenger?.showSnackBar(
-        const SnackBar(
-          content: Text('Could not delete dua. Please try again.'),
+        SnackBar(
+          content: Text('Could not delete dua. Please try again.'.tr()),
         ),
       );
     }
@@ -277,7 +263,7 @@ class _DuaWallPageState extends State<DuaWallPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Dua Wall',
+              'Dua wall'.tr(),
               style: textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
                 fontSize: 22,
@@ -286,7 +272,7 @@ class _DuaWallPageState extends State<DuaWallPage> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Share your duas and say Ameen for others.',
+              'Share your duas and say Ameen for others.'.tr(),
               style: textTheme.bodyMedium?.copyWith(
                 fontSize: 13,
                 color: Colors.grey[700],
@@ -299,7 +285,7 @@ class _DuaWallPageState extends State<DuaWallPage> {
         onPressed: _openCreateDuaDialog,
         backgroundColor: colorScheme.primary,
         icon: const Icon(Icons.auto_awesome),
-        label: const Text("Write a dua"),
+        label: Text("Write a dua".tr()),
       ),
       body: RefreshIndicator(
         onRefresh: _loadDuaWall,
@@ -320,8 +306,7 @@ class _DuaWallPageState extends State<DuaWallPage> {
                         .withValues(alpha: 0.4),
                   ),
                   const SizedBox(height: 12),
-                  Text(
-                    "No duas yet",
+                  Text("No duas yet".tr(),
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -329,8 +314,7 @@ class _DuaWallPageState extends State<DuaWallPage> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Text(
-                    "Be the first to write a dua and let others say Ameen 💚",
+                  Text("Be the first to write a dua and let others say Ameen 💚".tr(),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 13,
@@ -355,11 +339,10 @@ class _DuaWallPageState extends State<DuaWallPage> {
             final dua = visibleDuas[index];
             final isMine = dua.userId == _currentUserId;
             final isAmeened = dua.userHasAmeened;
-            final timeLabel = _formatTimeAgo(dua.createdAt);
 
             final String displayName =
             dua.isAnonymous && !isMine
-                ? 'Anonymous'
+                ? 'Anonymous'.tr()
                 : dua.userName;
 
             final avatarInitial = displayName.isNotEmpty
@@ -485,8 +468,7 @@ class _DuaWallPageState extends State<DuaWallPage> {
                                                       0.08),
                                                 ),
                                                 child:
-                                                const Text(
-                                                  "Private",
+                                                Text("Private".tr(),
                                                   style:
                                                   TextStyle(
                                                     fontSize:
@@ -504,17 +486,14 @@ class _DuaWallPageState extends State<DuaWallPage> {
                                         ),
                                         const SizedBox(
                                             height: 2),
-                                        Text(
-                                          timeLabel,
+                                        TimeAgoText(
+                                          createdAt: dua.createdAt,
                                           style: TextStyle(
                                             fontSize: 11,
-                                            color: colorScheme
-                                                .primary
-                                                .withValues(
-                                                alpha:
-                                                0.65),
+                                            color: colorScheme.primary.withValues(alpha: 0.65),
                                           ),
                                         ),
+
                                       ],
                                     ),
                                   ),
@@ -545,13 +524,17 @@ class _DuaWallPageState extends State<DuaWallPage> {
                         bottom: 8,
                         child: Text(
                           dua.ameenCount == 0
-                              ? "No Ameens yet"
-                              : "${dua.ameenCount} Ameen${dua.ameenCount == 1 ? '' : 's'}",
+                              ? 'No Ameens yet'.tr()
+                              : 'ameen_count'.plural(
+                            dua.ameenCount,
+                            namedArgs: {
+                              'count': dua.ameenCount.toString(),
+                            },
+                          ),
                           style: TextStyle(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w500,
-                            color: colorScheme.primary
-                                .withValues(alpha: 0.75),
+                            color: colorScheme.primary.withValues(alpha: 0.75),
                           ),
                         ),
                       ),
@@ -573,7 +556,7 @@ class _DuaWallPageState extends State<DuaWallPage> {
                           .withValues(alpha: 0.85),
                       onPressed: () =>
                           _confirmDeleteDua(dua),
-                      tooltip: 'Delete dua',
+                      tooltip: 'Delete dua'.tr(),
                     ),
                   ),
 
@@ -612,12 +595,11 @@ class _DuaWallPageState extends State<DuaWallPage> {
                             ),
                           ),
                         ),
-                        icon: const Text(
+                        icon: Text(
                           '🤲',
                           style: TextStyle(fontSize: 21),
                         ),
-                        label: Text(
-                          "Ameen",
+                        label: Text("Ameen".tr(),
                           style: TextStyle(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w600,

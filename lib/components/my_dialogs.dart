@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 /// Centralized app dialogs (errors, confirmations, etc.)
@@ -36,7 +37,7 @@ Future<void> showAppErrorDialog(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(dialogContext),
-          child: const Text('OK'),
+          child: Text('OK'.tr()),
         ),
       ],
     ),

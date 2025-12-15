@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -51,7 +52,7 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
           // 🔍 Search bar
           MySearchBar(
             controller: _searchController,
-            hintText: 'Search communities',
+            hintText: 'Search communities'.tr(),
             onChanged: (value) async {
               setState(() => _searchQuery = value);
 
@@ -157,7 +158,7 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
             child: Row(
               children: [
                 Text(
-                  'Your communities',
+                  'Your communities'.tr(),
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
@@ -204,8 +205,7 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
                       color: colorScheme.primary,
                     ),
                     const SizedBox(height: 10),
-                    Text(
-                      "You haven't joined any communities yet",
+                    Text("You haven't joined any communities yet".tr(),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 15,
@@ -214,8 +214,7 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      "Explore communities above or create your own to connect with others.",
+                    Text("Explore communities above or create your own to connect with others.".tr(),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 13,

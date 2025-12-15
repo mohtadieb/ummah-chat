@@ -5,6 +5,8 @@
 // - Last 7d   → "Mon", "Tue", ...
 // - Older     → "dd/MM"
 
+import 'package:easy_localization/easy_localization.dart';
+
 String? formatLastMessageTime(DateTime? time) {
   if (time == null) return null;
 
@@ -21,7 +23,7 @@ String? formatLastMessageTime(DateTime? time) {
 
   // Within last 7 days → show weekday (Mon, Tue...)
   if (difference.inDays < 7) {
-    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final weekdays = ['Mon'.tr(), 'Tue'.tr(), 'Wed'.tr(), 'Thu'.tr(), 'Fri'.tr(), 'Sat'.tr(), 'Sun'.tr()];
     return weekdays[local.weekday - 1];
   }
 

@@ -1,4 +1,5 @@
 // lib/pages/complete_profile_page.dart
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -28,38 +29,38 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
   bool _saving = false;
 
   // Simple country list – you can extend / reorder as you like
-  static const List<String> _countries = [
-    'Netherlands',
-    'Belgium',
-    'Germany',
-    'France',
-    'United Kingdom',
-    'Spain',
-    'Italy',
-    'Sweden',
-    'Norway',
-    'Denmark',
-    'Finland',
-    'Turkey',
-    'Morocco',
-    'Algeria',
-    'Tunisia',
-    'Egypt',
-    'Saudi Arabia',
-    'United Arab Emirates',
-    'Qatar',
-    'Kuwait',
-    'Jordan',
-    'Lebanon',
-    'Pakistan',
-    'India',
-    'Bangladesh',
-    'Indonesia',
-    'Malaysia',
-    'United States',
-    'Canada',
-    'Australia',
-    'Other',
+  static final List<String> _countries = [
+    'Netherlands'.tr(),
+    'Belgium'.tr(),
+    'Germany'.tr(),
+    'France'.tr(),
+    'United Kingdom'.tr(),
+    'Spain'.tr(),
+    'Italy'.tr(),
+    'Sweden'.tr(),
+    'Norway'.tr(),
+    'Denmark'.tr(),
+    'Finland'.tr(),
+    'Turkey'.tr(),
+    'Morocco'.tr(),
+    'Algeria'.tr(),
+    'Tunisia'.tr(),
+    'Egypt'.tr(),
+    'Saudi Arabia'.tr(),
+    'United Arab Emirates'.tr(),
+    'Qatar'.tr(),
+    'Kuwait'.tr(),
+    'Jordan'.tr(),
+    'Lebanon'.tr(),
+    'Pakistan'.tr(),
+    'India'.tr(),
+    'Bangladesh'.tr(),
+    'Indonesia'.tr(),
+    'Malaysia'.tr(),
+    'United States'.tr(),
+    'Canada'.tr(),
+    'Australia'.tr(),
+    'Other'.tr(),
   ];
 
   @override
@@ -82,8 +83,8 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
         country.isEmpty ||
         gender == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please fill in all required fields.'),
+        SnackBar(
+          content: Text('Please fill in all required fields.'.tr()),
         ),
       );
       return;
@@ -107,7 +108,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile completed!')),
+        SnackBar(content: Text('Profile completed!'.tr())),
       );
 
       // ✅ Let AuthGate / _ProfileGate handle switching to MainLayout
@@ -116,7 +117,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
       debugPrint('Error saving profile: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not save profile: $e')),
+            SnackBar(content: Text('Could not save profile:'.tr() + " $e"))
         );
       }
     } finally {
@@ -152,8 +153,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
 
                       const SizedBox(height: 8),
 
-                      Text(
-                        "Complete your Ummah Chat profile",
+                      Text("Complete your Ummah Chat profile".tr(),
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: colorScheme.primary,
@@ -162,8 +162,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      Text(
-                        "We use this info to personalise your experience\nand keep interactions respectful.",
+                      Text("We use this info to personalise your experience\nand keep interactions respectful.".tr(),
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: colorScheme.primary.withValues(alpha: 0.75),
@@ -177,7 +176,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                       // First name
                       MyTextField(
                         controller: _firstNameController,
-                        hintText: "First name",
+                        hintText: "First name".tr(),
                         obscureText: false,
                       ),
                       const SizedBox(height: 8),
@@ -185,7 +184,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                       // Last name
                       MyTextField(
                         controller: _lastNameController,
-                        hintText: "Last name",
+                        hintText: "Last name".tr(),
                         obscureText: false,
                       ),
                       const SizedBox(height: 16),
@@ -193,8 +192,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                       // Country dropdown
                       Align(
                         alignment: Alignment.centerLeft,
-                        child: Text(
-                          "Country *",
+                        child: Text("Country *".tr(),
                           style: TextStyle(
                             color: colorScheme.primary,
                             fontSize: 13,
@@ -220,8 +218,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                           child: DropdownButton<String>(
                             isExpanded: true,
                             value: _selectedCountry,
-                            hint: Text(
-                              "Select your country",
+                            hint: Text("Select your country".tr(),
                               style: TextStyle(
                                 color: colorScheme.primary.withValues(
                                   alpha: 0.7,
@@ -257,8 +254,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                       // Gender
                       Align(
                         alignment: Alignment.centerLeft,
-                        child: Text(
-                          "Gender *",
+                        child: Text("Gender *".tr(),
                           style: TextStyle(
                             color: colorScheme.primary,
                             fontSize: 13,
@@ -271,14 +267,14 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                         spacing: 8,
                         children: [
                           ChoiceChip(
-                            label: const Text("Male"),
+                            label: Text("Male".tr()),
                             selected: _selectedGender == 'male',
                             onSelected: (_) {
                               setState(() => _selectedGender = 'male');
                             },
                           ),
                           ChoiceChip(
-                            label: const Text("Female"),
+                            label: Text("Female".tr()),
                             selected: _selectedGender == 'female',
                             onSelected: (_) {
                               setState(() => _selectedGender = 'female');
@@ -290,7 +286,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                       const SizedBox(height: 28),
 
                       MyButton(
-                        text: "Save and continue",
+                        text: "Save and continue".tr(),
                         onTap: _saveProfile,
                       ),
 
@@ -312,17 +308,16 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                 borderRadius: BorderRadius.circular(16),
                 color: colorScheme.surface.withValues(alpha: 0.95),
                 elevation: 8,
-                child: const Padding(
+                child: Padding(
                   padding:
-                  EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 16),
-                      Text(
-                        "Saving profile...",
-                        style: TextStyle(
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 16),
+                      Text("Saving profile...".tr(),
+                        style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
                         ),

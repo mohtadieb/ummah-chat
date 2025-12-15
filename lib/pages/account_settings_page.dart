@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/database/database_provider.dart';
@@ -46,13 +47,12 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text("Confirm Account Deletion"),
+          title: Text("Confirm Account Deletion".tr()),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                "To confirm deletion, please re-enter your password. This action is irreversible.",
+              Text("To confirm deletion, please re-enter your password. This action is irreversible.".tr(),
               ),
 
               const SizedBox(height: 14),
@@ -61,9 +61,9 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
               TextField(
                 controller: _passwordController,
                 obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: "Password",
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: "Password".tr(),
+                  border: const OutlineInputBorder(),
                 ),
                 enabled: !_isDeleting,
               ),
@@ -73,7 +73,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                   padding: const EdgeInsets.only(top: 7.0),
                   child: Text(
                     _errorMessage,
-                    style: const TextStyle(color: Colors.red, fontSize: 14),
+                    style: TextStyle(color: Colors.red, fontSize: 14),
                   ),
                 ),
 
@@ -84,10 +84,10 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                   child: Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 12),
-                        Text("Deleting account..."),
+                      children: [
+                        const CircularProgressIndicator(),
+                        const SizedBox(height: 12),
+                        Text("Deleting account...".tr()),
                       ],
                     ),
                   ),
@@ -97,7 +97,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
           actions: [
             TextButton(
               onPressed: _isDeleting ? null : () => Navigator.pop(context),
-              child: const Text("Cancel"),
+              child: Text("Cancel".tr()),
             ),
             TextButton(
               onPressed: _isDeleting
@@ -107,7 +107,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
 
                 if (password.isEmpty) {
                   setState(() {
-                    _errorMessage = "Please enter your password.";
+                    _errorMessage = "Please enter your password.".tr();
                   });
                   return;
                 }
@@ -131,11 +131,11 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                   setState(() {
                     _isDeleting = false;
                     _errorMessage =
-                    "Deletion failed. Check password or try again.";
+                    "Deletion failed. Check password or try again.".tr();
                   });
                 }
               },
-              child: const Text("Delete"),
+              child: Text("Delete".tr()),
             ),
           ],
         ),
@@ -150,7 +150,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
       backgroundColor: Theme.of(context).colorScheme.surface,
       // App bar
       appBar: AppBar(
-        title: const Text("Account Settings"),
+        title: Text("Account Settings".tr()),
         foregroundColor: Theme.of(context).colorScheme.primary,
       ),
       body: Column(
@@ -168,10 +168,9 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
               ),
 
               // Delete account text
-              child: const Center(
-                child: Text(
-                  "Delete account",
-                  style: TextStyle(
+              child: Center(
+                child: Text("Delete account".tr(),
+                  style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),

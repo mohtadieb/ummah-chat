@@ -5,6 +5,7 @@ This is the comment tile widget which belongs below a post. It's similar to the
 post tile widget, but styled more like Instagram comments.
 */
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -63,7 +64,7 @@ class _MyCommentTileState extends State<MyCommentTile> {
               // REPLY (for everyone)
               ListTile(
                 leading: const Icon(Icons.reply_outlined),
-                title: const Text("Reply"),
+                title: Text("Reply".tr()),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   _openReplyBox();
@@ -74,7 +75,7 @@ class _MyCommentTileState extends State<MyCommentTile> {
                 // OWN COMMENT: delete
                 ListTile(
                   leading: const Icon(Icons.delete),
-                  title: const Text("Delete"),
+                  title: Text("Delete".tr()),
                   onTap: () async {
                     Navigator.pop(sheetContext);
 
@@ -88,7 +89,7 @@ class _MyCommentTileState extends State<MyCommentTile> {
                 // NOT OWN COMMENT: report / block
                 ListTile(
                   leading: const Icon(Icons.report),
-                  title: const Text("Report"),
+                  title: Text("Report".tr()),
                   onTap: () {
                     Navigator.pop(sheetContext);
                     _reportPostConfirmationBox();
@@ -96,7 +97,7 @@ class _MyCommentTileState extends State<MyCommentTile> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.block),
-                  title: const Text("Block"),
+                  title: Text("Block".tr()),
                   onTap: () {
                     Navigator.pop(sheetContext);
                     _blockUserConfirmationBox();
@@ -107,7 +108,7 @@ class _MyCommentTileState extends State<MyCommentTile> {
               // Always show cancel
               ListTile(
                 leading: const Icon(Icons.cancel),
-                title: const Text("Cancel"),
+                title: Text("Cancel".tr()),
                 onTap: () => Navigator.pop(sheetContext),
               ),
             ],
@@ -128,15 +129,15 @@ class _MyCommentTileState extends State<MyCommentTile> {
       context: context,
       builder: (dialogContext) => MyInputAlertBox(
         textController: _replyController,
-        hintText: "Write a reply",
-        onPressedText: "Reply",
+        hintText: "Write a reply".tr(),
+        onPressedText: "Reply".tr(),
         onPressed: () async {
           final text = _replyController.text.trim();
 
-          if (text.replaceAll(RegExp(r'\s+'), '').length < 2) {
+          if (text.replaceAll(RegExp(r'\s+'), '').length < 5) {
             messenger?.showSnackBar(
-              const SnackBar(
-                content: Text("Reply must be at least 2 characters"),
+              SnackBar(
+                content: Text("Reply must be at least 5 characters".tr()),
               ),
             );
             return;
@@ -171,7 +172,7 @@ class _MyCommentTileState extends State<MyCommentTile> {
         // COMMENT_REPLY:<postId>::<commentId>::<preview>
         await NotificationService().createNotificationForUser(
           targetUserId: widget.comment.userId,
-          title: 'New reply on your comment',
+          title: 'New reply on your comment'.tr(),
           body:
           'COMMENT_REPLY:${widget.comment.postId}::${widget.comment.id}::$preview',
         );
@@ -210,16 +211,16 @@ class _MyCommentTileState extends State<MyCommentTile> {
     showDialog(
       context: context,
       builder: (context) => MyConfirmationBox(
-        title: "Report Message",
-        content: "Are you sure you want to report this message?",
-        confirmText: "Report",
+        title: "Report Message".tr(),
+        content: "Are you sure you want to report this message?".tr(),
+        confirmText: "Report".tr(),
         onConfirm: () async {
           await databaseProvider.reportUser(
             widget.comment.id,
             widget.comment.userId,
           );
           ScaffoldMessenger.of(widget.scaffoldContext).showSnackBar(
-            const SnackBar(content: Text("Message reported!")),
+            SnackBar(content: Text("Message reported!".tr())),
           );
         },
       ),
@@ -230,13 +231,13 @@ class _MyCommentTileState extends State<MyCommentTile> {
     showDialog(
       context: context,
       builder: (context) => MyConfirmationBox(
-        title: "Block User",
-        content: "Are you sure you want to block this user?",
-        confirmText: "Block",
+        title: "Block User".tr(),
+        content: "Are you sure you want to block this user?".tr(),
+        confirmText: "Block".tr(),
         onConfirm: () async {
           await databaseProvider.blockUser(widget.comment.userId);
           ScaffoldMessenger.of(widget.scaffoldContext).showSnackBar(
-            const SnackBar(content: Text("User blocked!")),
+            SnackBar(content: Text("User blocked!".tr())),
           );
         },
       ),

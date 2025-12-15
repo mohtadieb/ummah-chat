@@ -6,6 +6,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../models/message.dart';
+import '../database/database_service.dart';
+import '../notifications/notification_service.dart';
 
 /// Info about the last message exchanged with a friend (DM only)
 class LastMessageInfo {
@@ -33,23 +35,25 @@ class LastMessageInfo {
 /// - Unread counters
 class ChatService {
   final SupabaseClient _supabase = Supabase.instance.client;
+  final NotificationService _notifications = NotificationService();
+  final DatabaseService _db = DatabaseService();
 
   // ---------------------------------------------------------------------------
   // ✉️ DIRECT MESSAGE (1-ON-1) BASICS
   // ---------------------------------------------------------------------------
 
-  /// Send a 1-on-1 *text* message to a chat room
+  /// Send a 1-on-1 *text* message (DATABASE)
   ///
   /// - `chat_room_id` = room id (DM)
   /// - `sender_id`    = current user
   /// - `receiver_id`  = friend
   /// - `message`      = text
-  Future<void> sendMessage(
+  Future<void> sendMessageInDatabase(
       String chatRoomId,
       String senderId,
       String receiverId,
       String message, {
-        String? replyToMessageId, // 🆕 named
+        String? replyToMessageId,
       }) async {
     await _supabase.from('messages').insert({
       'chat_room_id': chatRoomId,
@@ -57,16 +61,24 @@ class ChatService {
       'receiver_id': receiverId,
       'message': message,
       'created_at': DateTime.now().toUtc().toIso8601String(),
-      'reply_to_message_id': replyToMessageId, // 🆕
+      'reply_to_message_id': replyToMessageId,
       // `is_delivered`, `is_read`, `liked_by` use DB defaults
     });
+
+    // 🔔 After insert → send in-app + push notification to receiver
+    await notifyUserOfNewMessageInDatabase(
+      chatId: chatRoomId,
+      senderId: senderId,
+      receiverId: receiverId,
+      textPreview: message,
+    );
   }
 
-  /// 🖼 Send a 1-on-1 *image* message
+  /// 🖼 Send a 1-on-1 *image* message (DATABASE)
   ///
   /// - `createdAtOverride` lets us force the same timestamp for batched media
   ///   (multi-image WhatsApp-style grouping)
-  Future<void> sendImageMessage({
+  Future<void> sendImageMessageInDatabase({
     required String chatRoomId,
     required String senderId,
     required String receiverId,
@@ -74,8 +86,8 @@ class ChatService {
     String message = '',
     DateTime? createdAtOverride,
   }) async {
-    final createdAt =
-    (createdAtOverride ?? DateTime.now().toUtc()).toIso8601String();
+    final createdAt = (createdAtOverride ?? DateTime.now().toUtc())
+        .toIso8601String();
 
     await _supabase.from('messages').insert({
       'chat_room_id': chatRoomId,
@@ -85,13 +97,24 @@ class ChatService {
       'image_url': imageUrl,
       'created_at': createdAt,
     });
+
+    final preview = message.trim().isNotEmpty
+        ? message.trim()
+        : 'Sent you a photo';
+
+    await notifyUserOfNewMessageInDatabase(
+      chatId: chatRoomId,
+      senderId: senderId,
+      receiverId: receiverId,
+      textPreview: preview,
+    );
   }
 
-  /// 🎥 Send a 1-on-1 *video* message
+  /// 🎥 Send a 1-on-1 *video* message (DATABASE)
   ///
   /// - `video_url` points to Supabase Storage (chat_uploads bucket)
   /// - `message` can be a caption (or empty)
-  Future<void> sendVideoMessage({
+  Future<void> sendVideoMessageInDatabase({
     required String chatRoomId,
     required String senderId,
     required String receiverId,
@@ -99,8 +122,8 @@ class ChatService {
     String message = '',
     DateTime? createdAtOverride,
   }) async {
-    final createdAt =
-    (createdAtOverride ?? DateTime.now().toUtc()).toIso8601String();
+    final createdAt = (createdAtOverride ?? DateTime.now().toUtc())
+        .toIso8601String();
 
     await _supabase.from('messages').insert({
       'chat_room_id': chatRoomId,
@@ -110,10 +133,21 @@ class ChatService {
       'video_url': videoUrl,
       'created_at': createdAt,
     });
+
+    final preview = message.trim().isNotEmpty
+        ? message.trim()
+        : 'Sent you a video';
+
+    await notifyUserOfNewMessageInDatabase(
+      chatId: chatRoomId,
+      senderId: senderId,
+      receiverId: receiverId,
+      textPreview: preview,
+    );
   }
 
-  /// 🆕 Create a pending 1-on-1 video message (is_uploading = true)
-  Future<String> createPendingVideoMessageDM({
+  /// 🆕 Create a pending 1-on-1 video message (is_uploading = true) (DATABASE)
+  Future<String> createPendingVideoMessageDMInDatabase({
     required String chatRoomId,
     required String senderId,
     required String receiverId,
@@ -121,8 +155,8 @@ class ChatService {
     String message = '',
     DateTime? createdAtOverride,
   }) async {
-    final createdAt =
-    (createdAtOverride ?? DateTime.now().toUtc()).toIso8601String();
+    final createdAt = (createdAtOverride ?? DateTime.now().toUtc())
+        .toIso8601String();
 
     final inserted = await _supabase
         .from('messages')
@@ -145,12 +179,12 @@ class ChatService {
     return inserted['id'].toString();
   }
 
-  /// Get or create a 1-on-1 chat room ID
+  /// Get or create a 1-on-1 chat room ID (DATABASE)
   ///
   /// Uses `chat_rooms` with:
   /// - user1_id, user2_id
   /// - is_group = false (DM)
-  Future<String> getOrCreateChatRoomId(
+  Future<String> getOrCreateChatRoomIdFromDatabase(
       String currentUserId,
       String friendId,
       ) async {
@@ -178,12 +212,11 @@ class ChatService {
     return newRoom!['id'] as String;
   }
 
-  /// Fetch all messages for a room (DM or group),
+  /// Fetch all messages for a room (DM or group) FROM DATABASE,
   /// sorted oldest → newest.
-  ///
-  /// We select everything so MessageModel.fromMap can use:
-  /// - text, image_url, video_url, liked_by, is_read, etc.
-  Future<List<Map<String, dynamic>>> fetchMessages(String chatRoomId) async {
+  Future<List<Map<String, dynamic>>> fetchMessagesFromDatabase(
+      String chatRoomId,
+      ) async {
     final data = await _supabase
         .from('messages')
         .select()
@@ -193,11 +226,11 @@ class ChatService {
     return data.map((e) => e as Map<String, dynamic>).toList();
   }
 
-  /// Realtime listener for messages in a room.
+  /// Realtime listener for messages in a room FROM DATABASE.
   ///
   /// Emits both INSERTs (new messages) and UPDATEs
   /// (e.g. is_read, liked_by, image_url, video_url).
-  Stream<Map<String, dynamic>> streamMessages(String chatRoomId) {
+  Stream<Map<String, dynamic>> streamMessagesFromDatabase(String chatRoomId) {
     final controller = StreamController<Map<String, dynamic>>.broadcast();
 
     final channel = _supabase
@@ -244,19 +277,18 @@ class ChatService {
     return controller.stream;
   }
 
-  /// Get all users for FriendsPage (optional)
-  Stream<List<Map<String, dynamic>>> getUserStream() {
+  /// Get all users for FriendsPage (optional) FROM DATABASE
+  Stream<List<Map<String, dynamic>>> getUserStreamFromDatabase() {
     return _supabase
         .from('profiles')
-        .stream(primaryKey: ['id']).map(
-          (rows) => rows.map((r) => r as Map<String, dynamic>).toList(),
-    );
+        .stream(primaryKey: ['id'])
+        .map((rows) => rows.map((r) => r as Map<String, dynamic>).toList());
   }
 
-  /// Mark all messages in a DM chat room as read for the current user
+  /// Mark all messages in a DM chat room as read for the current user (DATABASE)
   ///
   /// Only applies to 1-on-1 messages, because group messages have receiver_id = NULL.
-  Future<void> markRoomMessagesAsRead(
+  Future<void> markRoomMessagesAsReadInDatabase(
       String chatRoomId,
       String currentUserId,
       ) async {
@@ -266,12 +298,18 @@ class ChatService {
         .eq('chat_room_id', chatRoomId)
         .eq('receiver_id', currentUserId)
         .eq('is_read', false);
+
+    // Also clear the chat notification for this room so a new push can be sent next time.
+    await _notifications.markChatNotificationsAsRead(
+      chatRoomId: chatRoomId,
+      userId: currentUserId,
+    );
   }
 
-  /// Get unread message counts per friend for the current user (DM only).
+  /// Get unread message counts per friend for the current user (DM only) FROM DATABASE.
   ///
   /// Returns a map: { senderId: unreadCount }
-  Future<Map<String, int>> fetchUnreadCountsByFriend(
+  Future<Map<String, int>> fetchUnreadCountsByFriendFromDatabase(
       String currentUserId,
       ) async {
     final data = await _supabase
@@ -290,39 +328,122 @@ class ChatService {
     return counts;
   }
 
-  /// Update the user's last_seen_at to "now" (UTC)
-  Future<void> updateLastSeen(String userId) async {
-    await _supabase.from('profiles').update({
-      'last_seen_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', userId);
+  /// Update the user's last_seen_at to "now" (UTC) IN DATABASE
+  Future<void> updateLastSeenInDatabase(String userId) async {
+    await _supabase
+        .from('profiles')
+        .update({'last_seen_at': DateTime.now().toUtc().toIso8601String()})
+        .eq('id', userId);
   }
 
-  /// 🔁 Polling stream of unread counts per friend.
+  /// 🆕 Set / clear which chat room the user is actively viewing (DM + group)
+  Future<void> setActiveChatRoomForUserInDatabase({
+    required String userId,
+    String? chatRoomId,
+  }) async {
+    if (userId.isEmpty) return;
+
+    try {
+      await _supabase.from('user_chat_presence').upsert({
+        'user_id': userId,
+        'active_chat_room_id': chatRoomId,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('⚠️ Error setting active chat room presence: $e');
+    }
+  }
+
+  /// 🔁 Polling stream of unread counts per friend (FROM DATABASE).
   ///
-  /// Uses your existing fetchUnreadCountsByFriend() under the hood,
+  /// Uses your existing fetchUnreadCountsByFriendFromDatabase() under the hood,
   /// but exposes it as a Stream that updates every [interval].
-  Stream<Map<String, int>> unreadCountsPollingStream(
+  Stream<Map<String, int>> unreadCountsPollingStreamFromDatabase(
       String currentUserId, {
         Duration interval = const Duration(seconds: 12),
       }) async* {
     // Initial value immediately
-    yield await fetchUnreadCountsByFriend(currentUserId);
+    yield await fetchUnreadCountsByFriendFromDatabase(currentUserId);
 
     // Then periodically
-    yield* Stream.periodic(interval)
-        .asyncMap((_) => fetchUnreadCountsByFriend(currentUserId));
+    yield* Stream.periodic(
+      interval,
+    ).asyncMap((_) => fetchUnreadCountsByFriendFromDatabase(currentUserId));
+  }
+
+  /// Notify a user that they received a new chat message (IN DATABASE + push).
+  ///
+  /// Called RIGHT AFTER inserting the message into your messages table.
+  Future<void> notifyUserOfNewMessageInDatabase({
+    required String chatId,
+    required String senderId,
+    required String receiverId,
+    required String textPreview,
+  }) async {
+    if (receiverId.isEmpty || senderId.isEmpty) return;
+    if (receiverId == senderId) return; // don't notify yourself
+
+    try {
+      // 1️⃣ Skip notification if receiver is currently viewing this chat
+      try {
+        final presence = await _supabase
+            .from('user_chat_presence')
+            .select('active_chat_room_id')
+            .eq('user_id', receiverId)
+            .maybeSingle();
+
+        final String? activeRoomId = presence == null
+            ? null
+            : presence['active_chat_room_id'] as String?;
+
+        if (activeRoomId != null && activeRoomId == chatId) {
+          debugPrint(
+            'ℹ️ Skipping notification: receiver is currently in chat $chatId',
+          );
+          return;
+        }
+      } catch (e) {
+        debugPrint(
+          '⚠️ Presence lookup failed, continuing with notification: $e',
+        );
+      }
+
+      // 2️⃣ Build sender display name
+      final senderProfile = await _db.getUserFromDatabase(senderId);
+      final displayName = (senderProfile?.username.isNotEmpty ?? false)
+          ? senderProfile!.username
+          : (senderProfile?.name ?? 'Someone');
+
+      final preview = textPreview.trim();
+      final truncatedPreview = preview.length > 60
+          ? '${preview.substring(0, 60)}…'
+          : preview;
+
+      // 3️⃣ Use chat-specific notification helper
+      await _notifications.createOrUpdateChatNotification(
+        targetUserId: receiverId,
+        chatRoomId: chatId,
+        senderId: senderId,
+        senderName: displayName,
+        messagePreview: truncatedPreview.isEmpty
+            ? '$displayName sent you a message'
+            : truncatedPreview,
+      );
+    } catch (e) {
+      debugPrint('⚠️ Error creating chat message notification: $e');
+    }
   }
 
   // ---------------------------------------------------------------------------
   // 🕒 LAST MESSAGE INFO PER FRIEND (DM ONLY)
   // ---------------------------------------------------------------------------
 
-  /// Fetch the latest message (text + time) per friend for this user.
+  /// Fetch the latest message (text + time) per friend for this user FROM DATABASE.
   ///
   /// Only considers 1-on-1 messages (both sender_id and receiver_id non-null).
   ///
   /// Returns a map: { friendId: LastMessageInfo }
-  Future<Map<String, LastMessageInfo>> fetchLastMessagesByFriend(
+  Future<Map<String, LastMessageInfo>> fetchLastMessagesByFriendFromDatabase(
       String currentUserId,
       ) async {
     // Get all messages where currentUser is either sender OR receiver.
@@ -345,8 +466,7 @@ class ChatService {
       if (senderId == null || receiverId == null) continue;
 
       // Determine the "other" person in this message
-      final String friendId =
-      senderId == currentUserId ? receiverId : senderId;
+      final String friendId = senderId == currentUserId ? receiverId : senderId;
 
       // We ordered DESC by created_at, so first time we see this friend
       // is already the newest message → keep it and skip older ones.
@@ -372,27 +492,29 @@ class ChatService {
     return lastMessages;
   }
 
-  /// Polling stream of "last message info" per friend for this user.
+  /// Polling stream of "last message info" per friend for this user (FROM DATABASE).
   ///
   /// Returns a map: { friendId: LastMessageInfo }
-  Stream<Map<String, LastMessageInfo>> lastMessagesByFriendPollingStream(
+  Stream<Map<String, LastMessageInfo>>
+  lastMessagesByFriendPollingStreamFromDatabase(
       String currentUserId, {
         Duration interval = const Duration(seconds: 18),
       }) async* {
     // Initial value immediately
-    yield await fetchLastMessagesByFriend(currentUserId);
+    yield await fetchLastMessagesByFriendFromDatabase(currentUserId);
 
     // Then periodically
-    yield* Stream.periodic(interval)
-        .asyncMap((_) => fetchLastMessagesByFriend(currentUserId));
+    yield* Stream.periodic(
+      interval,
+    ).asyncMap((_) => fetchLastMessagesByFriendFromDatabase(currentUserId));
   }
 
   // ---------------------------------------------------------------------------
   // 🟢 TYPING INDICATOR
   // ---------------------------------------------------------------------------
 
-  /// Set current user's typing status in a chat room
-  Future<void> setTypingStatus({
+  /// Set current user's typing status in a chat room (IN DATABASE)
+  Future<void> setTypingStatusInDatabase({
     required String chatRoomId,
     required String userId,
     required bool isTyping,
@@ -405,35 +527,55 @@ class ChatService {
     });
   }
 
-  /// Stream that tells whether [friendId] is currently typing in [chatRoomId].
+  /// Stream that tells whether [friendId] is currently typing in [chatRoomId] (FROM DATABASE).
   ///
   /// NOTE: We only filter by chat_room_id in the stream, and filter user_id in Dart
   /// to avoid the multiple `.eq(...)` error you had.
-  Stream<bool> friendTypingStream({
+  Stream<bool> friendTypingStreamFromDatabase({
     required String chatRoomId,
     required String friendId,
   }) {
     return _supabase
         .from('typing_status')
-        .stream(primaryKey: ['user_id', 'chat_room_id'])
+        .stream(
+      // must be columns that uniquely identify a row
+      primaryKey: ['user_id', 'chat_room_id'],
+    )
+    // Only rows for this room
         .eq('chat_room_id', chatRoomId)
         .map((rows) {
-      if (rows.isEmpty) return false;
+      debugPrint('🔁 typing_status rows for room $chatRoomId: $rows');
 
-      // Filter rows in this room for that specific friend
-      final matching =
-      rows.where((row) => row['user_id'] == friendId).toList();
-      if (matching.isEmpty) return false;
+      if (rows.isEmpty) {
+        return false;
+      }
+
+      // Find the row for THIS friend
+      final matching = rows.where(
+            (row) => row['user_id']?.toString() == friendId,
+      );
+
+      if (matching.isEmpty) {
+        return false;
+      }
 
       final row = matching.first;
-      final isTyping = row['is_typing'] == true;
 
-      // Optional timeout: if updated_at is older than X seconds → consider not typing
+      final isTyping = (row['is_typing'] as bool?) ?? false;
+
       final rawUpdated = row['updated_at'];
+      DateTime? updatedAt;
+
       if (rawUpdated is String) {
-        final updatedAt = DateTime.tryParse(rawUpdated)?.toUtc();
-        if (updatedAt != null &&
-            DateTime.now().toUtc().difference(updatedAt).inSeconds > 10) {
+        updatedAt = DateTime.tryParse(rawUpdated);
+      } else if (rawUpdated is DateTime) {
+        updatedAt = rawUpdated;
+      }
+
+      if (updatedAt != null) {
+        final diff = DateTime.now().toUtc().difference(updatedAt.toUtc());
+        if (diff.inSeconds > 10) {
+          // too old = no longer typing
           return false;
         }
       }
@@ -442,16 +584,69 @@ class ChatService {
     });
   }
 
+  /// 🆕 Stream of *all other users* currently typing in a GROUP chat.
+  ///
+  /// - Returns a `List<String>` of userIds.
+  /// - Excludes [currentUserId] from the list.
+  /// - Ignores rows where `is_typing = false` or where `updated_at` is stale
+  ///   (older than ~10 seconds).
+  Stream<List<String>> groupTypingStreamFromDatabase({
+    required String chatRoomId,
+    required String currentUserId,
+  }) {
+    return _supabase
+        .from('typing_status')
+        .stream(
+      primaryKey: ['user_id', 'chat_room_id'],
+    )
+        .eq('chat_room_id', chatRoomId)
+        .map((rows) {
+      debugPrint('🔁 group typing rows for room $chatRoomId: $rows');
+
+      final now = DateTime.now().toUtc();
+      final List<String> typingUserIds = [];
+
+      for (final row in rows) {
+        final String? userId = row['user_id']?.toString();
+        if (userId == null || userId == currentUserId) continue;
+
+        final bool isTyping = (row['is_typing'] as bool?) ?? false;
+        if (!isTyping) continue;
+
+        final rawUpdated = row['updated_at'];
+        DateTime? updatedAt;
+
+        if (rawUpdated is String) {
+          updatedAt = DateTime.tryParse(rawUpdated);
+        } else if (rawUpdated is DateTime) {
+          updatedAt = rawUpdated;
+        }
+
+        if (updatedAt == null) continue;
+
+        final diff = now.difference(updatedAt.toUtc());
+        if (diff.inSeconds > 10) {
+          // too old → treat as not typing
+          continue;
+        }
+
+        typingUserIds.add(userId);
+      }
+
+      return typingUserIds;
+    });
+  }
+
   // ---------------------------------------------------------------------------
   // ❤️ MESSAGE REACTIONS (LIKE)
   // ---------------------------------------------------------------------------
 
-  /// Toggle "like" for a message by a given user.
+  /// Toggle "like" for a message by a given user (IN DATABASE).
   ///
   /// Uses the `liked_by` text[] column on messages.
   /// If userId is in liked_by → remove it (unlike).
   /// If not → add it.
-  Future<void> toggleLikeMessage({
+  Future<void> toggleLikeMessageInDatabase({
     required String messageId,
     required String userId,
   }) async {
@@ -486,7 +681,7 @@ class ChatService {
   // 🧑‍🤝‍🧑 GROUP CHATS – CREATION & SENDING
   // ---------------------------------------------------------------------------
 
-  /// Create a new group chat room.
+  /// Create a new group chat room IN DATABASE.
   ///
   /// - is_group   = true
   /// - name       = group name
@@ -494,7 +689,7 @@ class ChatService {
   /// - members    = [creatorId, ...initialMemberIds]
   ///
   /// Returns the new chat_room_id.
-  Future<String> createGroupRoom({
+  Future<String> createGroupRoomInDatabase({
     required String name,
     required String creatorId,
     List<String> initialMemberIds = const [],
@@ -529,18 +724,15 @@ class ChatService {
 
     // -------------------------------
     // 2) FIRST: insert ONLY the creator as admin
-    //    This must satisfy the "Creator can create initial admin membership" policy.
     // -------------------------------
     await _supabase.from('chat_room_members').insert({
       'chat_room_id': roomId,
-      'user_id': creatorId,   // MUST be auth.uid()
-      'role': 'admin',        // MUST be 'admin'
+      'user_id': creatorId,
+      'role': 'admin',
     });
 
     // -------------------------------
     // 3) THEN: insert the remaining members (if any) as member
-    //    Now the "Room admin can add members" policy will pass, because
-    //    an admin row for this room already exists.
     // -------------------------------
     final otherMembers = initialMemberIds
         .where((id) => id != creatorId)
@@ -548,13 +740,12 @@ class ChatService {
         .toList();
 
     if (otherMembers.isNotEmpty) {
-      final rows = otherMembers.map((uid) {
-        return {
-          'chat_room_id': roomId,
-          'user_id': uid,
-          'role': 'member',
-        };
-      }).toList();
+      final rows = otherMembers
+          .map(
+            (uid) =>
+        {'chat_room_id': roomId, 'user_id': uid, 'role': 'member'},
+      )
+          .toList();
 
       await _supabase.from('chat_room_members').insert(rows);
     }
@@ -562,12 +753,11 @@ class ChatService {
     return roomId;
   }
 
-
-  /// Add one or more users to an existing group chat.
+  /// Add one or more users to an existing group chat IN DATABASE.
   ///
   /// - Uses `upsert` so we don't crash on duplicates
   ///   (because of UNIQUE(chat_room_id, user_id)).
-  Future<void> addUsersToGroup({
+  Future<void> addUsersToGroupInDatabase({
     required String chatRoomId,
     required List<String> userIds,
   }) async {
@@ -588,42 +778,45 @@ class ChatService {
         .upsert(rows, onConflict: 'chat_room_id,user_id');
   }
 
-  /// Send a message to a GROUP chat.
+  /// Send a message to a GROUP chat (IN DATABASE).
   ///
   /// - Uses the same `messages` table
   /// - `chat_room_id` = group room id
   /// - `sender_id`    = current user
   /// - `receiver_id`  = NULL (because many recipients)
-  Future<void> sendGroupMessage(
+  Future<void> sendGroupMessageInDatabase(
       String chatRoomId,
       String senderId,
       String message, {
-        String? replyToMessageId, // 🆕
+        String? replyToMessageId,
       }) async {
     await _supabase.from('messages').insert({
       'chat_room_id': chatRoomId,
       'sender_id': senderId,
-      'receiver_id': null, // group message has no single receiver
+      'receiver_id': null,
       'message': message,
       'created_at': DateTime.now().toUtc().toIso8601String(),
       'reply_to_message_id': replyToMessageId,
-      // other fields use DB defaults
     });
+
+    // Notify group members
+    await notifyGroupMembersOfNewMessageInDatabase(
+      chatRoomId: chatRoomId,
+      senderId: senderId,
+      textPreview: message.trim().isEmpty ? 'Sent a message' : message,
+    );
   }
 
-  /// 🖼 Send an *image* message to a GROUP chat
-  ///
-  /// - `receiver_id` = NULL for group messages
-  /// - `createdAtOverride` allows grouping multiple images into one logical batch
-  Future<void> sendGroupImageMessage({
+  /// 🖼 Send an *image* message to a GROUP chat (IN DATABASE)
+  Future<void> sendGroupImageMessageInDatabase({
     required String chatRoomId,
     required String senderId,
     required String imageUrl,
     String message = '',
     DateTime? createdAtOverride,
   }) async {
-    final createdAt =
-    (createdAtOverride ?? DateTime.now().toUtc()).toIso8601String();
+    final createdAt = (createdAtOverride ?? DateTime.now().toUtc())
+        .toIso8601String();
 
     await _supabase.from('messages').insert({
       'chat_room_id': chatRoomId,
@@ -633,18 +826,26 @@ class ChatService {
       'image_url': imageUrl,
       'created_at': createdAt,
     });
+
+    final preview = message.trim().isNotEmpty ? message.trim() : 'Sent a photo';
+
+    await notifyGroupMembersOfNewMessageInDatabase(
+      chatRoomId: chatRoomId,
+      senderId: senderId,
+      textPreview: preview,
+    );
   }
 
-  /// 🎥 Send a *video* message to a GROUP chat
-  Future<void> sendGroupVideoMessage({
+  /// 🎥 Send a *video* message to a GROUP chat (IN DATABASE)
+  Future<void> sendGroupVideoMessageInDatabase({
     required String chatRoomId,
     required String senderId,
     required String videoUrl,
     String message = '',
     DateTime? createdAtOverride,
   }) async {
-    final createdAt =
-    (createdAtOverride ?? DateTime.now().toUtc()).toIso8601String();
+    final createdAt = (createdAtOverride ?? DateTime.now().toUtc())
+        .toIso8601String();
 
     await _supabase.from('messages').insert({
       'chat_room_id': chatRoomId,
@@ -654,18 +855,26 @@ class ChatService {
       'video_url': videoUrl,
       'created_at': createdAt,
     });
+
+    final preview = message.trim().isNotEmpty ? message.trim() : 'Sent a video';
+
+    await notifyGroupMembersOfNewMessageInDatabase(
+      chatRoomId: chatRoomId,
+      senderId: senderId,
+      textPreview: preview,
+    );
   }
 
-  /// 🆕 Create a pending GROUP video message (is_uploading = true)
-  Future<String> createPendingGroupVideoMessage({
+  /// 🆕 Create a pending GROUP video message (is_uploading = true) (IN DATABASE)
+  Future<String> createPendingGroupVideoMessageInDatabase({
     required String chatRoomId,
     required String senderId,
     required String videoUrl,
     String message = '',
     DateTime? createdAtOverride,
   }) async {
-    final createdAt =
-    (createdAtOverride ?? DateTime.now().toUtc()).toIso8601String();
+    final createdAt = (createdAtOverride ?? DateTime.now().toUtc())
+        .toIso8601String();
 
     final inserted = await _supabase
         .from('messages')
@@ -688,16 +897,8 @@ class ChatService {
     return inserted['id'].toString();
   }
 
-  /// Mark all CURRENTLY unread messages in a group as read for this user.
-  ///
-  /// Simplified semantics:
-  /// - Only messages in this [chatRoomId]
-  /// - Only messages not sent by [currentUserId]
-  /// - Only rows where `is_read = false`
-  ///
-  /// This makes the unread badge on GroupsPage go back to 0
-  /// the moment the user opens the group chat.
-  Future<void> markGroupMessagesAsRead(
+  /// Mark all CURRENTLY unread messages in a group as read for this user (IN DATABASE).
+  Future<void> markGroupMessagesAsReadInDatabase(
       String chatRoomId,
       String currentUserId,
       ) async {
@@ -716,13 +917,19 @@ class ChatService {
 
       final count = (updated as List).length;
       debugPrint('✅ markGroupMessagesAsRead updated $count rows');
+
+      // 🧹 Also clear any chat notifications for this group for this user
+      await _notifications.markChatNotificationsAsRead(
+        chatRoomId: chatRoomId,
+        userId: currentUserId,
+      );
     } catch (e) {
       debugPrint('❌ markGroupMessagesAsRead error: $e');
     }
   }
 
-  /// 🆕 Mark a video message as fully uploaded (remove uploading badge)
-  Future<void> markVideoMessageUploaded(String messageId) async {
+  /// 🆕 Mark a video message as fully uploaded (remove uploading badge) IN DATABASE
+  Future<void> markVideoMessageUploadedInDatabase(String messageId) async {
     await _supabase
         .from('messages')
         .update({'is_uploading': false})
@@ -733,11 +940,7 @@ class ChatService {
   // 📋 GROUP LIST FOR CURRENT USER
   // ---------------------------------------------------------------------------
 
-  /// Fetch all GROUP chat rooms where this user is a member.
-  ///
-  /// Uses:
-  /// - chat_room_members (user_id, chat_room_id)
-  /// - join to chat_rooms (is_group = true)
+  /// Fetch all GROUP chat rooms where this user is a member FROM DATABASE.
   ///
   /// Returns a list of simple maps:
   ///   {
@@ -746,7 +949,7 @@ class ChatService {
   ///     'avatar_url': <nullable>,
   ///     'created_at': <DateTime or String>,
   ///   }
-  Future<List<Map<String, dynamic>>> fetchGroupRoomsForUser(
+  Future<List<Map<String, dynamic>>> fetchGroupRoomsForUserFromDatabase(
       String userId,
       ) async {
     final data = await _supabase
@@ -756,11 +959,7 @@ class ChatService {
     )
         .eq('user_id', userId)
         .eq('chat_rooms.is_group', true)
-        .order(
-      'created_at',
-      ascending: false,
-      referencedTable: 'chat_rooms',
-    );
+        .order('created_at', ascending: false, referencedTable: 'chat_rooms');
 
     final List<Map<String, dynamic>> groups = [];
 
@@ -781,31 +980,28 @@ class ChatService {
     return groups;
   }
 
-  /// Polling stream of group rooms for the current user.
-  ///
-  /// Very similar to your unread counts poller:
-  ///   - immediately emits current list
-  ///   - then refreshes every [interval]
-  Stream<List<Map<String, dynamic>>> groupRoomsForUserPollingStream(
+  /// Polling stream of group rooms for the current user FROM DATABASE.
+  Stream<List<Map<String, dynamic>>> groupRoomsForUserPollingStreamFromDatabase(
       String userId, {
         Duration interval = const Duration(seconds: 20),
       }) async* {
     // Initial value
-    yield await fetchGroupRoomsForUser(userId);
+    yield await fetchGroupRoomsForUserFromDatabase(userId);
 
     // Periodic updates
-    yield* Stream.periodic(interval)
-        .asyncMap((_) => fetchGroupRoomsForUser(userId));
+    yield* Stream.periodic(
+      interval,
+    ).asyncMap((_) => fetchGroupRoomsForUserFromDatabase(userId));
   }
 
   // ---------------------------------------------------------------------------
   // 👥 GROUP MEMBERS
   // ---------------------------------------------------------------------------
 
-  /// Fetch raw group member links (user_id + role) for a given chat room.
+  /// Fetch raw group member links (user_id + role) for a given chat room FROM DATABASE.
   ///
   /// We keep this low-level and let the UI fetch full profiles via DatabaseService.
-  Future<List<Map<String, dynamic>>> fetchGroupMemberLinks(
+  Future<List<Map<String, dynamic>>> fetchGroupMemberLinksFromDatabase(
       String chatRoomId,
       ) async {
     final data = await _supabase
@@ -816,13 +1012,11 @@ class ChatService {
     return List<Map<String, dynamic>>.from(data);
   }
 
-  /// Remove the current user from a group chat via RPC.
+  /// Remove the current user from a group chat via RPC (IN DATABASE).
   ///
   /// The RPC will also delete the room (and cascade-delete messages +
   /// memberships + typing_status rows) when the last member leaves.
-  ///
-  /// [userId] is kept for call-site compatibility, but the RPC reads auth.uid().
-  Future<void> leaveGroup({
+  Future<void> leaveGroupInDatabase({
     required String chatRoomId,
     required String userId, // not used inside; kept for signature compatibility
   }) async {
@@ -832,9 +1026,7 @@ class ChatService {
       // Call the Supabase RPC; user is taken from auth.uid() inside the function
       final result = await _supabase.rpc(
         'leave_group_and_cleanup',
-        params: {
-          'p_chat_room_id': chatRoomId,
-        },
+        params: {'p_chat_room_id': chatRoomId},
       );
 
       debugPrint('✅ leave_group_and_cleanup result: $result');
@@ -848,13 +1040,13 @@ class ChatService {
   // NEW: Group last messages + unread counts (for GroupsPage) - NO RPC
   // =======================================================================
 
-  /// Fetch last message per GROUP chat that this user can see.
+  /// Fetch last message per GROUP chat that this user can see FROM DATABASE.
   ///
   /// - We only consider group messages: receiver_id IS NULL (filter).
   /// - RLS on `messages` ensures we only see rooms where the user is a member.
   ///
   /// Returns a Map keyed by chatRoomId.
-  Future<Map<String, MessageModel>> fetchLastGroupMessages() async {
+  Future<Map<String, MessageModel>> fetchLastGroupMessagesFromDatabase() async {
     final data = await _supabase
         .from('messages')
         .select(
@@ -885,15 +1077,15 @@ class ChatService {
     return result;
   }
 
-  /// Polling stream for last group messages (similar to lastMessagesByFriend).
+  /// Polling stream for last group messages (similar to lastMessagesByFriend) FROM DATABASE.
   ///
   /// You can tweak [interval] to match your DM polling setup.
-  Stream<Map<String, MessageModel>> lastGroupMessagesPollingStream({
+  Stream<Map<String, MessageModel>> lastGroupMessagesPollingStreamFromDatabase({
     Duration interval = const Duration(seconds: 3),
   }) async* {
     while (true) {
       try {
-        final data = await fetchLastGroupMessages();
+        final data = await fetchLastGroupMessagesFromDatabase();
         yield data;
       } catch (_) {
         // swallow errors so the stream keeps going
@@ -902,7 +1094,7 @@ class ChatService {
     }
   }
 
-  /// Fetch unread counts per group chat for the current user.
+  /// Fetch unread counts per group chat for the current user FROM DATABASE.
   ///
   /// Logic:
   /// - only group messages: receiver_id IS NULL
@@ -910,7 +1102,7 @@ class ChatService {
   /// - only messages NOT sent by the current user
   ///
   /// Returns a Map<chatRoomId, unreadCount>.
-  Future<Map<String, int>> fetchUnreadCountsByGroup(
+  Future<Map<String, int>> fetchUnreadCountsByGroupFromDatabase(
       String currentUserId,
       ) async {
     debugPrint('🔢 fetchUnreadCountsByGroup for user $currentUserId');
@@ -947,14 +1139,14 @@ class ChatService {
     return result;
   }
 
-  /// Polling stream for unread counts per group (similar to fetchUnreadCountsByFriend).
-  Stream<Map<String, int>> groupUnreadCountsPollingStream(
+  /// Polling stream for unread counts per group (FROM DATABASE).
+  Stream<Map<String, int>> groupUnreadCountsPollingStreamFromDatabase(
       String currentUserId, {
         Duration interval = const Duration(seconds: 3),
       }) async* {
     while (true) {
       try {
-        final data = await fetchUnreadCountsByGroup(currentUserId);
+        final data = await fetchUnreadCountsByGroupFromDatabase(currentUserId);
         debugPrint('📡 groupUnreadCountsPollingStream tick → $data');
         yield data;
       } catch (e) {
@@ -964,21 +1156,19 @@ class ChatService {
     }
   }
 
-  /// Delete group as admin via RPC.
+  /// Delete group as admin via RPC (IN DATABASE).
   ///
   /// RPC is responsible for:
   /// - deleting the chat_rooms row
   /// - cascading to messages, memberships, typing_status, etc.
-  Future<void> deleteGroupAsAdmin({
+  Future<void> deleteGroupAsAdminInDatabase({
     required String chatRoomId,
   }) async {
     try {
       debugPrint('🗑 deleteGroupAsAdmin: room=$chatRoomId');
       final result = await _supabase.rpc(
         'delete_group_as_admin',
-        params: {
-          'p_chat_room_id': chatRoomId,
-        },
+        params: {'p_chat_room_id': chatRoomId},
       );
       debugPrint('✅ delete_group_as_admin result: $result');
     } catch (e) {
@@ -991,31 +1181,31 @@ class ChatService {
   //                              DELETE MESSAGES
   // =======================================================================
 
-  Future<void> deleteMessageForEveryone({
+  Future<void> deleteMessageForEveryoneInDatabase({
     required String messageId,
     required String userId,
   }) async {
     // Only allow sender to delete
-    await _supabase.from('messages').update({
+    await _supabase
+        .from('messages')
+        .update({
       'is_deleted': true,
       'deleted_at': DateTime.now().toUtc().toIso8601String(),
       'message': '',
       'image_url': null,
       'video_url': null,
-      'audio_url': null,                 // 🆕
+      'audio_url': null,
       'audio_duration_seconds': null,
-    }).match({
-      'id': messageId,
-      'sender_id': userId,
-    });
+    })
+        .match({'id': messageId, 'sender_id': userId});
   }
 
   // ---------------------------------------------------------------------------
   // 🎙 VOICE MESSAGES (DM + GROUP)
   // ---------------------------------------------------------------------------
 
-  /// 🆕 Upload raw audio file to 'voice_messages' bucket in Supabase Storage
-  Future<String> uploadVoiceFile({
+  /// 🆕 Upload raw audio file to 'voice_messages' bucket in Supabase Storage (DATABASE)
+  Future<String> uploadVoiceFileToDatabase({
     required String chatRoomId,
     required String messageId,
     required String filePath,
@@ -1025,17 +1215,18 @@ class ChatService {
         '$chatRoomId/voice_${DateTime.now().microsecondsSinceEpoch}_${const Uuid().v4()}.m4a';
 
     await _supabase.storage
-        .from('chat-voice')
+        .from('chat_voice')
         .uploadBinary(storagePath, fileBytes);
 
-    final publicUrl =
-    _supabase.storage.from('chat-voice').getPublicUrl(storagePath);
+    final publicUrl = _supabase.storage
+        .from('chat_voice')
+        .getPublicUrl(storagePath);
 
     return publicUrl;
   }
 
-  /// 🆕 Send a voice message in a 1-on-1 DM
-  Future<void> sendVoiceMessageDM({
+  /// 🆕 Send a voice message in a 1-on-1 DM (IN DATABASE)
+  Future<void> sendVoiceMessageDMInDatabase({
     required String chatRoomId,
     required String senderId,
     required String receiverId,
@@ -1053,10 +1244,107 @@ class ChatService {
       'created_at': DateTime.now().toUtc().toIso8601String(),
       'reply_to_message_id': replyToMessageId,
     });
+
+    await notifyUserOfNewMessageInDatabase(
+      chatId: chatRoomId,
+      senderId: senderId,
+      receiverId: receiverId,
+      textPreview: 'Sent you a voice message',
+    );
   }
 
-  /// 🆕 Send a voice message in a GROUP chat (receiver_id = NULL)
-  Future<void> sendVoiceMessageGroup({
+  /// Group notification helper (DMs use notifyUserOfNewMessageInDatabase)
+  Future<void> notifyGroupMembersOfNewMessageInDatabase({
+    required String chatRoomId,
+    required String senderId,
+    required String textPreview,
+  }) async {
+    try {
+      // 1️⃣ Get all member IDs for this group
+      final membersData = await _supabase
+          .from('chat_room_members')
+          .select('user_id')
+          .eq('chat_room_id', chatRoomId);
+
+      final memberIds = membersData
+          .map<String?>((row) => row['user_id']?.toString())
+          .whereType<String>()
+          .toSet()
+          .toList();
+
+      if (memberIds.isEmpty) return;
+
+      // 2️⃣ Fetch presence for these users in one query
+      final presenceData = await _supabase
+          .from('user_chat_presence')
+          .select('user_id, active_chat_room_id')
+          .inFilter('user_id', memberIds);
+
+      final Map<String, String?> activeByUser = {};
+      for (final row in presenceData) {
+        final uid = row['user_id']?.toString();
+        if (uid == null) continue;
+        activeByUser[uid] = row['active_chat_room_id']?.toString();
+      }
+
+      // 3️⃣ Build sender display name
+      final senderProfile = await _db.getUserFromDatabase(senderId);
+      final displayName = (senderProfile?.username.isNotEmpty ?? false)
+          ? senderProfile!.username
+          : (senderProfile?.name ?? 'Someone');
+
+      // Optional: include group name
+      final roomRow = await _supabase
+          .from('chat_rooms')
+          .select('name')
+          .eq('id', chatRoomId)
+          .maybeSingle();
+
+      final groupNameRaw = (roomRow?['name'] as String?)?.trim();
+      final safeGroupName = (groupNameRaw == null || groupNameRaw.isEmpty)
+          ? 'Group'
+          : groupNameRaw;
+
+      final previewRaw = textPreview.trim();
+      final truncatedPreview = previewRaw.length > 60
+          ? '${previewRaw.substring(0, 60)}…'
+          : previewRaw;
+
+      final basePreview = truncatedPreview.isEmpty
+          ? '$displayName sent a message'
+          : truncatedPreview;
+
+      // This is just for the push / UI preview text
+      final messagePreview = '[$safeGroupName] $basePreview';
+
+      // 4️⃣ Create / update notifications per target user
+      for (final targetUserId in memberIds) {
+        if (targetUserId == senderId) continue; // don't notify yourself
+
+        final activeRoomId = activeByUser[targetUserId];
+        if (activeRoomId != null && activeRoomId == chatRoomId) {
+          debugPrint(
+            'ℹ️ Skipping group notification for $targetUserId: currently in room $chatRoomId',
+          );
+          continue;
+        }
+
+        await _notifications.createOrUpdateGroupChatNotification(
+          targetUserId: targetUserId,
+          chatRoomId: chatRoomId,
+          groupName: safeGroupName,
+          senderId: senderId,
+          senderName: displayName,
+          messagePreview: messagePreview,
+        );
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error creating group chat notifications: $e');
+    }
+  }
+
+  /// 🆕 Send a voice message in a GROUP chat (receiver_id = NULL) (IN DATABASE)
+  Future<void> sendVoiceMessageGroupInDatabase({
     required String chatRoomId,
     required String senderId,
     required String audioUrl,
@@ -1073,6 +1361,11 @@ class ChatService {
       'created_at': DateTime.now().toUtc().toIso8601String(),
       'reply_to_message_id': replyToMessageId,
     });
-  }
 
+    await notifyGroupMembersOfNewMessageInDatabase(
+      chatRoomId: chatRoomId,
+      senderId: senderId,
+      textPreview: 'Sent a voice message',
+    );
+  }
 }

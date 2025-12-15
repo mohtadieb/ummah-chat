@@ -3,12 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ummah_chat/components/my_loading_circle.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart'; // 👈 NEW
+import 'package:url_launcher/url_launcher.dart';
+import 'package:easy_localization/easy_localization.dart'; // 👈 NEW
 
 import '../components/my_dialogs.dart';
 import '../components/my_settings_tile.dart';
 import '../helper/navigate_pages.dart';
-import '../services/auth/auth_gate.dart'; // you can actually remove this now if unused
+import '../services/auth/auth_gate.dart';
 import '../services/auth/auth_service.dart';
 import '../services/database/database_provider.dart';
 import '../services/notifications/notification_service.dart';
@@ -22,58 +23,43 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  // Auth Service
-  final AuthService _auth = AuthService(); // Auth logic
+  final AuthService _auth = AuthService();
 
-  /// Handles logout via AuthService
   Future<void> _logout() async {
-    // Hide keyboard if something somehow has focus
     FocusScope.of(context).unfocus();
 
-    showLoadingCircle(context, message: "Logging out...");
+    showLoadingCircle(context, message: "Logging out...".tr());
 
     try {
-      // Get database provider here (context-safe)
       final databaseProvider = Provider.of<DatabaseProvider>(
         context,
         listen: false,
       );
 
-      // Logout from Supabase
       await _auth.logout();
-
-      // Clear any cached user data in provider
       databaseProvider.clearAllCachedData();
 
       if (!mounted) return;
 
-      // Go back to the root (AuthGate) — this removes SettingsPage
       Navigator.of(context, rootNavigator: true)
           .popUntil((route) => route.isFirst);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Logged out successfully!')),
+        SnackBar(content: Text('Logged out successfully!'.tr())),
       );
-
-      // AuthGate will detect session change automatically and switch to LoginOrRegister
     } catch (e) {
       debugPrint('Logout error: $e');
       if (mounted) {
         showAppErrorDialog(
           context,
-          title: 'Logout Error',
+          title: 'Logout Error'.tr(),
           message: e.toString(),
         );
       }
     } finally {
-      if (mounted) {
-        hideLoadingCircle(context);
-      } else {
-        hideLoadingCircle(context);
-      }
+      hideLoadingCircle(context);
     }
   }
-
 
   TextStyle _sectionTitleStyle(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -89,16 +75,17 @@ class _SettingsPageState extends State<SettingsPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Support Ummah Chat'),
-        content: const Text('You’ll be redirected to PayPal to make a donation.'),
+        title: Text('Support Ummah Chat'.tr()),
+        content:
+        Text('You’ll be redirected to PayPal to make a donation.'.tr()),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text('Cancel'.tr()),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Continue'),
+            child: Text('Continue'.tr()),
           ),
         ],
       ),
@@ -112,16 +99,33 @@ class _SettingsPageState extends State<SettingsPage> {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
-
+  // 👇 Helper: how to show locale names in the dropdown
+  String _localeLabel(Locale locale) {
+    switch (locale.languageCode) {
+      case 'en':
+        return 'English';
+      case 'nl':
+        return 'Nederlands';
+      case 'ar':
+        return 'العربية';
+      default:
+        return locale.languageCode;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
 
+    // current & supported locales from EasyLocalization
+    final currentLocale = context.locale;
+    final supportedLocales = context.supportedLocales;
+
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        title: const Text("Settings"),
+        // later you can do: 'settings_title'.tr()
+        title: Text("Settings".tr()),
         backgroundColor: Theme.of(context).colorScheme.surface,
         foregroundColor: Theme.of(context).colorScheme.primary,
         elevation: 0,
@@ -135,43 +139,16 @@ class _SettingsPageState extends State<SettingsPage> {
             vertical: 20.0,
           ),
           children: [
-            ListTile(
-              leading: const Icon(Icons.notifications_active_outlined),
-              title: const Text('Test push notification'),
-              onTap: () async {
-                final user = Supabase.instance.client.auth.currentUser;
-                if (user == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('You must be logged in to test a push.')),
-                  );
-                  return;
-                }
-
-                try {
-                  await NotificationService().sendTestPushToUser();
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Push + in-app notification sent')),
-                  );
-                } catch (e) {
-                  debugPrint('Test push error: $e');
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Something went wrong sending the test')),
-                  );
-                }
-              },
-            ),
-
             // APPEARANCE SECTION
             Text(
-              'Appearance',
+              'Appearance'.tr(), // later: 'settings_appearance'.tr()
               style: _sectionTitleStyle(context),
             ),
             const SizedBox(height: 10),
 
+            // Dark mode toggle
             MySettingsTile(
-              title: "Dark Mode",
+              title: "Dark Mode".tr(), // later: 'settings_dark_mode'.tr()
               leadingIcon: Icons.dark_mode_outlined,
               onTap: CupertinoSwitch(
                 value: themeProvider.isDarkMode,
@@ -179,17 +156,41 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
 
+            const SizedBox(height: 10),
+
+            // 🌍 Language selector
+            MySettingsTile(
+              title: "Language".tr(), // later: 'settings_language'.tr()
+              leadingIcon: Icons.language_outlined,
+              onTap: DropdownButton<Locale>(
+                value: currentLocale,
+                underline: const SizedBox(), // no blue underline
+                borderRadius: BorderRadius.circular(12),
+                items: supportedLocales.map((locale) {
+                  return DropdownMenuItem<Locale>(
+                    value: locale,
+                    child: Text(_localeLabel(locale)),
+                  );
+                }).toList(),
+                onChanged: (newLocale) {
+                  if (newLocale != null) {
+                    context.setLocale(newLocale);
+                  }
+                },
+              ),
+            ),
+
             const SizedBox(height: 24),
 
             // PRIVACY & SAFETY SECTION
             Text(
-              'Privacy & Safety',
+              'Privacy & Safety'.tr(),
               style: _sectionTitleStyle(context),
             ),
             const SizedBox(height: 10),
 
             MySettingsTile(
-              title: "Blocked Users",
+              title: "Blocked Users".tr(),
               leadingIcon: Icons.block_outlined,
               onTap: IconButton(
                 icon: Icon(
@@ -212,13 +213,13 @@ class _SettingsPageState extends State<SettingsPage> {
 
             // ACCOUNT SECTION
             Text(
-              'Account',
+              'Account'.tr(),
               style: _sectionTitleStyle(context),
             ),
             const SizedBox(height: 10),
 
             MySettingsTile(
-              title: "Account Settings",
+              title: "Account Settings".tr(),
               leadingIcon: Icons.person_outline,
               onTap: IconButton(
                 icon: Icon(
@@ -232,15 +233,15 @@ class _SettingsPageState extends State<SettingsPage> {
 
             const SizedBox(height: 24),
 
-            // SUPPORT SECTION 🇵🇸🤍
+            // SUPPORT SECTION
             Text(
-              'Support',
+              'Support'.tr(),
               style: _sectionTitleStyle(context),
             ),
             const SizedBox(height: 10),
 
             MySettingsTile(
-              title: "Donate",
+              title: "Donate".tr(),
               leadingIcon: Icons.favorite_outline,
               onTap: IconButton(
                 icon: Icon(
@@ -252,12 +253,11 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
 
-
             const SizedBox(height: 32),
 
-            // DANGER ZONE / LOGOUT SECTION
+            // DANGER ZONE / LOGOUT
             Text(
-              'Danger Zone',
+              'Danger Zone'.tr(),
               style: _sectionTitleStyle(context).copyWith(
                 color: Theme.of(context)
                     .colorScheme
@@ -268,7 +268,7 @@ class _SettingsPageState extends State<SettingsPage> {
             const SizedBox(height: 10),
 
             MySettingsTile(
-              title: "Logout",
+              title: "Logout".tr(),
               leadingIcon: Icons.logout,
               onTap: IconButton(
                 icon: Icon(

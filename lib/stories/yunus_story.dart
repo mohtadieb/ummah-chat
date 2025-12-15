@@ -1,7 +1,7 @@
 // lib/pages/yunus_story.dart
 import 'package:flutter/material.dart';
 import '../models/story_data.dart';
-import 'stories_page.dart';
+import '../pages/stories_page.dart';
 
 const StoryData yunusStory = StoryData(
   id: 'yunus',

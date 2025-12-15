@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -186,9 +187,9 @@ class _MyChatTextFieldState extends State<MyChatTextField>
                       color: colors.inversePrimary,
                       fontSize: 14,
                     ),
-                    decoration: const InputDecoration(
-                      hintText: "Message",
-                      hintStyle: TextStyle(fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: "Message".tr(),
+                      hintStyle: const TextStyle(fontSize: 14),
                       border: InputBorder.none,
                       isDense: true,
                       contentPadding: EdgeInsets.zero,

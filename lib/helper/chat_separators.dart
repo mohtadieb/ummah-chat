@@ -1,4 +1,5 @@
 // lib/helper/chat_separators.dart
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 /// Check if two DateTimes fall on the same calendar day (local time)
@@ -21,34 +22,34 @@ String formatDayLabel(DateTime date) {
 
   final diffDays = today.difference(thatDay).inDays;
 
-  if (diffDays == 0) return 'Today';
-  if (diffDays == 1) return 'Yesterday';
+  if (diffDays == 0) return 'Today'.tr();
+  if (diffDays == 1) return 'Yesterday'.tr();
   if (diffDays >= 2 && diffDays <= 6) {
-    const weekdays = [
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
+    final weekdays = [
+      'Monday'.tr(),
+      'Tuesday'.tr(),
+      'Wednesday'.tr(),
+      'Thursday'.tr(),
+      'Friday'.tr(),
+      'Saturday'.tr(),
+      'Sunday'.tr(),
     ];
     return weekdays[local.weekday - 1];
   }
 
-  const monthNames = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
+  final monthNames = [
+    'Jan'.tr(),
+    'Feb'.tr(),
+    'Mar'.tr(),
+    'Apr'.tr(),
+    'May'.tr(),
+    'Jun'.tr(),
+    'Jul'.tr(),
+    'Aug'.tr(),
+    'Sep'.tr(),
+    'Oct'.tr(),
+    'Nov'.tr(),
+    'Dec'.tr(),
   ];
   final day = local.day.toString().padLeft(2, '0');
   final month = monthNames[local.month - 1];
@@ -97,9 +98,10 @@ Widget buildUnreadBubble({
 }) {
   final colorScheme = Theme.of(context).colorScheme;
 
-  final label = unreadCount == 1
-      ? '1 unread message'
-      : '$unreadCount unread messages';
+  final label = "unread messages".plural(
+    unreadCount,
+    namedArgs: {"count": unreadCount.toString()},
+  );
 
   return Padding(
     padding: const EdgeInsets.symmetric(vertical: 6),

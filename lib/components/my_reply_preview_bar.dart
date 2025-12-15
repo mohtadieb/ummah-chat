@@ -39,7 +39,7 @@ class MyReplyPreviewBar extends StatelessWidget {
               children: [
                 Text(
                   author,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: Color(0xFF128C7E),

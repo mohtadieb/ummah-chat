@@ -12,6 +12,7 @@ To use this widget, you need:
 - isFollowing (e.g. false -> then we will show follow button instead of unfollow button)
 */
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 class MyFollowButton extends StatelessWidget {
@@ -53,7 +54,7 @@ class MyFollowButton extends StatelessWidget {
 
           // Text
           child: Text(
-            isFollowing ? "Unfollow" : "Follow",
+            isFollowing ? "Unfollow".tr() : "Follow".tr(),
             style: TextStyle(
               color: Theme.of(context).colorScheme.tertiary, // text color
               fontWeight: FontWeight.bold,

@@ -1,0 +1,451 @@
+{
+  "Login": "Inloggen",
+  "Logout": "Uitloggen",
+  "Settings": "Instellingen",
+
+  "Dark_mode": "Donkere modus",
+  "Dark Mode": "Donkere modus",
+
+  "Appearance": "Uiterlijk",
+
+  "Language": "Taal",
+
+  "Privacy_safety": "Privacy & Veiligheid",
+  "Privacy & Safety": "Privacy & Veiligheid",
+
+  "Blocked_users": "Geblokkeerde gebruikers",
+  "Blocked Users": "Geblokkeerde gebruikers",
+
+  "Account": "Account",
+
+  "Account_settings": "Accountinstellingen",
+  "Account Settings": "Accountinstellingen",
+
+  "Support": "Ondersteuning",
+  "Donate": "Doneren",
+
+  "Danger_zone": "Gevarenzone",
+  "Danger Zone": "Gevarenzone",
+
+  "Logout_success": "Succesvol uitgelogd!",
+  "Logged out successfully!": "Succesvol uitgelogd!",
+
+  "Logging out...": "Bezig met uitloggen...",
+  "Logout Error": "Fout bij uitloggen",
+
+  "Support_ummah_chat": "Ondersteun Ummah Chat",
+  "Support Ummah Chat": "Ondersteun Ummah Chat",
+
+  "Redirect_paypal": "Je wordt doorgestuurd naar PayPal om te doneren.",
+  "You’ll be redirected to PayPal to make a donation.": "Je wordt doorgestuurd naar PayPal om te doneren.",
+
+  "Cancel": "Annuleren",
+  "Continue": "Doorgaan",
+  "OK": "OK",
+
+  "Home": "Home",
+  "Stories": "Verhalen",
+  "Chats": "Chats",
+  "Communities": "Communities",
+  "Profile": "Profiel",
+  "Dua wall": "Dua Muur",
+  "Social": "Sociaal",
+
+  "Search": "Zoeken",
+  "Search_users": "Gebruikers zoeken",
+
+  "Edit_profile": "Profiel bewerken",
+  "Save_changes": "Wijzigingen opslaan",
+
+  "Email": "E-mail",
+  "Password": "Wachtwoord",
+  "Forgot_password": "Wachtwoord vergeten?",
+  "Register": "Account aanmaken",
+
+  "Notifications": "Meldingen",
+  "Test_push": "Testpushmelding",
+
+  "Confirm": "Bevestigen",
+
+  "Error": "Fout",
+  "Error_loading": "Fout bij laden van gegevens",
+  "Error_loading_friends": "Fout bij laden van vrienden",
+
+  "Loading": "Laden...",
+  "No_data": "Geen gegevens beschikbaar",
+
+  "Post": "Bericht",
+  "Posts": "Berichten",
+  "Follower": "Volger",
+  "Followers": "Volgers",
+  "Following": "Volgend",
+
+  "Write_caption": "Schrijf een onderschrift...",
+  "Select_photo": "Selecteer een foto",
+  "Crop_image": "Foto bijsnijden",
+
+  "Add_dua": "Dua toevoegen",
+  "Ameen": "Ameen",
+  "Delete": "Verwijderen",
+
+  "Send_message": "Bericht verzenden",
+  "Type_message": "Typ een bericht...",
+  "Voice_message": "Spraakbericht",
+  "Recording": "Opnemen...",
+  "Stop": "Stop",
+
+  "Onboarding_1_title": "Welkom bij Ummah Chat",
+  "Onboarding_1_sub": "Een veilige plek voor de Ummah.",
+  "Onboarding_2_title": "Stories & Communities",
+  "Onboarding_2_sub": "Deel en verbind met anderen.",
+  "Onboarding_3_title": "Dua Muur",
+  "Onboarding_3_sub": "Maak dua voor je broeders en zusters.",
+
+  "Empty bio..": "Geen bio ingesteld...",
+
+  "Reply": "Antwoorden",
+  "Write a reply": "Schrijf een reactie",
+  "Reply must be at least 5 characters": "De reactie moet minimaal 5 tekens bevatten",
+  "New reply on your comment": "Nieuwe reactie op je bericht",
+  "Message reported!": "Bericht gemeld!",
+  "Report": "Melden",
+  "Block": "Blokkeren",
+  "Report Message": "Bericht melden",
+  "Are you sure you want to report this message?": "Weet je zeker dat je dit bericht wilt melden?",
+  "Block User": "Gebruiker blokkeren",
+  "Are you sure you want to block this user?": "Weet je zeker dat je deze gebruiker wilt blokkeren?",
+  "User blocked!": "Gebruiker geblokkeerd!",
+
+  "Edit": "Bewerken",
+
+  "Unfollow": "Ontvolgen",
+  "Follow": "Volgen",
+
+  "Accept": "Accepteren",
+  "Decline": "Weigeren",
+  "Cancel request": "Verzoek annuleren",
+  "Unfriend": "Vriendschap beëindigen",
+  "Blocked": "Geblokkeerd",
+  "Add friend": "Vriend toevoegen",
+
+  "Online": "Online",
+
+  "Video": "Video",
+
+  "Type a comment": "Typ een reactie",
+  "Comment must be at least 5 characters": "De reactie moet minimaal 5 tekens bevatten",
+
+  "Delete Post": "Bericht verwijderen",
+  "Are you sure you want to delete this post?": "Weet je zeker dat je dit bericht wilt verwijderen?",
+  "Post deleted": "Bericht verwijderd",
+
+  "Failed to load media": "Media laden is mislukt",
+
+  "View all": "Alles weergeven",
+  "comment": "reactie",
+  "comments": "reacties",
+
+  "1 like": "1 vind-ik-leuk",
+
+  "You deleted this message": "Je hebt dit bericht verwijderd",
+  "This message was deleted": "Dit bericht is verwijderd",
+
+  "Close video": "Video sluiten",
+  "You": "Jij",
+  "Contact": "Contact",
+
+  "Failed to upload image. Please try again.": "Afbeelding uploaden is mislukt. Probeer het opnieuw.",
+  "Failed to upload video. Please try again.": "Video uploaden is mislukt. Probeer het opnieuw.",
+  "Add caption...": "Bijschrift toevoegen...",
+  "Take photo": "Foto maken",
+  "Record video": "Video opnemen",
+  "Gallery": "Galerij",
+  "Camera": "Camera",
+
+  "Today": "Vandaag",
+  "Yesterday": "Gisteren",
+  "Monday": "Maandag",
+  "Tuesday": "Dinsdag",
+  "Wednesday": "Woensdag",
+  "Thursday": "Donderdag",
+  "Friday": "Vrijdag",
+  "Saturday": "Zaterdag",
+  "Sunday": "Zondag",
+
+  "Jan": "Jan",
+  "Feb": "Feb",
+  "Mar": "Mrt",
+  "Apr": "Apr",
+  "May": "Mei",
+  "Jun": "Jun",
+  "Jul": "Jul",
+  "Aug": "Aug",
+  "Sep": "Sep",
+  "Oct": "Okt",
+  "Nov": "Nov",
+  "Dec": "Dec",
+
+  "unread messages": {
+    "one": "1 ongelezen bericht",
+    "other": "{{count}} ongelezen berichten"
+  },
+
+  "1 reaction": "1 reactie",
+  "reactions": "reacties",
+
+  "Unread messages": "Ongelezen berichten",
+  "Failed to load thumbnail": "Miniatuur laden mislukt",
+  "Message deleted": "Bericht verwijderd",
+  "View profile": "Profiel bekijken",
+
+  "Mon": "Ma",
+  "Tue": "Di",
+  "Wed": "Wo",
+  "Thu": "Do",
+  "Fri": "Vr",
+  "Sat": "Za",
+  "Sun": "Zo",
+
+  "No likes yet": "Nog geen vind-ik-leuks",
+  "(You)": "(Jij)",
+
+  "Just now": "Zojuist",
+  "seconds_ago": "{}s geleden",
+  "minutes_ago": "{}m geleden",
+  "hours_ago": "{}u geleden",
+  "days_ago": "{}d geleden",
+
+  "Confirm Account Deletion": "Accountverwijdering bevestigen",
+  "To confirm deletion, please re-enter your password. This action is irreversible.": "Om de verwijdering te bevestigen, voer je je wachtwoord opnieuw in. Deze actie kan niet ongedaan worden gemaakt.",
+  "Deleting account...": "Account wordt verwijderd...",
+  "Please enter your password.": "Vul je wachtwoord in.",
+  "Delete account": "Account verwijderen",
+
+  "Add members": "Leden toevoegen",
+  "Failed to add members. Please try again.": "Leden toevoegen is mislukt. Probeer het opnieuw.",
+  "No friends yet": "Nog geen vrienden",
+  "Add friends first before inviting them to a group.": "Voeg eerst vrienden toe voordat je ze aan een groep toevoegt.",
+  "User": "Gebruiker",
+  "In group": "In groep",
+  "Add to group": "Aan groep toevoegen",
+
+  "Unblock User": "Gebruiker deblokkeren",
+  "Are you sure you want to unblock this user?": "Weet je zeker dat je deze gebruiker wilt deblokkeren?",
+  "User unblocked!": "Gebruiker gedeblokkeerd!",
+  "Unblock": "Deblokkeren",
+  "No blocked users...": "Geen geblokkeerde gebruikers...",
+
+  "No messages yet": "Nog geen berichten",
+  "Selected messages will be deleted for everyone in this chat.": "Geselecteerde berichten worden voor iedereen in deze chat verwijderd.",
+  "Delete message?": "Bericht verwijderen?",
+  "This message will be deleted for everyone in this chat.": "Dit bericht wordt voor iedereen in deze chat verwijderd.",
+  "Photo": "Foto",
+  "Voice message": "Spraakbericht",
+  "Message": "Bericht",
+  "selected": "geselecteerd",
+  "is typing…": "is aan het typen…",
+  "Recording…": "Opnemen…",
+
+  "Delete messages": {
+    "one": "Bericht verwijderen?",
+    "other": "{{count}} berichten verwijderen?"
+  },
+
+  "View all comments": {
+    "one": "Bekijk 1 reactie",
+    "other": "Bekijk alle {{count}} reacties"
+  },
+
+  "likes": {
+    "one": "1 vind-ik-leuk",
+    "other": "{{count}} vind-ik-leuks"
+  },
+
+  "typing_indicator": "{{name}} is aan het typen…",
+
+  "selected_messages": {
+    "one": "1 geselecteerd",
+    "other": "{{count}} geselecteerd"
+  },
+
+  "recording_label": "Opnemen… {{time}}",
+
+  "Last seen": "Laatst gezien",
+
+  "Friends": "Vrienden",
+  "Groups": "Groepen",
+  "Find people": "Mensen zoeken",
+  "New group": "Nieuwe groep",
+  "Add community": "Community toevoegen",
+  "Create community": "Community aanmaken",
+  "Name": "Naam",
+  "Description": "Beschrijving",
+  "Country": "Land",
+  "Please enter a name for your community.": "Vul een naam in voor je community.",
+  "Create": "Aanmaken",
+
+  "Search communities": "Communities zoeken",
+  "Your communities": "Jouw communities",
+  "You haven't joined any communities yet": "Je bent nog geen lid van een community.",
+  "Explore communities above or create your own to connect with others.": "Ontdek hierboven communities of maak je eigen community om met anderen in contact te komen.",
+
+  "Loading members…": "Leden laden…",
+  "No members yet": "Nog geen leden.",
+  "Leave community?": "Community verlaten?",
+  "Failed to leave community.": "Community verlaten is mislukt.",
+  "View members": "Leden bekijken",
+  "Leave community": "Community verlaten",
+  "Join community": "Lid worden van deze community",
+  "Join this community to share posts.": "Word lid van deze community om berichten te delen.",
+  "Nothing here yet…": "Er is hier nog niets…",
+  "Posting your content…": "Je bericht wordt geplaatst…",
+
+  "member_count": {
+    "one": "{{count}} lid",
+    "other": "{{count}} leden"
+  },
+
+  "you_left_community": "Je hebt \"{{name}}\" verlaten.",
+  "leave_warning": "Je ziet geen berichten of updates meer van \"{{name}}\".",
+  "you_joined_community": "Je bent lid geworden van \"{{name}}\".",
+  "Failed to join community. Please try again.": "Lid worden van de community is mislukt. Probeer het opnieuw.",
+
+
+  "Complete your Ummah Chat profile": "Maak je Ummah Chat-profiel compleet",
+  "We use this info to personalise your experience\nand keep interactions respectful.": "We gebruiken deze informatie om je ervaring te personaliseren\nen interacties respectvol te houden.",
+  "First name": "Voornaam",
+  "Last name": "Achternaam",
+  "Country *": "Land *",
+  "Select your country": "Selecteer je land",
+  "Gender *": "Geslacht *",
+  "Male": "Man",
+  "Female": "Vrouw",
+  "Save and continue": "Opslaan en doorgaan",
+  "Please fill in all required fields.": "Vul alle verplichte velden in.",
+  "Profile completed!": "Profiel voltooid!",
+  "Saving profile...": "Profiel wordt opgeslagen...",
+
+
+  "Could not save profile:": "Kon profiel niet opslaan:",
+
+  "Netherlands": "Nederland",
+  "Belgium": "België",
+  "Germany": "Duitsland",
+  "France": "Frankrijk",
+  "United Kingdom": "Verenigd Koninkrijk",
+  "Spain": "Spanje",
+  "Italy": "Italië",
+  "Sweden": "Zweden",
+  "Norway": "Noorwegen",
+  "Denmark": "Denemarken",
+  "Finland": "Finland",
+  "Turkey": "Turkije",
+  "Morocco": "Marokko",
+  "Algeria": "Algerije",
+  "Tunisia": "Tunesië",
+  "Egypt": "Egypte",
+  "Saudi Arabia": "Saoedi-Arabië",
+  "United Arab Emirates": "Verenigde Arabische Emiraten",
+  "Qatar": "Qatar",
+  "Kuwait": "Koeweit",
+  "Jordan": "Jordanië",
+  "Lebanon": "Libanon",
+  "Pakistan": "Pakistan",
+  "India": "India",
+  "Bangladesh": "Bangladesh",
+  "Indonesia": "Indonesië",
+  "Malaysia": "Maleisië",
+  "United States": "Verenigde Staten",
+  "Canada": "Canada",
+  "Australia": "Australië",
+  "Other": "Overig",
+
+  "Please enter a group name": "Voer een groepsnaam in.",
+  "Please select at least one member": "Selecteer minimaal één lid.",
+  "Failed to create group:": "Groep aanmaken is mislukt:",
+  "You must be logged in to create a group": "Je moet ingelogd zijn om een groep aan te maken.",
+  "Group name": "Groepsnaam",
+  "Select members": "Leden selecteren",
+  "You have no friends yet. Add some friends before creating a group.": "Je hebt nog geen vrienden. Voeg eerst vrienden toe voordat je een groep aanmaakt.",
+  "Creating...": "Bezig met aanmaken...",
+  "Create group": "Groep aanmaken",
+
+
+  "Please allow photo access in your settings to add photos/videos.": "Sta in je instellingen toegang tot foto's toe om foto's/video's toe te voegen.",
+  "Could not open gallery. Check app permissions.": "Kon de galerij niet openen. Controleer de app-machtigingen.",
+  "Cropping is only available for photos.": "Bijsnijden is alleen beschikbaar voor foto's.",
+  "Caption must have at least 5 characters.": "Het onderschrift moet minimaal 5 tekens bevatten.",
+  "No media files resolved from gallery selection.": "Er zijn geen mediabestanden gevonden in de galerijselectie.",
+  "Post uploaded successfully!": "Bericht succesvol geplaatst!",
+  "Failed to share. Please try again.": "Delen is mislukt. Probeer het opnieuw.",
+  "New post": "Nieuw bericht",
+  "new_post_in": "Nieuw bericht in {{name}}",
+  "Share": "Delen",
+  "No photos or videos added": "Nog geen foto's of video's toegevoegd",
+  "You can share a text-only post, or add media below.": "Je kunt een bericht alleen met tekst delen of hieronder media toevoegen.",
+  "Add photos / videos": "Foto's / video's toevoegen",
+  "Crop": "Bijsnijden",
+  "Filters": "Filters",
+  "Cover": "Omslag",
+  "Write a caption...": "Schrijf een onderschrift...",
+
+
+  "Write your dua here...": "Schrijf hier je dua...",
+  "Your dua should be at least 5 characters.": "Je dua moet minimaal 5 tekens bevatten.",
+  "Your dua has been shared.": "Je dua is gedeeld.",
+  "Could not share dua. Please try again.": "Dua kon niet worden gedeeld. Probeer het opnieuw.",
+
+  "Visibility": "Zichtbaarheid",
+  "Show my name": "Toon mijn naam",
+  "Anonymous": "Anoniem",
+  "Private (only me)": "Privé (alleen ik)",
+
+  "visibility_help": "• Anoniem: anderen zien \"Anoniem\" in plaats van je naam.\n• Privé: alleen jij ziet deze dua op de Dua Muur.",
+
+  "Delete dua?": "Dua verwijderen?",
+  "Are you sure you want to delete this dua? This cannot be undone.": "Weet je zeker dat je deze dua wilt verwijderen? Dit kan niet ongedaan worden gemaakt.",
+  "Dua deleted.": "Dua verwijderd.",
+  "Could not delete dua. Please try again.": "Dua kon niet worden verwijderd. Probeer het opnieuw.",
+  "Delete dua": "Dua verwijderen",
+
+  "Share your duas and say Ameen for others.": "Deel je dua's en zeg Ameen voor anderen.",
+  "Write a dua": "Schrijf een dua",
+
+  "No duas yet": "Nog geen dua's",
+  "Be the first to write a dua and let others say Ameen 💚": "Wees de eerste die een dua schrijft en laat anderen Ameen zeggen 💚",
+
+  "No Ameens yet": "Nog geen Ameen gezegd",
+  "ameen_count": {
+    "one": "1 Ameen",
+    "other": "{{count}} Ameens"
+  },
+
+  "No followers..": "Nog geen volgers...",
+  "No following..": "Je volgt nog niemand...",
+  "You must be logged in to view friends": "Je moet ingelogd zijn om je vrienden te kunnen zien.",
+  "Add people as friends or accept friend requests to start chatting.": "Voeg mensen toe als vriend of accepteer vriendverzoeken om te gaan chatten.",
+  "Search friends": "Vrienden zoeken",
+  "Your friends": "Jouw vrienden",
+  "No friends match your search": "Geen vrienden komen overeen met je zoekopdracht.",
+  "Error loading friends": "Fout bij het laden van vrienden",
+
+  "No members found": "Geen leden gevonden",
+  "Leave group?": "Groep verlaten?",
+  "leave_group_warning": "Je ontvangt geen berichten meer van \"{{name}}\".",
+  "Failed to leave group. Please try again.": "Het is niet gelukt de groep te verlaten. Probeer het opnieuw.",
+  "Delete group?": "Groep verwijderen?",
+  "delete_group_warning": "Dit verwijdert \"{{name}}\" permanent voor alle leden, inclusief alle berichten.",
+  "Failed to delete group. Please try again.": "Het is niet gelukt de groep te verwijderen. Probeer het opnieuw.",
+  "No members": "Geen leden",
+  "Leave group": "Groep verlaten",
+  "Delete group": "Groep verwijderen",
+  "This message will be deleted for everyone in the group.": "Dit bericht wordt voor iedereen in de groep verwijderd.",
+  "Selected messages will be deleted for everyone in the group.": "Geselecteerde berichten worden voor iedereen in de groep verwijderd.",
+  "Someone is typing…": "Iemand is aan het typen…",
+  "group_typing_two": "{{name1}} en {{name2}} zijn aan het typen…",
+  "group_typing_many": "{{name1}}, {{name2}} en anderen zijn aan het typen…",
+
+
+
+
+}

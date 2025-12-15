@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -15,7 +16,7 @@ import '../services/notifications/notification_service.dart';
 
 // Providers
 import 'package:provider/provider.dart';
-import '../stories/select_stories_page.dart';
+import '../pages/select_stories_page.dart';
 import '../services/navigation/bottom_nav_provider.dart'; // 👈 ADD THIS
 
 class MainLayout extends StatefulWidget {
@@ -145,15 +146,15 @@ class _MainLayoutState extends State<MainLayout> {
           bottomNav.setIndex(index);
         },
         type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.groups), label: 'Social'),
+        items: [
+          BottomNavigationBarItem(icon: const Icon(Icons.home), label: 'Home'.tr()),
+          BottomNavigationBarItem(icon: const Icon(Icons.groups), label: 'Social'.tr()),
           BottomNavigationBarItem(
-            icon: Icon(Icons.menu_book_rounded),
-            label: 'Stories',
+            icon: const Icon(Icons.menu_book_rounded),
+            label: 'Stories'.tr(),
           ),
-          BottomNavigationBarItem(icon: Icon(Icons.view_list), label: 'Dua Wall'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          BottomNavigationBarItem(icon: const Icon(Icons.view_list), label: 'Dua Wall'.tr()),
+          BottomNavigationBarItem(icon: const Icon(Icons.person), label: 'Profile'.tr()),
         ],
       ),
     );

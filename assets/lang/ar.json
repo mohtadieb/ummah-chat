@@ -1,0 +1,72 @@
+{
+  "Login": "تسجيل الدخول",
+  "Logout": "تسجيل الخروج",
+  "Settings": "الإعدادات",
+  "Dark_mode": "الوضع الداكن",
+  "Appearance": "المظهر",
+  "Language": "اللغة",
+  "Privacy_safety": "الخصوصية والأمان",
+  "Blocked_users": "المستخدمون المحظورون",
+  "Account": "الحساب",
+  "Account_settings": "إعدادات الحساب",
+  "Support": "الدعم",
+  "Donate": "تبرع",
+  "Danger_zone": "منطقة الخطر",
+  "Logout_success": "تم تسجيل الخروج بنجاح!",
+
+  "Home": "الرئيسية",
+  "Stories": "القصص",
+  "Chats": "الدردشات",
+  "Communities": "المجتمعات",
+  "Profile": "الملف الشخصي",
+  "Dua_wall": "حائط الدعاء",
+
+  "Search": "بحث",
+  "Search_users": "البحث عن مستخدمين",
+
+  "Edit_profile": "تعديل الملف الشخصي",
+  "Save_changes": "حفظ التغييرات",
+
+  "Email": "البريد الإلكتروني",
+  "Password": "كلمة المرور",
+  "Forgot_password": "نسيت كلمة المرور؟",
+  "Register": "إنشاء حساب",
+
+  "Notifications": "الإشعارات",
+  "Test_push": "اختبار الإشعار",
+
+  "Confirm": "تأكيد",
+  "Cancel": "إلغاء",
+
+  "Support_ummah_chat": "دعم تطبيق أمة تشات",
+  "Redirect_paypal": "سيتم توجيهك إلى PayPal لإتمام التبرع.",
+
+  "Error": "خطأ",
+  "Error_loading": "حدث خطأ أثناء التحميل",
+  "Error_loading_friends": "حدث خطأ أثناء تحميل الأصدقاء",
+
+  "Loading": "جارٍ التحميل...",
+  "No_data": "لا توجد بيانات",
+
+  "Post": "نشر",
+  "Write_caption": "اكتب عنوانًا...",
+  "Select_photo": "اختر صورة",
+  "Crop_image": "قص الصورة",
+
+  "Add_dua": "إضافة دعاء",
+  "Ameen": "آمين",
+  "Delete": "حذف",
+
+  "Send_message": "إرسال رسالة",
+  "Type_message": "اكتب رسالة...",
+  "Voice_message": "رسالة صوتية",
+  "Recording": "جارٍ التسجيل...",
+  "Stop": "إيقاف",
+
+  "Onboarding_1_title": "مرحبًا بك في Ummah Chat",
+  "Onboarding_1_sub": "مساحة آمنة للأمة.",
+  "Onboarding_2_title": "القصص والمجتمعات",
+  "Onboarding_2_sub": "شارك واتصل بالآخرين.",
+  "Onboarding_3_title": "حائط الدعاء",
+  "Onboarding_3_sub": "ادعُ لإخوانك وأخواتك."
+}

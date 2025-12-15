@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../components/my_user_tile.dart';
@@ -79,15 +80,13 @@ class _SearchPageState extends State<SearchPage> {
         centerTitle: true,
         title: Column(
           children: [
-            Text(
-              "Find people",
+            Text("Find people".tr(),
               style: TextStyle(
                 color: colorScheme.primary,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            Text(
-              "Search all users on Ummah Chat",
+            Text("Search all users on Ummah Chat".tr(),
               style: TextStyle(
                 fontSize: 11,
                 color: colorScheme.primary.withValues(alpha: 0.7),
@@ -102,7 +101,7 @@ class _SearchPageState extends State<SearchPage> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
             child: MySearchBar(
               controller: _searchController,
-              hintText: 'Search users',
+              hintText: 'Search users'.tr(),
               onChanged: (value) {
                 _onSearchChanged(value);
               },
@@ -132,8 +131,7 @@ class _SearchPageState extends State<SearchPage> {
   Widget _buildBodyContent(ColorScheme colorScheme) {
     if (_isSearching) {
       return Center(
-        child: Text(
-          "Searching...",
+        child: Text("Searching...".tr(),
           style: TextStyle(color: colorScheme.primary),
         ),
       );
@@ -141,8 +139,7 @@ class _SearchPageState extends State<SearchPage> {
 
     if (_hasSearched && listeningProvider.searchResults.isEmpty) {
       return Center(
-        child: Text(
-          "No users found",
+        child: Text("No users found".tr(),
           style: TextStyle(color: colorScheme.primary),
         ),
       );
@@ -153,8 +150,7 @@ class _SearchPageState extends State<SearchPage> {
 
     if (results.isEmpty && !_hasSearched) {
       return Center(
-        child: Text(
-          "Start typing to search for people",
+        child: Text("Start typing to search for people".tr(),
           style: TextStyle(
             color: colorScheme.primary.withValues(alpha: 0.75),
           ),

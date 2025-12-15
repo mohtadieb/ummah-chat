@@ -189,7 +189,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                     ),
                     child: Text(
                       _isLastPage ? 'Get started' : 'Next',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),

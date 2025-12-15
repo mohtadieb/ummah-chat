@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 class MyFriendButton extends StatelessWidget {
@@ -41,8 +42,7 @@ class MyFriendButton extends StatelessWidget {
                     borderRadius: BorderRadius.circular(18),
                   ),
                 ),
-                child: const Text(
-                  'Accept',
+                child: Text('Accept'.tr(),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -63,8 +63,8 @@ class MyFriendButton extends StatelessWidget {
                     borderRadius: BorderRadius.circular(18),
                   ),
                 ),
-                child: const Text(
-                  'Decline',
+                child: Text(
+                  'Decline'.tr(),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -140,8 +140,8 @@ class MyFriendButton extends StatelessWidget {
           ),
         ),
         child: Text(
-          label,
-          style: const TextStyle(
+          label.tr(),
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
           ),

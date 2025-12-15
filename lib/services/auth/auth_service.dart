@@ -6,55 +6,68 @@ Handles all authentication logic with Supabase:
 - Register
 - Logout
 - Delete account (requires password confirmation)
+- Google OAuth login
 */
 
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';                 // 👈 for kIsWeb
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/database_service.dart';
-
 
 class AuthService {
   final _auth = Supabase.instance.client.auth;
   final DatabaseService _db = DatabaseService();
 
   /* ==================== CURRENT USER ==================== */
+
   User? getCurrentUser() => _auth.currentUser;
 
-/// Returns the current user's id, or '' if there's no logged-in user.
-String getCurrentUserId() {
-  final user = _auth.currentUser;
-  if (user == null) {
-    return '';
+  /// Returns the current user's id, or '' if there's no logged-in user.
+  String getCurrentUserId() {
+    final user = _auth.currentUser;
+    if (user == null) {
+      return '';
+    }
+    return user.id;
   }
-  return user.id;
-}
-
 
   /* ==================== LOGIN / REGISTER ==================== */
 
   /// Login using email/password
   Future<AuthResponse> loginEmailPassword(String email, String password) async {
-
-    // Attempt login
     try {
       final authResponse = await _auth.signInWithPassword(
         email: email,
         password: password,
       );
 
-      if (authResponse.session == null) {
+      final user = authResponse.user;
+      if (authResponse.session == null || user == null) {
         throw Exception("Login failed.");
       }
+
+      // ❗ Require verified email
+      if (user.emailConfirmedAt == null) {
+        // Immediately log them out again
+        await _auth.signOut();
+        throw Exception(
+          "Please verify your email address first. "
+              "Click the link we sent you by email.",
+        );
+      }
+
       return authResponse;
     } on AuthException catch (e) {
       throw Exception(e.message);
     }
   }
 
+
   /// Register new user
-  Future<AuthResponse> registerEmailPassword(String email, String password) async {
+  Future<AuthResponse> registerEmailPassword(
+      String email, String password) async {
     try {
       // 1️⃣ Sign up user
       final authResponse = await _auth.signUp(
@@ -62,14 +75,12 @@ String getCurrentUserId() {
         password: password,
       );
 
-      if (authResponse.user == null) throw Exception("Registration failed.");
+      if (authResponse.user == null) {
+        throw Exception("Registration failed.");
+      }
 
-
-      // // 3️⃣ Sign in automatically
-      // await _auth.signInWithPassword(
-      //   email: email,
-      //   password: password,
-      // );
+      // Optionally sign in automatically if you want
+      // await _auth.signInWithPassword(email: email, password: password);
 
       return authResponse;
     } on AuthException catch (e) {
@@ -77,8 +88,28 @@ String getCurrentUserId() {
     }
   }
 
+  /// 🔐 Login / register with Google (Supabase OAuth)
+  Future<void> signInWithGoogle() async {
+    // For web: Supabase handles redirect automatically.
+    // For mobile: use custom deep link defined in AndroidManifest + Supabase URL config.
+    final redirectUrl = kIsWeb ? null : 'ummahchat://login-callback';
+
+    try {
+      await _auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: redirectUrl,
+      );
+      // On mobile, this opens the browser and then returns via deep link.
+      // Session is stored automatically on return.
+    } on AuthException catch (e) {
+      throw Exception(e.message);
+    } catch (e) {
+      rethrow;
+    }
+  }
 
   /* ==================== LOGOUT ==================== */
+
   Future<void> logout() async {
     try {
       await _auth.signOut();
@@ -91,7 +122,7 @@ String getCurrentUserId() {
 
   /* ==================== DELETE ACCOUNT WITH PASSWORD ==================== */
 
-  /// Delete user from firebase
+  /// Delete user from Supabase (auth + DB)
   Future<void> deleteAccountWithPassword(String password) async {
     final user = getCurrentUser();
     if (user == null || user.email == null) {
@@ -112,9 +143,8 @@ String getCurrentUserId() {
       // 2️⃣ Delete all user data from database
       await _db.deleteUserDataFromDatabase(user.id);
 
-      // delete user's auth record
+      // 3️⃣ Delete user's auth record via Edge Function
       await deleteMyAccountAuth();
-
     } on AuthException catch (e) {
       throw Exception(e.message);
     } catch (e) {
@@ -123,7 +153,7 @@ String getCurrentUserId() {
     }
   }
 
-  /// Delete user auth
+  /// Call Edge Function to delete user auth
   Future<void> deleteMyAccountAuth() async {
     final supabase = Supabase.instance.client;
     final session = supabase.auth.currentSession;
@@ -145,7 +175,6 @@ String getCurrentUserId() {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${session.accessToken}', // must include this
         },
-        // No body needed because the function uses the token to get the user
       );
 
       if (response.statusCode == 200) {
@@ -161,7 +190,4 @@ String getCurrentUserId() {
       print('❌ Error calling delete-user function: $e');
     }
   }
-
-
-
 }

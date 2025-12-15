@@ -1,15 +1,18 @@
+// lib/pages/friends_page.dart
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:ummah_chat/models/user_profile.dart';
 import 'package:ummah_chat/services/auth/auth_service.dart';
-import 'package:provider/provider.dart';
 
 import '../components/my_friend_tile.dart';
 import '../components/my_search_bar.dart';
-import '../services/chat/chat_service.dart';
+import '../services/chat/chat_provider.dart';
+import '../services/chat/chat_service.dart'; // for LastMessageInfo type
 import '../services/database/database_provider.dart';
+import '../services/notifications/notification_service.dart';
 import '../helper/last_message_time_formatter.dart';
 import 'chat_page.dart';
-// removed: import 'profile_page.dart';
 
 class FriendsPage extends StatefulWidget {
   const FriendsPage({super.key});
@@ -21,8 +24,6 @@ class FriendsPage extends StatefulWidget {
 class _FriendsPageState extends State<FriendsPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-
-  final ChatService _chatService = ChatService();
 
   @override
   void dispose() {
@@ -40,23 +41,26 @@ class _FriendsPageState extends State<FriendsPage> {
     final auth = AuthService();
     final currentUserId = auth.getCurrentUserId();
     final colorScheme = Theme.of(context).colorScheme;
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
+    // 🆕 Access NotificationService singleton
+    final notificationService = NotificationService();
 
     if (currentUserId.isEmpty) {
       return Center(
-        child: Text(
-          'You must be logged in to view friends',
+        child: Text('You must be logged in to view friends'.tr(),
           style: TextStyle(color: colorScheme.primary),
         ),
       );
     }
 
     return StreamBuilder<Map<String, int>>(
-      stream: _chatService.unreadCountsPollingStream(currentUserId),
+      stream: chatProvider.unreadCountsPollingStream(currentUserId),
       builder: (context, unreadSnapshot) {
         final unreadByFriend = unreadSnapshot.data ?? const <String, int>{};
 
         return StreamBuilder<Map<String, LastMessageInfo>>(
-          stream: _chatService.lastMessagesByFriendPollingStream(
+          stream: chatProvider.lastMessagesByFriendPollingStream(
             currentUserId,
           ),
           builder: (context, lastMsgSnapshot) {
@@ -68,8 +72,7 @@ class _FriendsPageState extends State<FriendsPage> {
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return Center(
-                    child: Text(
-                      "Error loading friends",
+                    child: Text("Error loading friends".tr(),
                       style: TextStyle(color: colorScheme.primary),
                     ),
                   );
@@ -97,8 +100,7 @@ class _FriendsPageState extends State<FriendsPage> {
                             colorScheme.primary.withValues(alpha: 0.6),
                           ),
                           const SizedBox(height: 12),
-                          Text(
-                            "No friends yet",
+                          Text("No friends yet".tr(),
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
@@ -106,8 +108,7 @@ class _FriendsPageState extends State<FriendsPage> {
                             ),
                           ),
                           const SizedBox(height: 6),
-                          Text(
-                            "Add people as friends or accept friend requests to start chatting.",
+                          Text("Add people as friends or accept friend requests to start chatting.".tr(),
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 13,
@@ -151,6 +152,10 @@ class _FriendsPageState extends State<FriendsPage> {
                     _searchQuery.trim().isNotEmpty &&
                         filteredFriends.isEmpty;
 
+                // 🆕 Read the currently active DM friend once per build
+                final String? activeDmFriendId =
+                    notificationService.activeDmFriendId;
+
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -159,7 +164,7 @@ class _FriendsPageState extends State<FriendsPage> {
                       const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 4.0),
                       child: MySearchBar(
                         controller: _searchController,
-                        hintText: 'Search friends',
+                        hintText: 'Search friends'.tr(),
                         onChanged: (value) {
                           setState(() {
                             _searchQuery = value;
@@ -180,8 +185,7 @@ class _FriendsPageState extends State<FriendsPage> {
                       ),
                       child: Row(
                         children: [
-                          Text(
-                            "Your friends",
+                          Text("Your friends".tr(),
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
@@ -214,8 +218,7 @@ class _FriendsPageState extends State<FriendsPage> {
                     Expanded(
                       child: noMatches
                           ? Center(
-                        child: Text(
-                          'No friends match your search',
+                        child: Text('No friends match your search'.tr(),
                           style: TextStyle(
                             color: colorScheme.primary
                                 .withValues(alpha: 0.8),
@@ -239,8 +242,17 @@ class _FriendsPageState extends State<FriendsPage> {
                             final user = filteredFriends[index];
 
                             final isOnline = user.isOnline;
-                            final unreadCount =
+
+                            // Raw unread count from DB
+                            final rawUnread =
                                 unreadByFriend[user.id] ?? 0;
+
+                            // 🆕 If this friend's chat is currently active, hide the dot
+                            final unreadCount =
+                            (activeDmFriendId != null &&
+                                activeDmFriendId == user.id)
+                                ? 0
+                                : rawUnread;
 
                             final lastInfo =
                             lastMessageByFriend[user.id];
@@ -250,12 +262,10 @@ class _FriendsPageState extends State<FriendsPage> {
                             final lastTimeLabel =
                             formatLastMessageTime(lastTime);
 
-                            final preview =
-                            (lastText == null ||
-                                lastText.trim().isEmpty)
+                            final preview = (lastText == null || lastText.trim().isEmpty)
                                 ? null
                                 : (lastInfo!.sentByCurrentUser
-                                ? 'You: $lastText'
+                                ? '${"You".tr()}: $lastText'
                                 : lastText);
 
                             return MyFriendTile(
@@ -266,8 +276,6 @@ class _FriendsPageState extends State<FriendsPage> {
                               unreadCount: unreadCount,
                               lastMessagePreview: preview,
                               lastMessageTimeLabel: lastTimeLabel,
-
-                              // 👇 Whole tile opens chat
                               onTap: () async {
                                 await Navigator.push(
                                   context,
@@ -280,7 +288,7 @@ class _FriendsPageState extends State<FriendsPage> {
                                 );
 
                                 if (mounted) {
-                                  setState(() {}); // refresh unread
+                                  setState(() {});
                                 }
                               },
                             );

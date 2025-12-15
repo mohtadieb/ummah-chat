@@ -1,4 +1,5 @@
 // lib/components/chat_video_fullscreen.dart
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
@@ -108,11 +109,11 @@ class _MyChatVideoFullscreenPlayerState extends State<MyChatVideoFullscreenPlaye
   }
 
   String get _headerTitle {
-    if (widget.isCurrentUser) return 'You';
+    if (widget.isCurrentUser) return 'You'.tr();
     if (widget.senderName != null && widget.senderName!.trim().isNotEmpty) {
       return widget.senderName!;
     }
-    return 'Contact';
+    return 'Contact'.tr();
   }
 
   @override
@@ -166,7 +167,7 @@ class _MyChatVideoFullscreenPlayerState extends State<MyChatVideoFullscreenPlaye
                             _headerTitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: Colors.white,
                               fontSize: 15,
                               fontWeight: FontWeight.w600,

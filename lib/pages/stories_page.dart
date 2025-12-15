@@ -85,7 +85,7 @@ class _StoriesPageState extends State<StoriesPage> {
         elevation: 0,
         title: Text(
           widget.story.appBarTitle,
-          style: const TextStyle(fontWeight: FontWeight.w600),
+          style: TextStyle(fontWeight: FontWeight.w600),
         ),
         centerTitle: true,
       ),
