@@ -4,141 +4,111 @@ import '../pages/stories_page.dart';
 
 const StoryData hudStory = StoryData(
   id: 'hud',
-  appBarTitle: 'Prophet Hud (as)',
-  chipLabel: 'Prophet Hud (as)',
-  title: 'The Story of Prophet Hud (as)',
-  subtitle: 'Warning a powerful nation that forgot Allah',
+  appBarTitle: 'story_hud.appBarTitle',
+  chipLabel: 'story_hud.chipLabel',
+  title: 'story_hud.title',
+  subtitle: 'story_hud.subtitle',
   icon: Icons.wind_power_rounded,
-  cardPreview:
-  'A prophet sent to a strong and proud people who built huge buildings but refused to obey Allah, until a mighty wind destroyed them.',
-  body:
-  'Prophet Hud (peace be upon him) was sent to the people of \'Ad. They were a very strong and powerful nation. '
-      'They built tall pillars and impressive buildings in the land of Al-Ahqaf, and they were proud of their strength. '
-      'Instead of being grateful to Allah, they became arrogant. They worshipped idols, oppressed others, and felt that no one could defeat them.\n\n'
-      'Allah sent Hud (as) to guide them. He was from among their own people, spoke their language, and cared about them. '
-      'He called them to worship Allah alone, to stop worshipping idols, and to fear Allah, who had given them everything they had. '
-      'He reminded them that their strength and their beautiful homes were gifts from Allah, not reasons to be proud and unjust.\n\n'
-      'Hud (as) told them that if they believed and obeyed Allah, He would increase their blessings. But if they continued in their arrogance and disbelief, '
-      'a punishment would come. The leaders of \'Ad laughed at him. They said things like, “Who is stronger than us?” and accused Hud (as) of being foolish. '
-      'They did not want to give up their pride or their idols.\n\n'
-      'Hud (as) remained patient. He told them clearly that he did not ask for any reward from them, that his reward was only with Allah. '
-      'He warned them again and again, over many years. Only a small group believed in him and followed him.\n\n'
-      'When the people completely refused to listen, the punishment of Allah began. At first, their land became dry. The rain stopped, and the people of \'Ad hoped for clouds of rain. '
-      'One day, they saw a huge dark cloud approaching and became happy, thinking it would bring water. But that cloud carried a violent, freezing wind. '
-      'The wind blew with great force for many days, destroying their homes and throwing their bodies to the ground. The strong nation of \'Ad, which thought no one could defeat them, '
-      'was wiped out. Only Hud (as) and the believers with him were saved.\n\n'
-      'Allah mentions the people of \'Ad in the Qur’an as a warning to others: power and wealth are not a protection if a person is arrogant and disobedient. '
-      'True safety is in obeying Allah and being humble.\n\n'
-      'From the story of Prophet Hud (as), we learn not to be proud of our strength, our homes, or our achievements. '
-      'Everything we have is a gift from Allah, and He can take it away whenever He wills. We also learn to stay patient like Hud (as) when others reject the truth, '
-      'and to remember that real honor comes from obeying Allah, not from impressing people.',
+  cardPreview: 'story_hud.cardPreview',
+  body: 'story_hud.body',
   questions: [
     QuizQuestion(
-      question: 'To which nation was Prophet Hud (as) sent?',
+      question: 'story_hud.q1.question',
       options: [
-        'The people of Madyan',
-        'The people of \'Ad',
-        'The people of Thamud',
-        'The people of Quraysh',
+        'story_hud.q1.o1',
+        'story_hud.q1.o2',
+        'story_hud.q1.o3',
+        'story_hud.q1.o4',
       ],
       correctIndex: 1,
     ),
     QuizQuestion(
-      question:
-      'What were the people of \'Ad especially known for?',
+      question: 'story_hud.q2.question',
       options: [
-        'Their weakness and poverty',
-        'Their love of traveling by sea',
-        'Their strength and tall buildings',
-        'Their skill in writing books',
+        'story_hud.q2.o1',
+        'story_hud.q2.o2',
+        'story_hud.q2.o3',
+        'story_hud.q2.o4',
       ],
       correctIndex: 2,
     ),
     QuizQuestion(
-      question:
-      'What was the main message that Hud (as) gave to his people?',
+      question: 'story_hud.q3.question',
       options: [
-        'To build even bigger houses',
-        'To worship Allah alone and stop worshipping idols',
-        'To move to another land',
-        'To stop farming completely',
+        'story_hud.q3.o1',
+        'story_hud.q3.o2',
+        'story_hud.q3.o3',
+        'story_hud.q3.o4',
       ],
       correctIndex: 1,
     ),
     QuizQuestion(
-      question:
-      'How did many of the leaders of \'Ad react to Hud (as)?',
+      question: 'story_hud.q4.question',
       options: [
-        'They welcomed him and believed immediately',
-        'They were afraid and left the town',
-        'They mocked him and called him foolish',
-        'They stayed silent and neutral',
+        'story_hud.q4.o1',
+        'story_hud.q4.o2',
+        'story_hud.q4.o3',
+        'story_hud.q4.o4',
       ],
       correctIndex: 2,
     ),
     QuizQuestion(
-      question:
-      'What did Hud (as) tell his people about the blessings they had?',
+      question: 'story_hud.q5.question',
       options: [
-        'That they earned them all by themselves',
-        'That the idols gave them everything',
-        'That they were gifts from Allah and should make them grateful',
-        'That they did not deserve any blessings',
+        'story_hud.q5.o1',
+        'story_hud.q5.o2',
+        'story_hud.q5.o3',
+        'story_hud.q5.o4',
       ],
       correctIndex: 2,
     ),
     QuizQuestion(
-      question:
-      'What happened in the land of \'Ad before the punishment came?',
+      question: 'story_hud.q6.question',
       options: [
-        'It started raining heavily for many months',
-        'They had an earthquake first',
-        'Their land became dry and they hoped for rain',
-        'A big fire appeared from the sky',
+        'story_hud.q6.o1',
+        'story_hud.q6.o2',
+        'story_hud.q6.o3',
+        'story_hud.q6.o4',
       ],
       correctIndex: 2,
     ),
     QuizQuestion(
-      question:
-      'What was inside the dark cloud that the people of \'Ad thought was bringing rain?',
+      question: 'story_hud.q7.question',
       options: [
-        'Soft, gentle rain only',
-        'A bright rainbow',
-        'A violent, freezing wind that destroyed them',
-        'Many birds',
+        'story_hud.q7.o1',
+        'story_hud.q7.o2',
+        'story_hud.q7.o3',
+        'story_hud.q7.o4',
       ],
       correctIndex: 2,
     ),
     QuizQuestion(
-      question:
-      'What happened to Prophet Hud (as) and the believers when the punishment came?',
+      question: 'story_hud.q8.question',
       options: [
-        'They were destroyed with the others',
-        'They were saved by Allah',
-        'They moved to the sky',
-        'They turned into angels',
+        'story_hud.q8.o1',
+        'story_hud.q8.o2',
+        'story_hud.q8.o3',
+        'story_hud.q8.o4',
       ],
       correctIndex: 1,
     ),
     QuizQuestion(
-      question:
-      'What important lesson do we learn from the story of Hud (as) and the people of \'Ad?',
+      question: 'story_hud.q9.question',
       options: [
-        'That being strong means you will never be punished',
-        'That wealth and power can replace obedience to Allah',
-        'That arrogance and idol worship can destroy a nation',
-        'That prophets should not warn their people',
+        'story_hud.q9.o1',
+        'story_hud.q9.o2',
+        'story_hud.q9.o3',
+        'story_hud.q9.o4',
       ],
       correctIndex: 2,
     ),
     QuizQuestion(
-      question:
-      'What is a good way to act, based on the story of Hud (as)?',
+      question: 'story_hud.q10.question',
       options: [
-        'Be proud and show off your strength',
-        'Think you are better than others',
-        'Be humble, thank Allah for His gifts, and obey Him',
-        'Ignore all warnings and do what you want',
+        'story_hud.q10.o1',
+        'story_hud.q10.o2',
+        'story_hud.q10.o3',
+        'story_hud.q10.o4',
       ],
       correctIndex: 2,
     ),

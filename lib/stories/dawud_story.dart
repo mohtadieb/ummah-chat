@@ -4,140 +4,111 @@ import '../pages/stories_page.dart';
 
 const StoryData dawudStory = StoryData(
   id: 'dawud',
-  appBarTitle: 'Prophet Dawud (as)',
-  chipLabel: 'Prophet Dawud (as)',
-  title: 'The Story of Prophet Dawud (as)',
-  subtitle: 'Courage, justice and gratitude to Allah',
+  appBarTitle: 'story_dawud.appBarTitle',
+  chipLabel: 'story_dawud.chipLabel',
+  title: 'story_dawud.title',
+  subtitle: 'story_dawud.subtitle',
   icon: Icons.shield_moon_rounded,
-  cardPreview:
-  'A brave prophet and king who defeated a giant, ruled with justice, and remembered Allah with beautiful recitation.',
-  body:
-  'Prophet Dawud (peace be upon him) was both a prophet and a just king. Allah blessed him with great strength, wisdom, '
-      'and a heart that was constantly remembering Allah. He is known in our tradition for his beautiful voice when reciting the praises of Allah, '
-      'and for his deep sense of justice.\n\n'
-      'As a young man, Dawud (as) lived among the people of Bani Israil. At that time, there was a powerful and frightening warrior named Jalut (Goliath). '
-      'Jalut and his army caused fear among the people. Many were too scared to face him in battle. But Dawud (as), though still young, trusted completely in Allah. '
-      'He did not rely on size or weapons, but on his faith. With a simple sling and a stone, and with the help of Allah, he faced Jalut and defeated him.\n\n'
-      'Because of this courage, Allah gave Dawud (as) honor, respect, and leadership among his people. Later, he became their king. '
-      'He did not become arrogant. Instead, he remained humble and grateful, always turning to Allah for guidance.\n\n'
-      'Allah also gave Dawud (as) a special gift: when he recited the praises of Allah, the mountains and the birds would join him. '
-      'They would echo and repeat his tasbih, glorifying Allah together with him. This shows how close he was to his Lord and how sincere his worship was.\n\n'
-      'Dawud (as) was also known as a fair judge. People came to him with their problems and arguments, and he would listen carefully to both sides before giving a decision. '
-      'One famous story is about two men who came to him with a dispute. They wanted a judgment about their sheep and their field. Allah used this situation as a test, '
-      'to remind Dawud (as) to always think deeply and carefully before making a judgment. When he realized that he could have judged in a better way, he turned to Allah, '
-      'asked forgiveness, and corrected himself. This shows us that even the best people can make a mistake, but the true believer quickly returns to Allah.\n\n'
-      'Allah also taught Dawud (as) how to soften iron, so that he could shape it with his hands and make armor. He would make strong coats of armor as a form of work, '
-      'and Allah encouraged him to be thankful and to do good deeds. He used his strength and skills in the path of Allah, not for showing off.\n\n'
-      'In addition to all of this, Dawud (as) had a beautiful daily routine of worship. It is known that he would fast every other day, a very beloved fast, '
-      'and he would spend part of the night in prayer and part of it resting. He divided his time between worship, judging between people, leading the community, and working with his hands.\n\n'
-      'From the story of Prophet Dawud (as), we learn that true strength is not in size or weapons, but in trust in Allah. '
-      'We learn that leaders must be fair, humble, and ready to admit when they are wrong. We also learn the importance of gratitude, using our skills in a good way, '
-      'and remembering Allah often with our hearts and tongues.',
+  cardPreview: 'story_dawud.cardPreview',
+  body: 'story_dawud.body',
   questions: [
     QuizQuestion(
-      question: 'What roles did Prophet Dawud (as) have?',
+      question: 'story_dawud.q1.question',
       options: [
-        'He was only a farmer',
-        'He was a prophet and a king',
-        'He was only a trader',
-        'He was a sailor',
+        'story_dawud.q1.o1',
+        'story_dawud.q1.o2',
+        'story_dawud.q1.o3',
+        'story_dawud.q1.o4',
       ],
       correctIndex: 1,
     ),
     QuizQuestion(
-      question: 'Who was Jalut (Goliath) in the story of Dawud (as)?',
+      question: 'story_dawud.q2.question',
       options: [
-        'A kind old man',
-        'A great scholar',
-        'A powerful warrior who frightened the people',
-        'A traveler from a far land',
+        'story_dawud.q2.o1',
+        'story_dawud.q2.o2',
+        'story_dawud.q2.o3',
+        'story_dawud.q2.o4',
       ],
       correctIndex: 2,
     ),
     QuizQuestion(
-      question:
-      'How did Dawud (as) defeat Jalut, by the permission of Allah?',
+      question: 'story_dawud.q3.question',
       options: [
-        'With a sword and shield',
-        'With a sling and a stone',
-        'With a large army',
-        'With a miracle of walking on water',
+        'story_dawud.q3.o1',
+        'story_dawud.q3.o2',
+        'story_dawud.q3.o3',
+        'story_dawud.q3.o4',
       ],
       correctIndex: 1,
     ),
     QuizQuestion(
-      question:
-      'How did Prophet Dawud (as) react after Allah gave him victory and leadership?',
+      question: 'story_dawud.q4.question',
       options: [
-        'He became proud and arrogant',
-        'He left his people',
-        'He was humble and grateful to Allah',
-        'He stopped worshipping Allah',
+        'story_dawud.q4.o1',
+        'story_dawud.q4.o2',
+        'story_dawud.q4.o3',
+        'story_dawud.q4.o4',
       ],
       correctIndex: 2,
     ),
     QuizQuestion(
-      question:
-      'What special gift did Allah give Dawud (as) when he praised Him?',
+      question: 'story_dawud.q5.question',
       options: [
-        'The sun stopped moving',
-        'The mountains and birds joined him in glorifying Allah',
-        'He could see through walls',
-        'He could speak every language',
+        'story_dawud.q5.o1',
+        'story_dawud.q5.o2',
+        'story_dawud.q5.o3',
+        'story_dawud.q5.o4',
       ],
       correctIndex: 1,
     ),
     QuizQuestion(
-      question: 'What kind of work did Dawud (as) learn to do with iron?',
+      question: 'story_dawud.q6.question',
       options: [
-        'Make swords only',
-        'Make jewelry',
-        'Make strong coats of armor',
-        'Build ships',
+        'story_dawud.q6.o1',
+        'story_dawud.q6.o2',
+        'story_dawud.q6.o3',
+        'story_dawud.q6.o4',
       ],
       correctIndex: 2,
     ),
     QuizQuestion(
-      question:
-      'How did Prophet Dawud (as) behave when judging between people?',
+      question: 'story_dawud.q7.question',
       options: [
-        'He chose his friends\' side quickly',
-        'He refused to listen to anyone',
-        'He listened carefully and tried to be fair',
-        'He told them to solve it alone',
+        'story_dawud.q7.o1',
+        'story_dawud.q7.o2',
+        'story_dawud.q7.o3',
+        'story_dawud.q7.o4',
       ],
       correctIndex: 2,
     ),
     QuizQuestion(
-      question:
-      'What did Dawud (as) do when he realized he could have judged a case in a better way?',
+      question: 'story_dawud.q8.question',
       options: [
-        'He ignored it and continued',
-        'He blamed the people',
-        'He turned to Allah, asked forgiveness, and corrected himself',
-        'He stopped being a judge',
+        'story_dawud.q8.o1',
+        'story_dawud.q8.o2',
+        'story_dawud.q8.o3',
+        'story_dawud.q8.o4',
       ],
       correctIndex: 2,
     ),
     QuizQuestion(
-      question:
-      'Which worship habit is known from Prophet Dawud (as)?',
+      question: 'story_dawud.q9.question',
       options: [
-        'He fasted the whole year without stopping',
-        'He never slept at night',
-        'He fasted every other day and prayed part of the night',
-        'He worshipped only once a week',
+        'story_dawud.q9.o1',
+        'story_dawud.q9.o2',
+        'story_dawud.q9.o3',
+        'story_dawud.q9.o4',
       ],
       correctIndex: 2,
     ),
     QuizQuestion(
-      question:
-      'What is one main lesson from the story of Prophet Dawud (as)?',
+      question: 'story_dawud.q10.question',
       options: [
-        'That power alone makes someone right',
-        'That true strength is in trusting Allah, being just, and being grateful',
-        'That we should not work with our hands',
-        'That a believer never makes mistakes',
+        'story_dawud.q10.o1',
+        'story_dawud.q10.o2',
+        'story_dawud.q10.o3',
+        'story_dawud.q10.o4',
       ],
       correctIndex: 1,
     ),

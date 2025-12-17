@@ -1,4 +1,5 @@
 // lib/pages/select_stories_page.dart
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ummah_chat/stories/adam_story.dart';
@@ -17,15 +18,23 @@ import 'package:ummah_chat/stories/zakariya_story.dart';
 import '../models/story_data.dart';
 import '../services/database/database_provider.dart';
 import '../services/auth/auth_service.dart';
+import '../stories/alyasa_story.dart';
+import '../stories/dhulkifl_story.dart';
 import '../stories/hud_story.dart';
+import '../stories/ilyas_story.dart';
 import '../stories/isa_story.dart';
+import '../stories/ismail_story.dart';
+import '../stories/lut_story.dart';
 import '../stories/muhammad_story_part_2.dart';
 import '../stories/muhammad_story_part_3.dart';
 import '../stories/muhammad_story_part_4.dart';
 import '../stories/muhammad_story_part_5.dart';
 import '../stories/muhammad_story_part_6.dart';
 import '../stories/muhammad_story_part_7.dart';
+import '../stories/salih_story.dart';
 import '../stories/shuayb_story.dart';
+import '../stories/yahya_story.dart';
+import '../stories/yaqub_story.dart';
 import 'stories_page.dart';
 import '../stories/yunus_story.dart';
 import '../stories/yusuf_story.dart';
@@ -49,24 +58,44 @@ class _SelectStoriesPageState extends State<SelectStoriesPage> {
   void initState() {
     super.initState();
     _stories = [
+      // Early prophets
       adamStory,
-      dawudStory,
-      isaStory,
-      shuaybStory,
-      hudStory,
-      yunusStory,
-      yusufStory,
-      musaStory,
-      ibrahimStory,
-      nuhStory,
-      sulaymanStory,
-      ayyubStory,
-      ishaqStory,
-      zakariyaStory,
       idrisStory,
+      nuhStory,
+      hudStory,
+      salihStory,
+
+      // Ibrahim family
+      ibrahimStory,
+      lutStory,
+      ismailStory,
+      ishaqStory,
+      yaqubStory,
+      yusufStory,
+
+      // Other nations
+      shuaybStory,
+      ayyubStory,
+      dhulKiflStory,
+
+      // Musa era
+      musaStory,
       harunStory,
+
+      // Kings & prophets
+      dawudStory,
+      sulaymanStory,
+      ilyasStory,
+      alyasaStory,
+      yunusStory,
+
+      // Later prophets
+      zakariyaStory,
+      yahyaStory,
       maryamStory,
-      // Group: Muhammad (ﷺ) stories
+      isaStory,
+
+      // Group: Muhammad (ﷺ)
       muhammadPart1Story,
       muhammadPart2Story,
       muhammadPart3Story,
@@ -125,7 +154,7 @@ class _SelectStoriesPageState extends State<SelectStoriesPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Stories of the Prophets',
+              'Stories of the Prophets'.tr(),
               style: textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
                 fontSize: 22,
@@ -134,7 +163,7 @@ class _SelectStoriesPageState extends State<SelectStoriesPage> {
             ),
             const SizedBox(height: 6),
             Text(
-              'Choose a story to read and explore the quiz.',
+              'Choose a story to read and explore the quiz.'.tr(),
               style: textTheme.bodyMedium?.copyWith(
                 fontSize: 14,
                 color: Colors.grey[700],
@@ -184,7 +213,7 @@ class _SelectStoriesPageState extends State<SelectStoriesPage> {
                         children: [
                           const SizedBox(height: 28),
                           Text(
-                            'Muhammad (ﷺ)',
+                            'prophet_muhammad'.tr(),
                             style: textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w700,
                               fontSize: 21,
@@ -216,7 +245,7 @@ class _SelectStoriesPageState extends State<SelectStoriesPage> {
     required bool isMuhammad,
   }) {
     final textTheme = Theme.of(context).textTheme;
-    final String subtitlePreview = story.cardPreview ?? '';
+    final String subtitlePreview = (story.cardPreview ?? '');
 
     return InkWell(
       borderRadius: BorderRadius.circular(16),
@@ -267,7 +296,7 @@ class _SelectStoriesPageState extends State<SelectStoriesPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      story.title,
+                      story.title.tr(),
                       style: textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
@@ -298,7 +327,7 @@ class _SelectStoriesPageState extends State<SelectStoriesPage> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              'Completed',
+                              'Completed'.tr(),
                               style: textTheme.bodySmall?.copyWith(
                                 color: Colors.green[800],
                                 fontWeight: FontWeight.w600,
@@ -312,7 +341,7 @@ class _SelectStoriesPageState extends State<SelectStoriesPage> {
                     if (story.subtitle != null) ...[
                       const SizedBox(height: 6),
                       Text(
-                        story.subtitle!,
+                        story.subtitle!.tr(),
                         style: textTheme.bodySmall?.copyWith(
                           color: Colors.grey[600],
                         ),
@@ -320,7 +349,7 @@ class _SelectStoriesPageState extends State<SelectStoriesPage> {
                     ],
                     const SizedBox(height: 4),
                     Text(
-                      subtitlePreview,
+                      subtitlePreview.tr(),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: textTheme.bodySmall?.copyWith(

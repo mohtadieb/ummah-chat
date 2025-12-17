@@ -151,6 +151,52 @@ class _NotificationPageState extends State<NotificationPage> {
     return items;
   }
 
+  String _localizedTitleFor(models.Notification n, String body) {
+    // If your DB title contains the display name already, we can try to extract it.
+    // Otherwise you can just show n.title for unknown types.
+    final rawTitle = (n.title).trim();
+
+    // Try get a name from the start of the title, e.g. "Ahmed liked your post"
+    // If it fails, fallback to "Someone".
+    String name = 'Someone'.tr();
+    if (rawTitle.isNotEmpty) {
+      final firstWord = rawTitle.split(' ').first.trim();
+      if (firstWord.isNotEmpty && firstWord.length < 30) {
+        name = firstWord; // simple heuristic; good enough for now
+      }
+    }
+
+    if (body.startsWith('LIKE_POST:')) {
+      return 'notif_like_post'.tr(namedArgs: {'name': name});
+    }
+    if (body.startsWith('COMMENT_POST:')) {
+      return 'notif_comment_post'.tr(namedArgs: {'name': name});
+    }
+    if (body.startsWith('COMMENT_REPLY:')) {
+      return 'notif_comment_reply'.tr(namedArgs: {'name': name});
+    }
+    if (body.startsWith('FOLLOW_USER:')) {
+      return 'notif_follow_user'.tr(namedArgs: {'name': name});
+    }
+    if (body.startsWith('FRIEND_REQUEST:')) {
+      return 'notif_friend_request'.tr(namedArgs: {'name': name});
+    }
+    if (body.startsWith('FRIEND_ACCEPTED:')) {
+      return 'notif_friend_accepted'.tr(namedArgs: {'name': name});
+    }
+    if (body.startsWith('CHAT_MESSAGE:')) {
+      return 'notif_chat_message'.tr(namedArgs: {'name': name});
+    }
+    if (body.startsWith('GROUP_MESSAGE:')) {
+      // groupName is already parsed elsewhere, but we can still show a generic title here:
+      return 'notif_group_message'.tr();
+    }
+
+    // fallback (legacy notifications)
+    return rawTitle.isNotEmpty ? rawTitle : 'Notifications'.tr();
+  }
+
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -684,7 +730,7 @@ class _NotificationPageState extends State<NotificationPage> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  n.title,
+                                  _localizedTitleFor(n, body),
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: isUnread

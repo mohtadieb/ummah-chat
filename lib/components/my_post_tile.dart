@@ -19,6 +19,12 @@ import 'package:visibility_detector/visibility_detector.dart';
 // 👇 adjust this path if your fullscreen page lives somewhere else
 import '../pages/fullscreen_image_page.dart';
 
+/// ✅ Optional UI toggles (easy to keep or remove)
+/// - Adaptive media ratio: uses real image ratio when possible; falls back to 4/5
+/// - Subtle separator: adds a small background spacer between posts (feed looks smoother)
+const bool kUseAdaptiveMediaAspectRatio = true;
+const bool kShowSubtlePostSeparator = true;
+
 class MyPostTile extends StatefulWidget {
   final Post post;
   final void Function()? onUserTap;
@@ -51,6 +57,9 @@ class _MyPostTileState extends State<MyPostTile> {
   bool _mediaLoading = true;
   int _currentMediaIndex = 0;
 
+  // ✅ Optional: cache aspect ratios for image URLs (so PageView doesn’t jump)
+  final Map<String, double> _imageAspectRatios = {};
+
   @override
   void initState() {
     super.initState();
@@ -67,6 +76,7 @@ class _MyPostTileState extends State<MyPostTile> {
       _media = [];
       _mediaLoading = true;
       _currentMediaIndex = 0;
+      _imageAspectRatios.clear(); // ✅ reset aspect cache for new post
       _loadMedia();
     }
   }
@@ -89,6 +99,15 @@ class _MyPostTileState extends State<MyPostTile> {
         _media = items;
         _mediaLoading = false;
       });
+
+      // ✅ Optional: warm up aspect ratios for images (prevents visual “jump”)
+      if (kUseAdaptiveMediaAspectRatio) {
+        for (final m in items) {
+          if (m.type == 'image') {
+            _precacheImageAspectRatio(m.url);
+          }
+        }
+      }
     } catch (e) {
       debugPrint('Error loading post media: $e');
       if (!mounted) return;
@@ -177,17 +196,16 @@ class _MyPostTileState extends State<MyPostTile> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                       title: Text("Delete Post".tr()),
-                      content: Text("Are you sure you want to delete this post?".tr(),
+                      content: Text(
+                        "Are you sure you want to delete this post?".tr(),
                       ),
                       actions: [
                         TextButton(
-                          onPressed: () =>
-                              Navigator.pop(dialogContext, false),
+                          onPressed: () => Navigator.pop(dialogContext, false),
                           child: Text("Cancel".tr()),
                         ),
                         TextButton(
-                          onPressed: () =>
-                              Navigator.pop(dialogContext, true),
+                          onPressed: () => Navigator.pop(dialogContext, true),
                           child: Text("Delete".tr()),
                         ),
                       ],
@@ -250,8 +268,7 @@ class _MyPostTileState extends State<MyPostTile> {
             widget.post.id,
             widget.post.userId,
           );
-          final messenger =
-          ScaffoldMessenger.maybeOf(widget.scaffoldContext);
+          final messenger = ScaffoldMessenger.maybeOf(widget.scaffoldContext);
           messenger?.showSnackBar(
             SnackBar(content: Text("Message reported".tr())),
           );
@@ -269,8 +286,7 @@ class _MyPostTileState extends State<MyPostTile> {
         confirmText: "Block".tr(),
         onConfirm: () async {
           await databaseProvider.blockUser(widget.post.userId);
-          final messenger =
-          ScaffoldMessenger.maybeOf(widget.scaffoldContext);
+          final messenger = ScaffoldMessenger.maybeOf(widget.scaffoldContext);
           messenger?.showSnackBar(
             SnackBar(content: Text("User blocked".tr())),
           );
@@ -292,8 +308,7 @@ class _MyPostTileState extends State<MyPostTile> {
     }
 
     // 👉 If it's your own post → switch bottom nav to Profile tab
-    final bottomNav =
-    Provider.of<BottomNavProvider>(context, listen: false);
+    final bottomNav = Provider.of<BottomNavProvider>(context, listen: false);
 
     // 4 = index of Profile tab in MainLayout's BottomNavigationBar
     bottomNav.setIndex(4);
@@ -336,7 +351,8 @@ class _MyPostTileState extends State<MyPostTile> {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text('@${widget.post.username}',
+                    Text(
+                      '@${widget.post.username}',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.primary,
                       ),
@@ -365,8 +381,9 @@ class _MyPostTileState extends State<MyPostTile> {
     if (imageMedias.isEmpty) return;
 
     final imageUrls = imageMedias.map((m) => m.url).toList();
-    final initialIndex =
-    imageMedias.indexWhere((m) => m.id == media.id).clamp(0, imageUrls.length - 1);
+    final initialIndex = imageMedias
+        .indexWhere((m) => m.id == media.id)
+        .clamp(0, imageUrls.length - 1);
 
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -378,57 +395,117 @@ class _MyPostTileState extends State<MyPostTile> {
     );
   }
 
+  /// ✅ Optional: resolve and cache an image aspect ratio for a URL
+  void _precacheImageAspectRatio(String url) {
+    if (_imageAspectRatios.containsKey(url)) return;
+
+    final image = NetworkImage(url);
+    final stream = image.resolve(const ImageConfiguration());
+
+    ImageStreamListener? listener;
+    listener = ImageStreamListener(
+          (ImageInfo info, bool _) {
+        final w = info.image.width.toDouble();
+        final h = info.image.height.toDouble();
+        if (w > 0 && h > 0) {
+          final ratio = w / h;
+          if (mounted) {
+            setState(() {
+              _imageAspectRatios[url] = ratio;
+            });
+          } else {
+            _imageAspectRatios[url] = ratio;
+          }
+        }
+        stream.removeListener(listener!);
+      },
+      onError: (Object _, StackTrace? __) {
+        stream.removeListener(listener!);
+      },
+    );
+
+    stream.addListener(listener);
+  }
+
+  /// Decide the media aspect ratio for the current page index
+  /// - If image ratio known → use it (clamped)
+  /// - If video → default to 4/5 (keeps your existing style)
+  /// - Else fallback → 4/5
+  double _currentMediaAspectRatio() {
+    const fallback = 4 / 5;
+
+    if (!kUseAdaptiveMediaAspectRatio) return fallback;
+    if (_media.isEmpty) return fallback;
+
+    final media = _media[_currentMediaIndex];
+
+    if (media.type == 'image') {
+      final ratio = _imageAspectRatios[media.url];
+      if (ratio == null) return fallback;
+
+      // clamp so it doesn’t get ridiculous tall/wide
+      // (prevents super wide panoramas or super tall images breaking the feed)
+      return ratio.clamp(0.8, 1.25);
+    }
+
+    // video fallback (you can tune this later if you want)
+    return fallback;
+  }
+
   // swipable media (images + videos) OR text-only
   Widget _buildImageOrText(BuildContext context) {
     final theme = Theme.of(context);
 
     // 1️⃣ If we have media items → show PageView
     if (!_mediaLoading && _media.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: AspectRatio(
-          aspectRatio: 4 / 5,
-          child: PageView.builder(
-            itemCount: _media.length,
-            onPageChanged: (index) {
-              setState(() {
-                _currentMediaIndex = index;
-              });
-            },
-            itemBuilder: (context, index) {
-              final media = _media[index];
+      // - No rounded corners on media
+      // - Media expands to the full screen width
+      // - (Optional) Adaptive aspect ratio
+      final aspectRatio = _currentMediaAspectRatio();
 
-              if (media.type == 'video') {
-                // keep current behavior: tap = play/pause only
-                return _VideoPostPlayer(videoUrl: media.url);
-              }
+      return AspectRatio(
+        aspectRatio: aspectRatio,
+        child: PageView.builder(
+          itemCount: _media.length,
+          onPageChanged: (index) {
+            setState(() {
+              _currentMediaIndex = index;
+            });
+          },
+          itemBuilder: (context, index) {
+            final media = _media[index];
 
-              // default = image (tap → fullscreen, not post page)
-              return GestureDetector(
-                onTap: () => _openFullscreenForMedia(media),
-                child: Image.network(
-                  media.url,
-                  fit: BoxFit.cover,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: CircularProgressIndicator(),
-                      ),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      alignment: Alignment.center,
-                      child: Text('Failed to load media'.tr()),
-                    );
-                  },
-                ),
-              );
-            },
-          ),
+            if (media.type == 'video') {
+              // keep current behavior: tap = play/pause only
+              return _VideoPostPlayer(videoUrl: media.url);
+            }
+
+            // default = image (tap → fullscreen, not post page)
+            return GestureDetector(
+              onTap: () => _openFullscreenForMedia(media),
+              child: Image.network(
+                media.url,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    alignment: Alignment.center,
+                    child: Text('Failed to load media'.tr()),
+                  );
+                },
+              ),
+            );
+          },
         ),
       );
     }
@@ -529,33 +606,33 @@ class _MyPostTileState extends State<MyPostTile> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final likeCount = listeningProvider.getLikeCount(widget.post.id);
-    final commentCount =
-        listeningProvider.getComments(widget.post.id).length;
+    final commentCount = listeningProvider.getComments(widget.post.id).length;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      child: Card(
-        elevation: theme.brightness == Brightness.dark ? 0.5 : 1.5,
-        shadowColor: theme.colorScheme.shadow
-            .withValues(alpha: theme.brightness == Brightness.dark ? 0.25 : 0.18),
-        color: theme.colorScheme.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(22),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.only(
-            left: 10,
-            right: 10,
-            top: 8,
-            bottom: 10,
+    // ✅ Updated:
+    // Full-width layout + optional subtle separator between posts.
+    return Column(
+      children: [
+        if (kShowSubtlePostSeparator)
+          Container(
+            height: 10,
+            color: theme.colorScheme.surfaceContainerLowest,
           ),
+
+        Material(
+          // Using Material instead of Card here allows full-width content
+          // without rounded clipping affecting the media.
+          color: theme.colorScheme.surface,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeader(context),
+              // header stays nicely padded
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: _buildHeader(context),
+              ),
               const SizedBox(height: 4),
 
-              // image / video / text content
+              // media goes full width
               _buildImageOrText(context),
 
               // dots indicator if multiple media
@@ -563,8 +640,11 @@ class _MyPostTileState extends State<MyPostTile> {
 
               const SizedBox(height: 6),
 
-              // actions
-              _buildActionsRow(context),
+              // actions stay padded
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: _buildActionsRow(context),
+              ),
 
               // likes
               if (likeCount > 0)
@@ -613,7 +693,6 @@ class _MyPostTileState extends State<MyPostTile> {
                   ),
                 ),
 
-
               const SizedBox(height: 4),
 
               // view all comments → ONLY place that opens post page
@@ -639,13 +718,11 @@ class _MyPostTileState extends State<MyPostTile> {
 
               // time ago
               Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 child: TimeAgoText(
                   createdAt: widget.post.createdAt,
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.primary
-                        .withValues(alpha: 0.8),
+                    color: theme.colorScheme.primary.withValues(alpha: 0.8),
                     letterSpacing: 0.2,
                   ),
                 ),
@@ -653,7 +730,7 @@ class _MyPostTileState extends State<MyPostTile> {
             ],
           ),
         ),
-      ),
+      ],
     );
   }
 }

@@ -1,4 +1,5 @@
 // lib/pages/stories_page.dart
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -84,7 +85,7 @@ class _StoriesPageState extends State<StoriesPage> {
         backgroundColor: _accent,
         elevation: 0,
         title: Text(
-          widget.story.appBarTitle,
+          widget.story.appBarTitle.tr(),
           style: TextStyle(fontWeight: FontWeight.w600),
         ),
         centerTitle: true,
@@ -112,7 +113,7 @@ class _StoriesPageState extends State<StoriesPage> {
                 _buildStoryCard(textTheme),
                 const SizedBox(height: 24),
                 Text(
-                  'Quiz about the story',
+                  'Quiz about the story'.tr(),
                   style: textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: _accent,
@@ -120,7 +121,7 @@ class _StoriesPageState extends State<StoriesPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Tap the answer you think is correct. If you are wrong, the correct answer will be highlighted for you.',
+                  'Tap the answer you think is correct. If you are wrong, the correct answer will be highlighted for you.'.tr(),
                   style: textTheme.bodyMedium?.copyWith(
                     color: Colors.grey[700],
                   ),
@@ -169,7 +170,7 @@ class _StoriesPageState extends State<StoriesPage> {
                       Icon(widget.story.icon, size: 16, color: _accent),
                       const SizedBox(width: 6),
                       Text(
-                        widget.story.chipLabel,
+                        widget.story.chipLabel.tr(),
                         style: TextStyle(
                           color: _accent,
                           fontSize: 12,
@@ -185,7 +186,7 @@ class _StoriesPageState extends State<StoriesPage> {
             ),
             const SizedBox(height: 12),
             Text(
-              widget.story.title,
+              widget.story.title.tr(),
               style: textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -193,7 +194,7 @@ class _StoriesPageState extends State<StoriesPage> {
             if (widget.story.subtitle != null) ...[
               const SizedBox(height: 4),
               Text(
-                widget.story.subtitle!,
+                widget.story.subtitle!.tr(),
                 style: textTheme.bodySmall?.copyWith(
                   color: Colors.grey[600],
                   fontStyle: FontStyle.italic,
@@ -202,7 +203,7 @@ class _StoriesPageState extends State<StoriesPage> {
             ],
             const SizedBox(height: 8),
             Text(
-              widget.story.body,
+              widget.story.body.tr(),
               style: textTheme.bodyMedium?.copyWith(
                 height: 1.4,
                 color: Colors.grey[600],
@@ -250,7 +251,7 @@ class _StoriesPageState extends State<StoriesPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    question.question,
+                    question.question.tr(),
                     style: textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
@@ -271,8 +272,8 @@ class _StoriesPageState extends State<StoriesPage> {
                 alignment: Alignment.centerRight,
                 child: Text(
                   selectedIndex == question.correctIndex
-                      ? 'Well done!'
-                      : 'Check the highlighted correct answer 💡',
+                      ? 'Well done!'.tr()
+                      : 'Check the highlighted correct answer 💡'.tr(),
                   style: textTheme.bodySmall?.copyWith(
                     color: selectedIndex == question.correctIndex
                         ? _accent
@@ -338,7 +339,7 @@ class _StoriesPageState extends State<StoriesPage> {
             children: [
               Expanded(
                 child: Text(
-                  question.options[optionIndex],
+                  question.options[optionIndex].tr(),
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight:

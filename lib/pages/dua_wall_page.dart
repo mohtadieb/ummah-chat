@@ -263,7 +263,7 @@ class _DuaWallPageState extends State<DuaWallPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Dua wall'.tr(),
+              'Dua Wall'.tr(),
               style: textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
                 fontSize: 22,
@@ -573,8 +573,8 @@ class _DuaWallPageState extends State<DuaWallPage> {
                           elevation: isAmeened ? 3 : 0,
                           padding:
                           const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
+                            horizontal: 14,
+                            vertical: 3,
                           ),
                           backgroundColor: isAmeened
                               ? const Color(0xFF0F8254)

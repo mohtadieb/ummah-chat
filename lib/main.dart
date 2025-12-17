@@ -14,7 +14,6 @@ import 'themes/theme_provider.dart';
 import 'services/navigation/bottom_nav_provider.dart';
 import 'package:easy_localization/easy_localization.dart';
 
-
 // 🔔 Push notification utilities
 import 'services/notifications/push_notification_service.dart';
 
@@ -129,10 +128,32 @@ class _MyAppState extends State<MyApp> {
       debugShowCheckedModeBanner: false,
       theme: themeProvider.themeData,
 
-      // 🟢 Add these three lines:
+      // 🟢 EasyLocalization wiring
       localizationsDelegates: context.localizationDelegates,
       supportedLocales: context.supportedLocales,
       locale: context.locale,
+
+      // ✅ Fallback to English if device locale isn't supported
+      localeResolutionCallback: (deviceLocale, supportedLocales) {
+        if (deviceLocale == null) return const Locale('en');
+
+        // 1) Try exact match (language + country if present)
+        for (final l in supportedLocales) {
+          final countryOk =
+              (l.countryCode == null) || (l.countryCode == deviceLocale.countryCode);
+          if (l.languageCode == deviceLocale.languageCode && countryOk) {
+            return l;
+          }
+        }
+
+        // 2) Try language-only match
+        for (final l in supportedLocales) {
+          if (l.languageCode == deviceLocale.languageCode) return l;
+        }
+
+        // 3) Fallback to English
+        return const Locale('en');
+      },
 
       initialRoute: '/',
       routes: {
@@ -144,4 +165,3 @@ class _MyAppState extends State<MyApp> {
     );
   }
 }
-

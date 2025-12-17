@@ -167,7 +167,11 @@ class _ProfilePageState extends State<ProfilePage> {
         debugPrint('❌ Unable to load asset ${song.assetPath}: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Asset not found: ${song.assetPath}'.tr())),
+            SnackBar(
+              content: Text(
+                'asset_not_found'.tr(namedArgs: {'path': song.assetPath}),
+              ),
+            ),
           );
         }
         return;
@@ -381,7 +385,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
     // Country first (always set after CompleteProfilePage)
     if (country.isNotEmpty) {
-      chips.add(_chip(country));
+      chips.add(_chip(country.tr()));
     }
 
     // Then city
@@ -1467,7 +1471,11 @@ class _ProfilePageState extends State<ProfilePage> {
 
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28.0),
-              child: Text("Stories completed: ${sortedCompletedIds.length} / $totalStories",
+              child: Text(
+                'stories_completed'.tr(namedArgs: {
+                  'done': sortedCompletedIds.length.toString(),
+                  'total': totalStories.toString(),
+                }),
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.primary,
                   fontWeight: FontWeight.bold,
@@ -1518,10 +1526,10 @@ class _ProfilePageState extends State<ProfilePage> {
                       );
                       final int? partNo = partInfo.partNo;
                       displayName = partNo != null
-                          ? 'Muhammad (ﷺ) $partNo'
-                          : 'Muhammad (ﷺ)';
+                          ? 'muhammad_part'.tr(namedArgs: {'part': partNo.toString()})
+                          : 'muhammad'.tr();
                     } else {
-                      final rawLabel = story.chipLabel;
+                      final rawLabel = story.chipLabel.tr();
                       final lower = rawLabel.toLowerCase();
                       displayName = lower.startsWith('prophet ')
                           ? rawLabel.substring('Prophet '.length)
@@ -1644,7 +1652,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           color: Color(0xFF0F8254),
                         ),
                         const SizedBox(width: 8),
-                        Text("Prophets Stories Level $levelsCompleted".tr(),
+                        Text('prophets_stories_level'.tr(namedArgs: {'level': levelsCompleted.toString()}),
                           style: TextStyle(
                             color: Color(0xFF0F8254),
                             fontSize: 12.5,
@@ -1726,13 +1734,14 @@ class _ProfilePageState extends State<ProfilePage> {
                           const SizedBox(height: 2),
                           Text(
                             postCount == 0
-                                ? "Tap to view posts".tr()
-                                : "$postCount post${postCount == 1 ? '' : 's'} • tap to view",
+                                ? 'tap_to_view_posts'.tr()
+                                : 'posts_tap_to_view'.plural(
+                              postCount,
+                              namedArgs: {'count': postCount.toString()},
+                            ),
                             style: TextStyle(
                               fontSize: 12,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.primary.withValues(alpha: 0.75),
+                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.75),
                             ),
                           ),
                         ],

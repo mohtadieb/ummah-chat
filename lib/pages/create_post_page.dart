@@ -64,7 +64,8 @@ class _CreatePostPageState extends State<CreatePostPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Please allow photo access in your settings to add photos/videos.'.tr(),
+              'Please allow photo access in your settings to add photos/videos.'
+                  .tr(),
             ),
           ),
         );
@@ -75,9 +76,14 @@ class _CreatePostPageState extends State<CreatePostPage> {
 
       final result = await AssetPicker.pickAssets(
         context,
-        pickerConfig: const AssetPickerConfig(
+        pickerConfig: AssetPickerConfig(
           maxAssets: 10,
           requestType: RequestType.common, // images + videos
+
+          // ✅ Best fix:
+          // Always use app-driven translations (EasyLocalization)
+          // so ANY language you add later will be consistent and never fallback to Chinese.
+          textDelegate: const _AppAssetPickerTextDelegate(),
         ),
       );
 
@@ -90,8 +96,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
 
       setState(() {
         _selectedAssets = result;
-        _editedFiles =
-        List<File?>.filled(result.length, null, growable: true);
+        _editedFiles = List<File?>.filled(result.length, null, growable: true);
         _currentIndex = 0;
       });
     } catch (e, s) {
@@ -208,9 +213,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
       }
 
       // 🔸 Only throw if user DID select something, but we somehow could not resolve any files.
-      if (_selectedAssets.isNotEmpty &&
-          imageFiles.isEmpty &&
-          videoFiles.isEmpty) {
+      if (_selectedAssets.isNotEmpty && imageFiles.isEmpty && videoFiles.isEmpty) {
         throw Exception('No media files resolved from gallery selection.'.tr());
       }
 
@@ -283,7 +286,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
             )
                 : Text(
               'Share'.tr(),
-              style: TextStyle(fontWeight: FontWeight.w600),
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -344,12 +347,11 @@ class _CreatePostPageState extends State<CreatePostPage> {
                                       decoration: BoxDecoration(
                                         color: Colors.black
                                             .withValues(alpha: 0.55),
-                                        borderRadius:
-                                        BorderRadius.circular(20),
+                                        borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Text(
                                         '${_currentIndex + 1}/${_selectedAssets.length}',
-                                        style: TextStyle(
+                                        style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 11,
                                           fontWeight: FontWeight.w500,
@@ -370,23 +372,20 @@ class _CreatePostPageState extends State<CreatePostPage> {
                                       decoration: BoxDecoration(
                                         color: Colors.black
                                             .withValues(alpha: 0.6),
-                                        borderRadius:
-                                        BorderRadius.circular(20),
+                                        borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           const Icon(Icons.videocam,
-                                              size: 16,
-                                              color: Colors.white),
+                                              size: 16, color: Colors.white),
                                           const SizedBox(width: 4),
                                           Text(
                                             'Video'.tr(),
                                             style: const TextStyle(
                                               color: Colors.white,
                                               fontSize: 11,
-                                              fontWeight:
-                                              FontWeight.w500,
+                                              fontWeight: FontWeight.w500,
                                             ),
                                           ),
                                         ],
@@ -413,8 +412,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
                                 : color.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color:
-                              color.outline.withValues(alpha: 0.4),
+                              color: color.outline.withValues(alpha: 0.4),
                             ),
                           ),
                           child: Column(
@@ -430,18 +428,17 @@ class _CreatePostPageState extends State<CreatePostPage> {
                                 'No photos or videos added'.tr(),
                                 style: TextStyle(
                                   fontWeight: FontWeight.w600,
-                                  color: color.onSurface
-                                      .withValues(alpha: 0.9),
+                                  color: color.onSurface.withValues(alpha: 0.9),
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'You can share a text-only post, or add media below.'.tr(),
+                                'You can share a text-only post, or add media below.'
+                                    .tr(),
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: color.onSurface
-                                      .withValues(alpha: 0.7),
+                                  color: color.onSurface.withValues(alpha: 0.7),
                                 ),
                               ),
                               const SizedBox(height: 12),
@@ -449,8 +446,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
                                 onPressed: _openGallery,
                                 icon: const Icon(
                                     Icons.add_photo_alternate_outlined),
-                                label: Text(
-                                    'Add photos / videos'.tr()),
+                                label: Text('Add photos / videos'.tr()),
                               ),
                             ],
                           ),
@@ -460,8 +456,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
                     // --- TOOLBAR (Crop / Filters / Cover) ---
                     if (!isGalleryEmpty)
                       Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16.0),
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
                         child: Row(
                           children: [
                             _ToolChip(
@@ -497,12 +492,9 @@ class _CreatePostPageState extends State<CreatePostPage> {
                         height: 90,
                         child: ListView.separated(
                           scrollDirection: Axis.horizontal,
-                          padding:
-                          const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount:
-                          _selectedAssets.length + 1, // +1 for "add more"
-                          separatorBuilder: (_, __) =>
-                          const SizedBox(width: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: _selectedAssets.length + 1, // +1 for "add more"
+                          separatorBuilder: (_, __) => const SizedBox(width: 8),
                           itemBuilder: (context, index) {
                             if (index == _selectedAssets.length) {
                               // "Add more" tile
@@ -515,16 +507,13 @@ class _CreatePostPageState extends State<CreatePostPage> {
                                         ? color.surfaceVariant
                                         .withValues(alpha: 0.6)
                                         : color.surfaceVariant,
-                                    borderRadius:
-                                    BorderRadius.circular(14),
+                                    borderRadius: BorderRadius.circular(14),
                                     border: Border.all(
-                                      color: color.outline
-                                          .withValues(alpha: 0.5),
+                                      color: color.outline.withValues(alpha: 0.5),
                                     ),
                                   ),
                                   child: const Center(
-                                    child: Icon(Icons.add_rounded,
-                                        size: 28),
+                                    child: Icon(Icons.add_rounded, size: 28),
                                   ),
                                 ),
                               );
@@ -542,8 +531,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
                               child: Container(
                                 width: 70,
                                 decoration: BoxDecoration(
-                                  borderRadius:
-                                  BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
                                     color: isSelected
                                         ? color.primary
@@ -552,8 +540,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
                                   ),
                                 ),
                                 child: ClipRRect(
-                                  borderRadius:
-                                  BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(12),
                                   child: Stack(
                                     children: [
                                       Positioned.fill(
@@ -561,13 +548,11 @@ class _CreatePostPageState extends State<CreatePostPage> {
                                           entity,
                                           isOriginal: false,
                                           thumbnailSize:
-                                          const ThumbnailSize
-                                              .square(200),
+                                          const ThumbnailSize.square(200),
                                           fit: BoxFit.cover,
                                         ),
                                       ),
-                                      if (entity.type ==
-                                          AssetType.video)
+                                      if (entity.type == AssetType.video)
                                         const Positioned(
                                           right: 4,
                                           bottom: 4,
@@ -590,16 +575,14 @@ class _CreatePostPageState extends State<CreatePostPage> {
 
                     // --- CAPTION AREA (ALWAYS SHOWN) ---
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                          16, 0, 16, 16),
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // Placeholder avatar – later you can pass real user photo
                           CircleAvatar(
                             radius: 18,
-                            backgroundColor: color.primary
-                                .withValues(alpha: 0.15),
+                            backgroundColor: color.primary.withValues(alpha: 0.15),
                             child: Icon(
                               Icons.person_rounded,
                               color: color.primary,
@@ -619,12 +602,10 @@ class _CreatePostPageState extends State<CreatePostPage> {
                                     .withValues(alpha: 0.8)
                                     : color.surfaceContainerHighest,
                                 border: OutlineInputBorder(
-                                  borderRadius:
-                                  BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(14),
                                   borderSide: BorderSide.none,
                                 ),
-                                contentPadding:
-                                const EdgeInsets.all(14),
+                                contentPadding: const EdgeInsets.all(14),
                               ),
                             ),
                           ),
@@ -671,6 +652,52 @@ class _CreatePostPageState extends State<CreatePostPage> {
       fit: BoxFit.cover,
     );
   }
+}
+
+/// ✅ App-driven picker strings (EasyLocalization)
+/// Add these keys in your translation JSONs.
+/// This prevents any fallback-to-Chinese behavior and scales to any language.
+class _AppAssetPickerTextDelegate extends AssetPickerTextDelegate {
+  const _AppAssetPickerTextDelegate();
+
+  // Bottom bar
+  @override
+  String get preview => 'picker_preview'.tr();
+
+  @override
+  String get confirm => 'picker_confirm'.tr();
+
+  // Common actions
+  @override
+  String get cancel => 'picker_cancel'.tr();
+
+  @override
+  String get edit => 'picker_edit'.tr();
+
+  @override
+  String get original => 'picker_original'.tr();
+
+  // Album / path selection
+  @override
+  String get allAlbums => 'picker_all_albums'.tr();
+
+  @override
+  String get recent => 'picker_recent'.tr();
+
+  // Empty / errors
+  @override
+  String get emptyList => 'picker_empty_list'.tr();
+
+  @override
+  String get loadFailed => 'picker_load_failed'.tr();
+
+  @override
+  String get unSupportedAssetType => 'picker_unsupported'.tr();
+
+  // Selection limits
+  @override
+  String maximumAssetsCount(int count) =>
+      'picker_max_assets'.tr(namedArgs: {'count': '$count'});
 }
 
 // Small pill-shaped tool buttons under the preview

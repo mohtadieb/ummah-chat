@@ -76,8 +76,7 @@ class _SettingsPageState extends State<SettingsPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Support Ummah Chat'.tr()),
-        content:
-        Text('You’ll be redirected to PayPal to make a donation.'.tr()),
+        content: Text('You’ll be redirected to PayPal to make a donation.'.tr()),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -150,7 +149,12 @@ class _SettingsPageState extends State<SettingsPage> {
             MySettingsTile(
               title: "Dark Mode".tr(), // later: 'settings_dark_mode'.tr()
               leadingIcon: Icons.dark_mode_outlined,
-              onTap: CupertinoSwitch(
+
+              // ✅ Switch rows should NOT navigate on tile tap
+              enabled: false,
+
+              // ✅ New API: use trailing instead of onTap widget
+              trailing: CupertinoSwitch(
                 value: themeProvider.isDarkMode,
                 onChanged: (value) => themeProvider.toggleTheme(),
               ),
@@ -162,7 +166,11 @@ class _SettingsPageState extends State<SettingsPage> {
             MySettingsTile(
               title: "Language".tr(), // later: 'settings_language'.tr()
               leadingIcon: Icons.language_outlined,
-              onTap: DropdownButton<Locale>(
+
+              // ✅ Dropdown rows should NOT navigate on tile tap
+              enabled: false,
+
+              trailing: DropdownButton<Locale>(
                 value: currentLocale,
                 underline: const SizedBox(), // no blue underline
                 borderRadius: BorderRadius.circular(12),
@@ -192,20 +200,22 @@ class _SettingsPageState extends State<SettingsPage> {
             MySettingsTile(
               title: "Blocked Users".tr(),
               leadingIcon: Icons.block_outlined,
-              onTap: IconButton(
-                icon: Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 18,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                onPressed: () async {
-                  final databaseProvider = Provider.of<DatabaseProvider>(
-                    context,
-                    listen: false,
-                  );
-                  await databaseProvider.loadBlockedUsers();
-                  goBlockedUsersPage(context);
-                },
+
+              // ✅ Whole tile tap navigates
+              onPressed: () async {
+                final databaseProvider = Provider.of<DatabaseProvider>(
+                  context,
+                  listen: false,
+                );
+                await databaseProvider.loadBlockedUsers();
+                goBlockedUsersPage(context);
+              },
+
+              // ✅ Trailing icon just for visual hint (tile handles tap)
+              trailing: Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 18,
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
 
@@ -221,13 +231,11 @@ class _SettingsPageState extends State<SettingsPage> {
             MySettingsTile(
               title: "Account Settings".tr(),
               leadingIcon: Icons.person_outline,
-              onTap: IconButton(
-                icon: Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 18,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                onPressed: () => goAccountSettingsPage(context),
+              onPressed: () => goAccountSettingsPage(context),
+              trailing: Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 18,
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
 
@@ -243,13 +251,11 @@ class _SettingsPageState extends State<SettingsPage> {
             MySettingsTile(
               title: "Donate".tr(),
               leadingIcon: Icons.favorite_outline,
-              onTap: IconButton(
-                icon: Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 18,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                onPressed: _openDonateLink,
+              onPressed: _openDonateLink,
+              trailing: Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 18,
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
 
@@ -270,12 +276,10 @@ class _SettingsPageState extends State<SettingsPage> {
             MySettingsTile(
               title: "Logout".tr(),
               leadingIcon: Icons.logout,
-              onTap: IconButton(
-                icon: Icon(
-                  Icons.logout,
-                  color: Theme.of(context).colorScheme.error,
-                ),
-                onPressed: _logout,
+              onPressed: _logout,
+              trailing: Icon(
+                Icons.logout,
+                color: Theme.of(context).colorScheme.error,
               ),
             ),
             const SizedBox(height: 30),

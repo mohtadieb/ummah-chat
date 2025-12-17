@@ -10,81 +10,111 @@ Features:
 - Full width tile
 - Rounded corners
 - Reduced padding
-- Title uses theme primary color
+- Title uses theme colors
 - Flexible action widget (e.g., switch, button)
 
 - (Updated)
-- Uses surface color + subtle border for a more "card-like" professional look
-- Optional leading icon for consistent settings UX
+- Clean, modern, borderless design
+- Subtle surface tint instead of borders or dividers
+- Leading icon sits inside a soft container for visual balance
+- Uses InkWell for modern touch feedback
+- Optimized spacing & typography for settings-style UX
+- Whole tile is tappable (optional)
 
 */
 
 class MySettingsTile extends StatelessWidget {
   final String title;
 
-  /// Trailing widget (e.g. Switch, IconButton)
-  /// NOTE: Kept the original name `onTap` for backwards compatibility.
-  final Widget onTap;
+  /// Callback when the tile (or trailing button) is tapped
+  /// Use this for navigation or opening a new page
+  final VoidCallback? onPressed;
 
-  /// Optional leading icon to visually distinguish setting types.
+  /// Trailing widget (e.g. Switch, Icon)
+  /// NOTE: Kept flexible on purpose
+  final Widget? trailing;
+
+  /// Optional leading icon to visually distinguish setting types
   final IconData? leadingIcon;
+
+  /// Whether the whole tile should be tappable
+  /// Useful to disable for Switch-only rows
+  final bool enabled;
 
   const MySettingsTile({
     super.key,
     required this.title,
-    required this.onTap,
+    this.onPressed,
+    this.trailing,
     this.leadingIcon,
+    this.enabled = true,
   });
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.symmetric(vertical: 6.0),
-      decoration: BoxDecoration(
-        // Use surface color for a clean, modern card look
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          // Subtle border to separate from background
-          color: colorScheme.secondary.withValues(alpha: 0.7),
-        ),
-      ),
-      child: Padding(
-        // Slightly tighter, but balanced padding
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
-        child: Row(
-          children: [
-            // Optional leading icon
-            if (leadingIcon != null) ...[
-              Icon(
-                leadingIcon,
-                size: 20,
-                color: colorScheme.primary,
-              ),
-              const SizedBox(width: 12),
-            ],
+    return Padding(
+      // Vertical spacing between tiles (instead of dividers)
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Material(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
 
-            // Title
-            Expanded(
-              child: Text(
-                title,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
-                  color: colorScheme.primary,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
+          // ✅ Whole tile is now tappable
+          onTap: enabled ? onPressed : null,
+
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
             ),
+            child: Row(
+              children: [
+                // Optional leading icon with soft container
+                if (leadingIcon != null) ...[
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      leadingIcon,
+                      size: 20,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                ],
 
-            const SizedBox(width: 12),
+                // Title
+                Expanded(
+                  child: Text(
+                    title,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w500,
+                      color: enabled
+                          ? colorScheme.onSurface
+                          : colorScheme.onSurface.withValues(alpha: 0.5),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
 
-            // Trailing control (Switch, Arrow, etc.)
-            onTap,
-          ],
+                if (trailing != null) ...[
+                  const SizedBox(width: 8),
+
+                  // Trailing control (Switch, Arrow, etc.)
+                  trailing!,
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );
