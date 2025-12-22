@@ -7,6 +7,7 @@ class Post {
   final String? communityId;   // optional community
   final DateTime createdAt;
   final int likeCount;
+  final int commentCount;
 
   Post({
     required this.id,
@@ -17,6 +18,7 @@ class Post {
     this.communityId,
     required this.createdAt,
     required this.likeCount,
+    this.commentCount = 0, // ✅ default safe
   });
 
   factory Post.fromMap(Map<String, dynamic> map) {
@@ -29,6 +31,7 @@ class Post {
       communityId: map['community_id']?.toString(),
       createdAt: DateTime.parse(map['created_at']).toLocal(),
       likeCount: map['like_count'] ?? 0,
+      commentCount: (map['comment_count'] ?? 0) as int,
     );
   }
 
@@ -41,6 +44,7 @@ class Post {
       'community_id': communityId,
       'created_at': createdAt.toIso8601String(),
       'like_count': likeCount,
+      'comment_count': commentCount,
     };
 
     if (id.isNotEmpty) map['id'] = id;
@@ -52,6 +56,7 @@ class Post {
     String? message,
     String? communityId,
     int? likeCount,
+    int? commentCount,
   }) {
     return Post(
       id: id ?? this.id,
@@ -62,6 +67,7 @@ class Post {
       communityId: communityId ?? this.communityId,
       createdAt: createdAt,
       likeCount: likeCount ?? this.likeCount,
+      commentCount: commentCount ?? this.commentCount,
     );
   }
 }

@@ -113,6 +113,7 @@ class DatabaseProvider extends ChangeNotifier {
       communityId: null,
       createdAt: DateTime.now(),
       likeCount: 0,
+      commentCount: 0,
     );
 
     notifyListeners();
@@ -144,7 +145,6 @@ class DatabaseProvider extends ChangeNotifier {
       await loadFriendIds(notify: false);
 
       // ✅ Load likes map for For You (friends + following likes)
-      // (only for recent N posts to keep query small) WITHOUT notifying mid-load
       final postIds = _posts
           .take(200)
           .map((p) => p.id)
@@ -153,11 +153,10 @@ class DatabaseProvider extends ChangeNotifier {
 
       await loadLikesForForYou(postIds, notify: false);
 
-      // 4️⃣ Initialize like counts
-      initializeLikeMap();
+      // ✅ Init like + comment count maps from posts (single source for UI)
+      initializeCountMaps();
 
       // ✅ Load bookmarks after posts so bookmarkedPosts can be derived from _posts
-      // WITHOUT notifying mid-load
       await loadBookmarks(notify: false);
 
       // 5️⃣ Load which posts are liked by the current user (from post_likes)
@@ -186,6 +185,7 @@ class DatabaseProvider extends ChangeNotifier {
 
     try {
       await loadAllPosts();
+      clearPostMediaCache();
     } catch (e, s) {
       debugPrint('Error reloading posts: $e\n$s');
     } finally {
@@ -232,6 +232,7 @@ class DatabaseProvider extends ChangeNotifier {
     final oldPosts = List<Post>.from(_posts);
     final oldFollowingPosts = List<Post>.from(_followingPosts);
     final oldLikeCounts = Map<String, int>.from(_likeCounts);
+    final oldCommentCounts = Map<String, int>.from(_commentCounts);
     final oldLikedPosts = List<String>.from(_likedPosts);
     final oldBookmarkedPostIds = Set<String>.from(_bookmarkedPostIds);
     final oldComments = Map<String, List<Comment>>.from(_comments);
@@ -243,6 +244,7 @@ class DatabaseProvider extends ChangeNotifier {
 
       // remove local caches tied to this post
       _likeCounts.remove(post.id);
+      _commentCounts.remove(post.id);
       _likedPosts.remove(post.id);
       _bookmarkedPostIds.remove(post.id);
       _comments.remove(post.id);
@@ -261,6 +263,7 @@ class DatabaseProvider extends ChangeNotifier {
       _posts = oldPosts;
       _followingPosts = oldFollowingPosts;
       _likeCounts = oldLikeCounts;
+      _commentCounts = oldCommentCounts;
       _likedPosts = oldLikedPosts;
 
       _bookmarkedPostIds
@@ -323,6 +326,46 @@ class DatabaseProvider extends ChangeNotifier {
     }
   }
 
+  // ✅ Media cache to prevent refetch + stutter
+  final Map<String, List<PostMedia>> _postMediaCache = {};
+
+  // ✅ Dedupe concurrent requests per post (prevents "loading forever" feeling)
+  final Map<String, Future<List<PostMedia>>> _postMediaInFlight = {};
+
+  // Optional: if you want to clear cache on refresh / logout
+  void clearPostMediaCache() {
+    _postMediaCache.clear();
+    _postMediaInFlight.clear();
+  }
+
+  Future<List<PostMedia>> getPostMediaCached(String postId) {
+    // cache hit
+    final cached = _postMediaCache[postId];
+    if (cached != null) return Future.value(cached);
+
+    // in-flight hit (dedupe)
+    final inFlight = _postMediaInFlight[postId];
+    if (inFlight != null) return inFlight;
+
+    // create in-flight
+    final future = getPostMedia(postId)
+        .timeout(const Duration(seconds: 12), onTimeout: () {
+      // ✅ Avoid "forever loading"
+      return <PostMedia>[];
+    }).then((items) {
+      _postMediaCache[postId] = items;
+      return items;
+    }).catchError((_) {
+      // ✅ Avoid "forever loading"
+      return <PostMedia>[];
+    }).whenComplete(() {
+      _postMediaInFlight.remove(postId);
+    });
+
+    _postMediaInFlight[postId] = future;
+    return future;
+  }
+
   /* ==================== BOOKMARKS ==================== */
 
   final Set<String> _bookmarkedPostIds = {};
@@ -340,17 +383,11 @@ class DatabaseProvider extends ChangeNotifier {
   bool isAyahBookmarkedByCurrentUser(String ayahKey) =>
       _bookmarkedAyahKeys.contains(ayahKey);
 
-  /// ✅ Posts that are bookmarked by the current user (for Saved tab)
-  ///
-  /// IMPORTANT:
-  /// - This is derived from the current in-memory `_posts` list.
-  /// - So make sure `loadAllPosts()` runs before you rely on this.
   List<Post> get bookmarkedPosts {
     final idSet = _bookmarkedPostIds;
     return _posts.where((p) => idSet.contains(p.id)).toList();
   }
 
-  /// Load bookmarks once (call this after login / on app start / when opening Saved)
   Future<void> loadBookmarks({bool notify = true}) async {
     try {
       final rows = await _db.getBookmarksFromDatabase();
@@ -373,7 +410,6 @@ class DatabaseProvider extends ChangeNotifier {
     }
   }
 
-  /// Toggle bookmark (optimistic UI like your toggleLike)
   Future<void> toggleBookmark({
     required String itemType, // 'post' or 'ayah'
     required String itemId,
@@ -414,23 +450,26 @@ class DatabaseProvider extends ChangeNotifier {
     }
   }
 
-  /* ==================== LIKES ==================== */
+  /* ==================== LIKES + COMMENTS COUNTS (SAME PATTERN) ==================== */
 
   Map<String, int> _likeCounts = {};
+  Map<String, int> _commentCounts = {};
   List<String> _likedPosts = [];
 
   bool isPostLikedByCurrentUser(String postId) => _likedPosts.contains(postId);
 
   int getLikeCount(String postId) => _likeCounts[postId] ?? 0;
+  int getCommentCount(String postId) => _commentCounts[postId] ?? 0;
 
-  /// Initialize like map locally from `_posts`
-  void initializeLikeMap() {
+  /// Initialize count maps locally from `_posts`
+  void initializeCountMaps() {
     _likeCounts.clear();
-    _likedPosts.clear();
+    _commentCounts.clear();
 
-    for (var post in _posts) {
+    for (final post in _posts) {
       if (post.id.isNotEmpty) {
         _likeCounts[post.id] = post.likeCount;
+        _commentCounts[post.id] = post.commentCount;
       }
     }
   }
@@ -513,13 +552,21 @@ class DatabaseProvider extends ChangeNotifier {
   }
 
   Future<void> addComment(String postId, String message) async {
-    if (message.trim().isEmpty) return;
+    final text = message.trim();
+    if (text.isEmpty) return;
+
+    // ✅ instant UI update (same as likes pattern)
+    _bumpPostCommentCount(postId, 1);
 
     try {
-      await _db.addCommentInDatabase(postId, message);
-      await loadComments(postId);
+      await _db.addCommentInDatabase(postId, text);
+      await loadComments(postId); // for post page
     } catch (e) {
       debugPrint('Error adding comment: $e');
+
+      // rollback
+      _bumpPostCommentCount(postId, -1);
+      rethrow;
     }
   }
 
@@ -530,25 +577,69 @@ class DatabaseProvider extends ChangeNotifier {
     required String parentCommentUserId,
     required String parentCommentUsername,
   }) async {
-    await _db.replyToCommentInDatabase(
-      postId: postId,
-      replyText: replyText,
-      parentCommentId: parentCommentId,
-      parentCommentUserId: parentCommentUserId,
-      parentCommentUsername: parentCommentUsername,
-    );
+    final text = replyText.trim();
+    if (text.isEmpty) return;
 
-    await loadComments(postId);
-    notifyListeners();
+    _bumpPostCommentCount(postId, 1);
+
+    try {
+      await _db.replyToCommentInDatabase(
+        postId: postId,
+        replyText: text,
+        parentCommentId: parentCommentId,
+        parentCommentUserId: parentCommentUserId,
+        parentCommentUsername: parentCommentUsername,
+      );
+
+      await loadComments(postId);
+    } catch (e) {
+      debugPrint('Error replying to comment: $e');
+      _bumpPostCommentCount(postId, -1);
+      rethrow;
+    }
   }
 
   Future<void> deleteComment(String commentId, String postId) async {
+    _bumpPostCommentCount(postId, -1);
+
     try {
       await _db.deleteCommentFromDatabase(commentId);
       await loadComments(postId);
     } catch (e) {
       debugPrint('Error deleting comment: $e');
+      _bumpPostCommentCount(postId, 1); // rollback
+      rethrow;
     }
+  }
+
+  void _bumpPostCommentCount(String postId, int delta) {
+    // provider map (same pattern as likes)
+    final current = _commentCounts[postId] ?? 0;
+    _commentCounts[postId] = (current + delta).clamp(0, 1 << 30);
+
+    // also keep Post objects in sync (optional but nice for deep-linked PostPage)
+    bool changed = false;
+
+    final i = _posts.indexWhere((p) => p.id == postId);
+    if (i != -1) {
+      final currentPost = _posts[i];
+      _posts[i] = currentPost.copyWith(
+        commentCount: (_commentCounts[postId] ?? currentPost.commentCount),
+      );
+      changed = true;
+    }
+
+    final j = _followingPosts.indexWhere((p) => p.id == postId);
+    if (j != -1) {
+      final currentPost = _followingPosts[j];
+      _followingPosts[j] = currentPost.copyWith(
+        commentCount: (_commentCounts[postId] ?? currentPost.commentCount),
+      );
+      changed = true;
+    }
+
+    // Always notify (count changed even if post list didn't contain it)
+    notifyListeners();
   }
 
   /* ==================== BLOCKED USERS ==================== */
@@ -813,10 +904,6 @@ class DatabaseProvider extends ChangeNotifier {
   Set<String> _friendsOfFriendsIds = {};
   Set<String> get friendsOfFriendsIds => _friendsOfFriendsIds;
 
-  /// ✅ Load FOAF ids (best-effort).
-  /// Requires:
-  /// - friendUserIds (Set<String>) already in your provider
-  /// - _db.getFriendsOfFriendsIdsFromDatabase(...) added in DatabaseService
   Future<void> _ensureFriendsOfFriendsLoaded() async {
     try {
       final currentUserId = _auth.getCurrentUserId();
@@ -837,26 +924,19 @@ class DatabaseProvider extends ChangeNotifier {
     }
   }
 
-  /// ✅ Ensures the social graph needed for ranking is loaded:
-  /// - friends
-  /// - following
-  /// - friends-of-friends
   Future<void> _ensureSearchGraphLoaded() async {
     final uid = _auth.getCurrentUserId();
     if (uid.isEmpty) return;
 
     try {
-      // Friends not loaded yet? load them.
       if (friendUserIds.isEmpty) {
         await loadFriendIds();
       }
 
-      // Following not loaded yet? load it.
       if (followingUserIds.isEmpty) {
         await loadUserFollowing(uid);
       }
 
-      // FOAF not loaded yet? load it (needs friends).
       if (_friendsOfFriendsIds.isEmpty && friendUserIds.isNotEmpty) {
         await _ensureFriendsOfFriendsLoaded();
       }
@@ -875,17 +955,13 @@ class DatabaseProvider extends ChangeNotifier {
     }
 
     try {
-      // ✅ Make sure ranking inputs exist (best-effort, cached)
       await _ensureSearchGraphLoaded();
 
-      // 1) DB search (username/name/city/country) - from DatabaseService
       final results = await _db.searchUsersInDatabase(query);
       final currentUserId = _auth.getCurrentUserId();
 
-      // 2) Remove myself
       final candidates = results.where((u) => u.id != currentUserId).toList();
 
-      // 3) Rank (friends -> FOAF -> following -> text match)
       _searchResults = UserSearchRanker.rank(
         candidates: candidates,
         currentUserId: currentUserId,
@@ -1167,8 +1243,9 @@ class DatabaseProvider extends ChangeNotifier {
     _followingPosts.clear();
     _loadingPost = null;
 
-    // Likes
+    // Likes + comment counts
     _likeCounts.clear();
+    _commentCounts.clear();
     _likedPosts.clear();
 
     // ✅ Bookmarks (important so Saved tab doesn't show old user's saved posts)

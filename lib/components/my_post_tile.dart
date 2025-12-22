@@ -1,11 +1,10 @@
 // lib/components/my_post_tile.dart
 import 'package:easy_localization/easy_localization.dart';
-import 'package:flutter/gestures.dart'; // ✅ NEW: for TapGestureRecognizer
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-
-import 'package:url_launcher/url_launcher.dart'; // ✅ NEW: open links
+import 'package:url_launcher/url_launcher.dart';
 
 import '../helper/time_ago_text.dart';
 import '../models/post.dart';
@@ -26,7 +25,7 @@ const bool kShowSubtlePostSeparator = true;
 class MyPostTile extends StatefulWidget {
   final Post post;
   final void Function()? onUserTap;
-  final void Function()? onPostTap; // navigation ("view post")
+  final void Function()? onPostTap;
   final BuildContext scaffoldContext;
   final bool isInPostPage;
 
@@ -46,7 +45,6 @@ class MyPostTile extends StatefulWidget {
   State<MyPostTile> createState() => _MyPostTileState();
 }
 
-// ✅ FIX: Keep tiles alive after scrolling past them (prevents rebuild/reload jitter)
 class _MyPostTileState extends State<MyPostTile>
     with AutomaticKeepAliveClientMixin {
   late final listeningProvider =
@@ -56,28 +54,43 @@ class _MyPostTileState extends State<MyPostTile>
 
   final _commentController = TextEditingController();
 
+  late Future<List<PostMedia>> _mediaFuture;
   List<PostMedia> _media = [];
-  bool _mediaLoading = true;
-  int _currentMediaIndex = 0;
+  bool _mediaReady = false;
 
+  int _currentMediaIndex = 0;
   final Map<String, double> _imageAspectRatios = {};
 
   bool? _optimisticBookmarked;
 
-  // ✅ NEW: keep recognizers and dispose them properly
   final List<TapGestureRecognizer> _linkRecognizers = [];
-
-  // ✅ NEW: prevent double delete taps
   bool _deleting = false;
 
   @override
-  bool get wantKeepAlive => true; // ✅ keep alive!
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
-    _loadComments();
-    _loadMedia();
+
+    // ✅ IMPORTANT: DO NOT load comments per tile (stutter source)
+    // Comments should load only on post details page.
+
+    // ✅ Media: cached + deduped in provider
+    _mediaFuture = databaseProvider.getPostMediaCached(widget.post.id);
+    _mediaFuture.then((items) {
+      if (!mounted) return;
+      setState(() {
+        _media = items;
+        _mediaReady = true;
+      });
+
+      if (kUseAdaptiveMediaAspectRatio) {
+        for (final m in items) {
+          if (m.type == 'image') _precacheImageAspectRatio(m.url);
+        }
+      }
+    });
   }
 
   @override
@@ -86,11 +99,25 @@ class _MyPostTileState extends State<MyPostTile>
 
     if (oldWidget.post.id != widget.post.id) {
       _media = [];
-      _mediaLoading = true;
+      _mediaReady = false;
       _currentMediaIndex = 0;
       _imageAspectRatios.clear();
       _optimisticBookmarked = null;
-      _loadMedia();
+
+      _mediaFuture = databaseProvider.getPostMediaCached(widget.post.id);
+      _mediaFuture.then((items) {
+        if (!mounted) return;
+        setState(() {
+          _media = items;
+          _mediaReady = true;
+        });
+
+        if (kUseAdaptiveMediaAspectRatio) {
+          for (final m in items) {
+            if (m.type == 'image') _precacheImageAspectRatio(m.url);
+          }
+        }
+      });
     }
   }
 
@@ -98,41 +125,12 @@ class _MyPostTileState extends State<MyPostTile>
   void dispose() {
     _commentController.dispose();
 
-    // ✅ dispose recognizers to avoid memory leaks
     for (final r in _linkRecognizers) {
       r.dispose();
     }
     _linkRecognizers.clear();
 
     super.dispose();
-  }
-
-  Future<void> _loadComments() async {
-    await databaseProvider.loadComments(widget.post.id);
-  }
-
-  Future<void> _loadMedia() async {
-    try {
-      final items = await databaseProvider.getPostMedia(widget.post.id);
-      if (!mounted) return;
-      setState(() {
-        _media = items;
-        _mediaLoading = false;
-      });
-
-      if (kUseAdaptiveMediaAspectRatio) {
-        for (final m in items) {
-          if (m.type == 'image') _precacheImageAspectRatio(m.url);
-        }
-      }
-    } catch (e) {
-      debugPrint('Error loading post media: $e');
-      if (!mounted) return;
-      setState(() {
-        _media = [];
-        _mediaLoading = false;
-      });
-    }
   }
 
   void _toggleLikePost() async {
@@ -173,7 +171,6 @@ class _MyPostTileState extends State<MyPostTile>
     }
   }
 
-  // ✅ Share post (text + first media URL if available)
   Future<void> _sharePost() async {
     try {
       final name = widget.post.name.trim();
@@ -249,14 +246,13 @@ class _MyPostTileState extends State<MyPostTile>
     }
   }
 
-  // ✅ FIXED: No external controller, so nothing can be disposed too early.
   Future<void> _openPrivateReflectionDialog() async {
     final messenger = ScaffoldMessenger.maybeOf(widget.scaffoldContext);
 
     await showDialog(
       context: context,
       builder: (ctx) => MyInputAlertBox(
-        title: 'private_reflection'.tr(), // translation key
+        title: 'private_reflection'.tr(),
         hintText: "Write a private reflection...".tr(),
         onPressedText: "Save".tr(),
         onPressedWithText: (text) async {
@@ -554,7 +550,6 @@ class _MyPostTileState extends State<MyPostTile>
     return fallback;
   }
 
-  // ✅ NEW: URL parsing + clickable spans
   static final RegExp _urlRegex = RegExp(
     r'((https?:\/\/)|(www\.))[^\s]+',
     caseSensitive: false,
@@ -563,7 +558,6 @@ class _MyPostTileState extends State<MyPostTile>
   Future<void> _openUrl(String raw) async {
     var url = raw.trim();
 
-    // allow "www.example.com"
     if (url.toLowerCase().startsWith('www.')) {
       url = 'https://$url';
     }
@@ -636,10 +630,7 @@ class _MyPostTileState extends State<MyPostTile>
         child: RichText(
           maxLines: maxLines,
           overflow: overflow ?? TextOverflow.clip,
-          text: TextSpan(
-            style: baseStyle,
-            children: spans,
-          ),
+          text: TextSpan(style: baseStyle, children: spans),
         ),
       ),
     );
@@ -648,18 +639,34 @@ class _MyPostTileState extends State<MyPostTile>
   Widget _buildImageOrText(BuildContext context) {
     final theme = Theme.of(context);
 
-    if (!_mediaLoading && _media.isNotEmpty) {
+    if (!_mediaReady) {
+      // ✅ fixed-size placeholder so layout stays stable while loading
+      return AspectRatio(
+        aspectRatio: 4 / 5,
+        child: Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest
+                .withValues(alpha: 0.45),
+          ),
+          alignment: Alignment.center,
+          child: const SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+
+    if (_media.isNotEmpty) {
       final aspectRatio = _currentMediaAspectRatio();
 
       return AspectRatio(
         aspectRatio: aspectRatio,
         child: PageView.builder(
-          // ✅ stable key per-post helps Flutter keep internal page state
           key: PageStorageKey<String>('post_media_${widget.post.id}'),
           itemCount: _media.length,
-          onPageChanged: (index) {
-            setState(() => _currentMediaIndex = index);
-          },
+          onPageChanged: (index) => setState(() => _currentMediaIndex = index),
           itemBuilder: (context, index) {
             final media = _media[index];
 
@@ -673,6 +680,7 @@ class _MyPostTileState extends State<MyPostTile>
                 media.url,
                 fit: BoxFit.cover,
                 width: double.infinity,
+                cacheWidth: 1080,
                 loadingBuilder: (context, child, loadingProgress) {
                   if (loadingProgress == null) return child;
                   return const Center(
@@ -804,10 +812,13 @@ class _MyPostTileState extends State<MyPostTile>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // ✅ REQUIRED for AutomaticKeepAliveClientMixin
+    super.build(context);
     final theme = Theme.of(context);
+
     final likeCount = listeningProvider.getLikeCount(widget.post.id);
-    final commentCount = listeningProvider.getComments(widget.post.id).length;
+
+    // ✅ Uses posts.comment_count (no comment fetching here)
+    final int commentCount = listeningProvider.getCommentCount(widget.post.id);
 
     return Column(
       children: [
@@ -862,6 +873,12 @@ class _MyPostTileState extends State<MyPostTile>
                   ),
                 ),
               const SizedBox(height: 4),
+
+              // ✅ EXACT BEHAVIOR YOU WANT:
+              // - show nothing when 0
+              // - plural uses your "View all comments" key:
+              //   one: "View 1 comment"
+              //   other: "View all {count} comments"
               if (!widget.isInPostPage && commentCount > 0)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -879,6 +896,7 @@ class _MyPostTileState extends State<MyPostTile>
                     ),
                   ),
                 ),
+
               const SizedBox(height: 4),
               Padding(
                 padding:
