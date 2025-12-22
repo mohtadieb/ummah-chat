@@ -7,6 +7,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'pages/home_page.dart';
 import 'pages/search_page.dart';
 import 'pages/settings_page.dart';
+import 'pages/post_page.dart'; // ✅ NEW
 import 'services/auth/startup_gate.dart';
 import 'services/database/database_provider.dart';
 import 'services/chat/chat_provider.dart';
@@ -50,7 +51,10 @@ Future<void> setupPushNotifications() async {
   // ✅ Register listener so refreshed tokens are also saved
   PushNotificationService.registerTokenRefreshListener();
 
-  // Foreground messages
+  // ✅ IMPORTANT: enable deep-link handling for taps (terminated + background)
+  await PushNotificationService.initPushTapHandlers();
+
+  // Foreground messages (only logs)
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
     debugPrint('📩 Foreground message: ${message.messageId}');
     debugPrint('Data: ${message.data}');
@@ -59,11 +63,10 @@ Future<void> setupPushNotifications() async {
     );
   });
 
-  // When user taps a notification and opens the app
-  FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-    debugPrint('📬 Notification opened app: ${message.data}');
-    // Later: navigate to a chat / notifications page based on message.data
-  });
+  // ❌ REMOVE this, PushNotificationService handles tap routing
+  // FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+  //   debugPrint('📬 Notification opened app: ${message.data}');
+  // });
 }
 
 Future<void> main() async {
@@ -88,10 +91,12 @@ Future<void> main() async {
       supportedLocales: const [
         Locale('en'),
         Locale('nl'),
-        Locale('ar'), // later if you add Arabic
+        Locale('ar'),
       ],
-      path: 'assets/lang', // folder where en.json / nl.json live
+      path: 'assets/lang',
       fallbackLocale: const Locale('en'),
+      saveLocale: true,
+      useOnlyLangCode: true,
       child: MultiProvider(
         providers: [
           ChangeNotifierProvider(create: (_) => ThemeProvider()),
@@ -128,16 +133,18 @@ class _MyAppState extends State<MyApp> {
       debugShowCheckedModeBanner: false,
       theme: themeProvider.themeData,
 
+      // ✅ Allows PushNotificationService to navigate on tap
+      navigatorKey: PushNotificationService.navigatorKey,
+
       // 🟢 EasyLocalization wiring
       localizationsDelegates: context.localizationDelegates,
       supportedLocales: context.supportedLocales,
       locale: context.locale,
 
-      // ✅ Fallback to English if device locale isn't supported
       localeResolutionCallback: (deviceLocale, supportedLocales) {
         if (deviceLocale == null) return const Locale('en');
 
-        // 1) Try exact match (language + country if present)
+        // 1) Try exact match
         for (final l in supportedLocales) {
           final countryOk =
               (l.countryCode == null) || (l.countryCode == deviceLocale.countryCode);
@@ -161,6 +168,25 @@ class _MyAppState extends State<MyApp> {
         '/home': (context) => const HomePage(),
         '/search': (context) => const SearchPage(),
         '/settings': (context) => const SettingsPage(),
+
+        // ✅ NEW: Post deep link route used by pushes
+        '/post': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          final map = (args is Map) ? args : <String, dynamic>{};
+
+          final postId = (map['postId'] ?? '').toString();
+          final highlightCommentId = (map['highlightCommentId'] ?? '').toString();
+
+          return PostPage(
+            post: null,
+            postId: postId,
+            // for comment notifications, we highlight the comments area
+            scrollToComments: true,
+            highlightComments: true,
+            highlightCommentId:
+            highlightCommentId.isNotEmpty ? highlightCommentId : null,
+          );
+        },
       },
     );
   }

@@ -131,7 +131,7 @@ class MyChatBubble extends StatelessWidget {
     final bool hasText = !isDeleted && message.trim().isNotEmpty;
 
     // 🟢 Sender (current user) bubble style
-    final senderBg = const Color(0xFF467E55); // WhatsApp green
+    final senderBg = const Color(0xFF467E55);
     final senderText = Colors.white;
 
     // ⚪ Receiver bubble style (theme-aware)
@@ -445,14 +445,8 @@ class MyChatBubble extends StatelessWidget {
           bottomLeft: bottomLeft,
           bottomRight: bottomRight,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: colors.primary.withValues(alpha: 0.12),
-            blurRadius: 3,
-            offset: const Offset(1, 2),
-          ),
-        ],
       ),
+
       child: Column(
         crossAxisAlignment: isCurrentUser
             ? CrossAxisAlignment.end

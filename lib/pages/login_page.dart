@@ -4,6 +4,7 @@ import '../components/my_button.dart';
 import '../components/my_dialogs.dart';
 import '../components/my_text_field.dart';
 import '../services/auth/auth_service.dart';
+import '../services/localization/locale_sync_service.dart';
 
 class LoginPage extends StatefulWidget {
   final void Function()? onTap; // Callback to switch to RegisterPage
@@ -32,6 +33,9 @@ class _LoginPageState extends State<LoginPage> {
         emailController.text.trim(),
         pwController.text.trim(),
       );
+
+      // ✅ NEW: ensure profile locale is saved
+      await LocaleSyncService.syncLocaleToSupabase(context);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -96,7 +100,10 @@ class _LoginPageState extends State<LoginPage> {
 
     return PopupMenuButton<Locale>(
       tooltip: 'Language'.tr(),
-      onSelected: (locale) => context.setLocale(locale),
+      onSelected: (locale) async {
+        await context.setLocale(locale);
+        await LocaleSyncService.syncLocaleToSupabase(context);
+      },
       itemBuilder: (context) => const [
         PopupMenuItem(value: Locale('en'), child: Text('English')),
         PopupMenuItem(value: Locale('nl'), child: Text('Nederlands')),

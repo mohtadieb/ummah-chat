@@ -506,7 +506,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
                                     color: isDark
                                         ? color.surfaceVariant
                                         .withValues(alpha: 0.6)
-                                        : color.surfaceVariant,
+                                        : color.surfaceContainerHighest,
                                     borderRadius: BorderRadius.circular(14),
                                     border: Border.all(
                                       color: color.outline.withValues(alpha: 0.5),
@@ -676,6 +676,9 @@ class _AppAssetPickerTextDelegate extends AssetPickerTextDelegate {
 
   @override
   String get original => 'picker_original'.tr();
+
+  @override
+  String get select => 'picker_select'.tr();
 
   // Album / path selection
   @override

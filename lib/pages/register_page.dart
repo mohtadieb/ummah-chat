@@ -5,6 +5,7 @@ import '../components/my_button.dart';
 import '../components/my_dialogs.dart';
 import '../components/my_text_field.dart';
 import '../services/auth/auth_service.dart';
+import '../services/localization/locale_sync_service.dart';
 
 class RegisterPage extends StatefulWidget {
   final void Function()? onTap; // Callback to switch to LoginPage
@@ -53,6 +54,9 @@ class _RegisterPageState extends State<RegisterPage> {
 
     try {
       await _auth.registerEmailPassword(email, pw);
+
+      // ✅ NEW: ensure profile locale is saved
+      await LocaleSyncService.syncLocaleToSupabase(context);
 
       if (!mounted) return;
 
@@ -130,7 +134,10 @@ class _RegisterPageState extends State<RegisterPage> {
 
     return PopupMenuButton<Locale>(
       tooltip: 'Language'.tr(),
-      onSelected: (locale) => context.setLocale(locale),
+        onSelected: (locale) async {
+          await context.setLocale(locale);
+          await LocaleSyncService.syncLocaleToSupabase(context);
+        },
       itemBuilder: (context) => const [
         PopupMenuItem(value: Locale('en'), child: Text('English')),
         PopupMenuItem(value: Locale('nl'), child: Text('Nederlands')),

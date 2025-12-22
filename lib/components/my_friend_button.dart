@@ -42,10 +42,19 @@ class MyFriendButton extends StatelessWidget {
                     borderRadius: BorderRadius.circular(18),
                   ),
                 ),
-                child: Text('Accept'.tr(),
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                // ✅ Fix: make long translations fit inside the button
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.center,
+                  child: Text(
+                    'Accept'.tr(),
+                    maxLines: 1,
+                    softWrap: false,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
@@ -63,11 +72,19 @@ class MyFriendButton extends StatelessWidget {
                     borderRadius: BorderRadius.circular(18),
                   ),
                 ),
-                child: Text(
-                  'Decline'.tr(),
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                // ✅ Fix: make long translations fit inside the button
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.center,
+                  child: Text(
+                    'Decline'.tr(),
+                    maxLines: 1,
+                    softWrap: false,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
@@ -139,11 +156,19 @@ class MyFriendButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(18),
           ),
         ),
-        child: Text(
-          label.tr(),
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
+        // ✅ Fix: this is the main one — "Vriendschap beëindigen" will now scale down to fit
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.center,
+          child: Text(
+            label.tr(),
+            maxLines: 1,
+            softWrap: false,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ),

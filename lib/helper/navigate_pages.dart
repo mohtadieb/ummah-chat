@@ -1,5 +1,6 @@
 // Navigation helper functions
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:ummah_chat/layouts/main_layout.dart';
 import '../pages/home_page.dart';
 import '../pages/account_settings_page.dart';
@@ -7,6 +8,7 @@ import '../pages/blocked_users_page.dart';
 import '../pages/post_page.dart';
 import '../pages/profile_page.dart';
 import '../models/post.dart';
+import '../services/navigation/bottom_nav_provider.dart';
 
 /// Navigate to a user's profile page
 void goUserPage(BuildContext context, String userId) {
@@ -85,4 +87,13 @@ void goMainLayout(BuildContext context) {
     '/',
         (route) => false, // removes everything before it
   );
+}
+
+void goToOwnProfileTab(BuildContext context) {
+  // Pop back to the root of the whole app (MainLayout / BottomNav host)
+  Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
+
+  // Switch to your Profile tab
+  final bottomNav = Provider.of<BottomNavProvider>(context, listen: false);
+  bottomNav.setIndex(4);
 }

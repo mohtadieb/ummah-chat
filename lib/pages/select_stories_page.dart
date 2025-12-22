@@ -350,8 +350,8 @@ class _SelectStoriesPageState extends State<SelectStoriesPage> {
                     const SizedBox(height: 4),
                     Text(
                       subtitlePreview.tr(),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                      // maxLines: 2,
+                      // overflow: TextOverflow.ellipsis,
                       style: textTheme.bodySmall?.copyWith(
                         color: Colors.grey[600],
                       ),

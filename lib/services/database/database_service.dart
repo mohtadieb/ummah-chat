@@ -213,61 +213,6 @@ class DatabaseService {
   /* ==================== POSTS ==================== */
 
 
-  /// Delete a post
-  // Future<void> deletePostFromDatabase(
-  //     String postId, {
-  //       String? imagePath,
-  //       String? videoPath,
-  //     }) async {
-  //   try {
-  //     // 1️⃣ Delete image from Supabase Storage if provided
-  //     if (imagePath != null && imagePath.isNotEmpty) {
-  //       try {
-  //         final uri = Uri.parse(imagePath);
-  //         final segments = uri.pathSegments;
-  //         final bucketIndex = segments.indexOf('post_images');
-  //         String? pathToDelete;
-  //         if (bucketIndex != -1 && bucketIndex + 1 < segments.length) {
-  //           pathToDelete = segments.sublist(bucketIndex + 1).join('/');
-  //         }
-  //
-  //         if (pathToDelete != null && pathToDelete.isNotEmpty) {
-  //           await _storage.from('post_images').remove([pathToDelete]);
-  //           print('Image deleted from storage: $pathToDelete');
-  //         }
-  //       } catch (e) {
-  //         print('Error deleting image from storage: $e');
-  //       }
-  //     }
-  //
-  //     // 2️⃣ Delete video from Supabase Storage if provided
-  //     if (videoPath != null && videoPath.isNotEmpty) {
-  //       try {
-  //         final uri = Uri.parse(videoPath);
-  //         final segments = uri.pathSegments;
-  //         final bucketIndex = segments.indexOf('post_videos');
-  //         String? pathToDelete;
-  //         if (bucketIndex != -1 && bucketIndex + 1 < segments.length) {
-  //           pathToDelete = segments.sublist(bucketIndex + 1).join('/');
-  //         }
-  //
-  //         if (pathToDelete != null && pathToDelete.isNotEmpty) {
-  //           await _storage.from('post_videos').remove([pathToDelete]);
-  //           print('Video deleted from storage: $pathToDelete');
-  //         }
-  //       } catch (e) {
-  //         print('Error deleting video from storage: $e');
-  //       }
-  //     }
-  //
-  //     // 3️⃣ Delete post from database
-  //     await _db.from('posts').delete().eq('id', postId);
-  //     print('Post deleted from database: $postId');
-  //   } catch (e) {
-  //     print("Error deleting post (or media): $e");
-  //   }
-  // }
-
 
   /// Get all posts
   ///
@@ -293,123 +238,6 @@ class DatabaseService {
     }
   }
 
-  /// Toggle like for a post
-  ///
-  /// We now let the database trigger keep `like_count` in sync based
-  /// on rows in `post_likes`. Here we only insert/delete the like row
-  /// and (optionally) create notifications.
-  Future<void> toggleLikeInDatabase(String postId) async {
-    try {
-      final currentUserId = _auth.currentUser!.id;
-
-      // 1️⃣ Get the post owner + message (for notifications)
-      final postData = await _db
-          .from('posts')
-          .select('id, user_id, message')
-          .eq('id', postId)
-          .maybeSingle();
-
-      if (postData == null) {
-        print("⚠️ Post not found for id: $postId");
-        return;
-      }
-
-      final postOwnerId = postData['user_id']?.toString() ?? '';
-
-      // 2️⃣ Check if the user already liked this post
-      final existingLike = await _db
-          .from('post_likes')
-          .select('id')
-          .eq('post_id', postId)
-          .eq('user_id', currentUserId)
-          .maybeSingle();
-
-      final isCurrentlyLiked = existingLike != null;
-      final isLikingNow = !isCurrentlyLiked;
-
-      // 3️⃣ Insert / delete from post_likes
-      if (isLikingNow) {
-        // Like
-        await _db.from('post_likes').insert({
-          'post_id': postId,
-          'user_id': currentUserId,
-        });
-      } else {
-        // Unlike
-        await _db
-            .from('post_likes')
-            .delete()
-            .eq('post_id', postId)
-            .eq('user_id', currentUserId);
-      }
-
-      // ⚠️ IMPORTANT:
-      // We do NOT manually update `posts.like_count` here anymore.
-      // The database trigger `update_post_like_count()` will update
-      // the `like_count` for us whenever post_likes changes.
-
-      // 4️⃣ Only when it's a new like (not unlike) → create notification
-      if (isLikingNow &&
-          postOwnerId.isNotEmpty &&
-          postOwnerId != currentUserId) {
-        try {
-          final likerProfile = await getUserFromDatabase(currentUserId);
-          final displayName = (likerProfile?.username.isNotEmpty ?? false)
-              ? likerProfile!.username
-              : (likerProfile?.name ?? 'Someone');
-
-          final postPreview = (postData['message']?.toString() ?? '').trim();
-          final truncatedPreview = postPreview.length > 50
-              ? '${postPreview.substring(0, 50)}...'
-              : postPreview;
-
-          final rawPreview = postPreview.isEmpty ? '' : truncatedPreview;
-
-          // Machine-readable + human preview
-          final body = 'LIKE_POST:$postId::$rawPreview';
-
-          await _notifications.createNotificationForUser(
-            targetUserId: postOwnerId,
-            title: '$displayName liked your post',
-            body: body,
-          );
-        } catch (e) {
-          print('⚠️ Error creating like notification: $e');
-        }
-      }
-    } catch (e) {
-      print("❌ Error toggling like: $e");
-    }
-  }
-
-  /// EXTRA /// for when I use post_likes
-  Future<List<String>> getLikedPostIdsFromDatabase(
-      String userId,
-      List<String> postIds,
-      ) async {
-    final likedPostIds = <String>[];
-    if (postIds.isEmpty) return likedPostIds;
-
-    try {
-      final res = await _db
-          .from('post_likes')
-          .select('post_id')
-          .eq('user_id', userId)
-          .inFilter('post_id', postIds);
-
-      if (res != null && res is List) {
-        for (final row in res) {
-          if (row['post_id'] != null) {
-            likedPostIds.add(row['post_id'].toString());
-          }
-        }
-      }
-    } catch (e) {
-      print("Error fetching liked posts: $e");
-    }
-
-    return likedPostIds;
-  }
 
   Future<Post?> getPostByIdFromDatabase(String postId) async {
     try {
@@ -526,55 +354,235 @@ class DatabaseService {
   /// Delete a post + all its media
   Future<void> deletePostFromDatabase(String postId) async {
     try {
-      // 1️⃣ Delete all media files in post_media bucket for this post
-      try {
-        final mediaRows = await _db
-            .from('post_media')
-            .select('url')
-            .eq('post_id', postId);
+      // 1️⃣ Fetch media urls for this post
+      final mediaRows =
+      await _db.from('post_media').select('url').eq('post_id', postId);
 
-        if (mediaRows is List && mediaRows.isNotEmpty) {
-          final pathsToDelete = <String>[];
+      // 2️⃣ Delete storage objects
+      if (mediaRows is List && mediaRows.isNotEmpty) {
+        final pathsToDelete = <String>[];
 
-          for (final row in mediaRows) {
-            final url = row['url']?.toString();
-            if (url == null || url.isEmpty) continue;
+        for (final row in mediaRows) {
+          final url = row['url']?.toString();
+          if (url == null || url.isEmpty) continue;
 
-            final uri = Uri.parse(url);
-            final segments = uri.pathSegments;
-            final bucketIndex = segments.indexOf('post_media');
+          final path = _extractStoragePathFromPublicUrl(
+            publicUrl: url,
+            bucketName: 'post_media',
+          );
 
-            if (bucketIndex != -1 && bucketIndex + 1 < segments.length) {
-              final path = segments.sublist(bucketIndex + 1).join('/');
-              pathsToDelete.add(path);
-            }
-          }
-
-          if (pathsToDelete.isNotEmpty) {
-            await _storage.from('post_media').remove(pathsToDelete);
-            debugPrint('🗑 Deleted ${pathsToDelete.length} media files from post_media');
+          if (path != null && path.isNotEmpty) {
+            pathsToDelete.add(path);
           }
         }
-      } catch (e) {
-        debugPrint('⚠️ Error deleting media from post_media bucket: $e');
+
+        if (pathsToDelete.isNotEmpty) {
+          await _storage.from('post_media').remove(pathsToDelete);
+          debugPrint(
+            '🗑 Deleted ${pathsToDelete.length} media files from post_media',
+          );
+        }
       }
 
-      // 2️⃣ Delete media rows (if FK ON DELETE CASCADE is not configured)
-      try {
-        await _db.from('post_media').delete().eq('post_id', postId);
-      } catch (e) {
-        debugPrint('⚠️ Error deleting post_media rows for $postId: $e');
-        // If you already have FK with ON DELETE CASCADE, this will be redundant but harmless
-      }
+      // 3️⃣ Delete DB rows (order depends on your FK setup)
+      // If you have ON DELETE CASCADE on post_media.post_id -> posts.id,
+      // you can skip deleting post_media rows manually.
+      await _db.from('post_media').delete().eq('post_id', postId);
 
-      // 3️⃣ Delete the post itself
-      await _db.from('posts').delete().eq('id', postId);
-      debugPrint('✅ Post deleted from database: $postId');
-    } catch (e) {
-      debugPrint("❌ Error deleting post (or media): $e");
+      // 4️⃣ Delete the post itself
+      final res = await _db.from('posts').delete().eq('id', postId);
+
+      debugPrint('✅ Post deleted from database: $postId | res=$res');
+    } catch (e, st) {
+      debugPrint("❌ Error deleting post (or media): $e\n$st");
+      rethrow; // ✅ IMPORTANT: let the UI/provider know it failed
     }
   }
 
+  /// Extract storage path from a Supabase public URL.
+  /// Returns something like: "userId/postId/file.jpg"
+  String? _extractStoragePathFromPublicUrl({
+    required String publicUrl,
+    required String bucketName,
+  }) {
+    try {
+      final uri = Uri.parse(publicUrl);
+
+      // Typical public URL format:
+      // .../storage/v1/object/public/<bucket>/<path>
+      final segments = uri.pathSegments;
+
+      final bucketIndex = segments.indexOf(bucketName);
+      if (bucketIndex == -1) return null;
+
+      if (bucketIndex + 1 >= segments.length) return null;
+
+      return segments.sublist(bucketIndex + 1).join('/');
+    } catch (_) {
+      return null;
+    }
+  }
+
+
+  //* ==================== LIKES ==================== */
+
+  /// Toggle like for a post
+  ///
+  /// We now let the database trigger keep `like_count` in sync based
+  /// on rows in `post_likes`. Here we only insert/delete the like row
+  /// and (optionally) create notifications.
+  Future<void> toggleLikeInDatabase(String postId) async {
+    try {
+      final currentUserId = _auth.currentUser!.id;
+
+      // 1️⃣ Get the post owner + message (for notifications)
+      final postData = await _db
+          .from('posts')
+          .select('id, user_id, message')
+          .eq('id', postId)
+          .maybeSingle();
+
+      if (postData == null) {
+        print("⚠️ Post not found for id: $postId");
+        return;
+      }
+
+      final postOwnerId = postData['user_id']?.toString() ?? '';
+
+      // 2️⃣ Check if the user already liked this post
+      final existingLike = await _db
+          .from('post_likes')
+          .select('id')
+          .eq('post_id', postId)
+          .eq('user_id', currentUserId)
+          .maybeSingle();
+
+      final isCurrentlyLiked = existingLike != null;
+      final isLikingNow = !isCurrentlyLiked;
+
+      // 3️⃣ Insert / delete from post_likes
+      if (isLikingNow) {
+        // Like
+        await _db.from('post_likes').insert({
+          'post_id': postId,
+          'user_id': currentUserId,
+        });
+      } else {
+        // Unlike
+        await _db
+            .from('post_likes')
+            .delete()
+            .eq('post_id', postId)
+            .eq('user_id', currentUserId);
+      }
+
+      // ⚠️ IMPORTANT:
+      // We do NOT manually update `posts.like_count` here anymore.
+      // The database trigger `update_post_like_count()` will update
+      // the `like_count` for us whenever post_likes changes.
+
+      // 4️⃣ Only when it's a new like (not unlike) → create notification
+      if (isLikingNow &&
+          postOwnerId.isNotEmpty &&
+          postOwnerId != currentUserId) {
+        try {
+          final likerProfile = await getUserFromDatabase(currentUserId);
+
+          final displayName = (likerProfile?.username.isNotEmpty ?? false)
+              ? likerProfile!.username
+              : (likerProfile?.name ?? 'Someone');
+
+          final postPreview = (postData['message']?.toString() ?? '').trim();
+          final truncatedPreview = postPreview.length > 50
+              ? '${postPreview.substring(0, 50)}...'
+              : postPreview;
+
+          final rawPreview = postPreview.isEmpty ? '' : truncatedPreview;
+
+          // Machine-readable + human preview (NotificationPage parsing stays same)
+          final body = 'LIKE_POST:$postId::$rawPreview';
+
+          await _notifications.createNotificationForUser(
+            targetUserId: postOwnerId,
+            title: '$displayName liked your post', // fallback for in-app list
+            body: body,
+            data: {
+              'type': 'LIKE_POST',
+              'fromUserId': currentUserId,
+              'senderName': displayName,
+              'postId': postId,
+            },
+          );
+        } catch (e) {
+          print('⚠️ Error creating like notification: $e');
+        }
+      }
+    } catch (e) {
+      print("❌ Error toggling like: $e");
+    }
+  }
+
+  /// EXTRA /// for when I use post_likes
+  Future<List<String>> getLikedPostIdsFromDatabase(
+      String userId,
+      List<String> postIds,
+      ) async {
+    final likedPostIds = <String>[];
+    if (postIds.isEmpty) return likedPostIds;
+
+    try {
+      final res = await _db
+          .from('post_likes')
+          .select('post_id')
+          .eq('user_id', userId)
+          .inFilter('post_id', postIds);
+
+      if (res != null && res is List) {
+        for (final row in res) {
+          if (row['post_id'] != null) {
+            likedPostIds.add(row['post_id'].toString());
+          }
+        }
+      }
+    } catch (e) {
+      print("Error fetching liked posts: $e");
+    }
+
+    return likedPostIds;
+  }
+
+  /// ✅ Get likes for a set of posts, but only from specific users (friends/following).
+  /// Returns: { postId: { userId1, userId2, ... } }
+  Future<Map<String, Set<String>>> getLikesByPostIdsForUsersFromDatabase({
+    required List<String> postIds,
+    required List<String> userIds,
+  }) async {
+    final map = <String, Set<String>>{};
+    if (postIds.isEmpty || userIds.isEmpty) return map;
+
+    try {
+      final res = await _db
+          .from('post_likes')
+          .select('post_id, user_id')
+          .inFilter('post_id', postIds)
+          .inFilter('user_id', userIds);
+
+      if (res is! List) return map;
+
+      for (final row in res) {
+        final postId = row['post_id']?.toString();
+        final userId = row['user_id']?.toString();
+        if (postId == null || userId == null) continue;
+
+        map.putIfAbsent(postId, () => <String>{}).add(userId);
+      }
+
+      return map;
+    } catch (e, st) {
+      debugPrint('❌ Error getLikesByPostIdsForUsersFromDatabase: $e\n$st');
+      return map;
+    }
+  }
 
 
   //* ==================== COMMENTS ==================== */
@@ -619,8 +627,7 @@ class DatabaseService {
       // 🆕 Create notification for post owner (if not commenting on own post)
       if (postOwnerId.isNotEmpty && postOwnerId != currentUserId) {
         try {
-          final displayName =
-          user.username.isNotEmpty ? user.username : user.name;
+          final displayName = user.username.isNotEmpty ? user.username : user.name;
 
           final postPreview = (postData?['message']?.toString() ?? '').trim();
           final truncatedPostPreview = postPreview.length > 50
@@ -631,17 +638,85 @@ class DatabaseService {
 
           await _notifications.createNotificationForUser(
             targetUserId: postOwnerId,
-            title: '$displayName commented on your post',
+            title: '$displayName commented on your post', // fallback
             body: body,
+            data: {
+              'type': 'COMMENT_POST',
+              'fromUserId': currentUserId,
+              'senderName': displayName,
+              'postId': postId,
+            },
           );
         } catch (e) {
           print('⚠️ Error creating comment notification: $e');
         }
       }
+
     } catch (e) {
       print("Error adding comment: $e");
     }
   }
+
+  /// Reply to a specific comment (stores as a normal comment on the post)
+  /// and notifies the original commenter.
+  ///
+  /// ✅ Keeps notification logic inside DatabaseService (not UI).
+  Future<void> replyToCommentInDatabase({
+    required String postId,
+    required String replyText,
+    required String parentCommentId,
+    required String parentCommentUserId,
+    required String parentCommentUsername,
+  }) async {
+    final currentUserId = _auth.currentUser?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return;
+
+    final text = replyText.trim();
+    if (text.isEmpty) return;
+
+    try {
+      // 1) Save reply as a normal comment (same as you currently do in UI)
+      // This will ALSO trigger COMMENT_POST notification to the post owner
+      // (because your addCommentInDatabase does that).
+      await addCommentInDatabase(postId, text);
+
+      // 2) Notify the user who wrote the original comment (not yourself)
+      if (parentCommentUserId != currentUserId) {
+        final me = await getUserFromDatabase(currentUserId);
+
+        // Name for push/title consistency (username > name > Someone)
+        final displayName = (me?.username.isNotEmpty ?? false)
+            ? me!.username
+            : (me?.name ?? 'Someone');
+
+        final preview = text.length > 80 ? '${text.substring(0, 80)}…' : text;
+
+        // BODY FORMAT (what your NotificationPage parses):
+        // COMMENT_REPLY:<postId>::<commentId>::<preview>
+        // (keep :: delimiter consistent)
+        final body =
+            'COMMENT_REPLY:$postId::${parentCommentId}::$preview';
+
+        await _notifications.createNotificationForUser(
+          targetUserId: parentCommentUserId,
+          title: '$displayName replied to your comment',
+          body: body,
+          data: {
+            'type': 'COMMENT_REPLY',
+            'postId': postId,
+            'commentId': parentCommentId,
+            'fromUserId': currentUserId,
+            'senderName': displayName,
+          },
+        );
+
+      }
+    } catch (e, st) {
+      debugPrint('❌ Error replying to comment: $e\n$st');
+      rethrow;
+    }
+  }
+
 
   /// Delete comment for a post
   Future<void> deleteCommentFromDatabase(String commentId) async {
@@ -804,6 +879,91 @@ class DatabaseService {
     // 5️⃣ like_count on posts will be updated automatically by triggers.
   }
 
+  /* ==================== BOOKMARKS ==================== */
+
+  /// Toggle bookmark for an item.
+  ///
+  /// itemType: 'post' or 'ayah'
+  /// itemId:  postId OR ayahKey like "2:255"
+  Future<void> toggleBookmarkInDatabase({
+    required String itemType,
+    required String itemId,
+  }) async {
+    final currentUserId = _auth.currentUser?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return;
+
+    try {
+      final existing = await _db
+          .from('bookmarks')
+          .select('id')
+          .eq('user_id', currentUserId)
+          .eq('item_type', itemType)
+          .eq('item_id', itemId)
+          .maybeSingle();
+
+      if (existing != null) {
+        // remove bookmark
+        await _db.from('bookmarks').delete().eq('id', existing['id']);
+      } else {
+        // add bookmark
+        await _db.from('bookmarks').insert({
+          'user_id': currentUserId,
+          'item_type': itemType,
+          'item_id': itemId,
+        });
+      }
+    } catch (e, st) {
+      debugPrint('❌ Error toggling bookmark: $e\n$st');
+      rethrow;
+    }
+  }
+
+  /// Get all bookmarks for the current user.
+  /// Returns rows with: item_type, item_id, created_at
+  Future<List<Map<String, dynamic>>> getBookmarksFromDatabase() async {
+    final currentUserId = _auth.currentUser?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return [];
+
+    try {
+      final res = await _db
+          .from('bookmarks')
+          .select('item_type, item_id, created_at')
+          .eq('user_id', currentUserId)
+          .order('created_at', ascending: false);
+
+      return List<Map<String, dynamic>>.from(res);
+    } catch (e, st) {
+      debugPrint('❌ Error loading bookmarks: $e\n$st');
+      return [];
+    }
+  }
+
+  /// Optional helper if you ever want it (not required if you cache in provider)
+  Future<bool> isBookmarkedInDatabase({
+    required String itemType,
+    required String itemId,
+  }) async {
+    final currentUserId = _auth.currentUser?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return false;
+
+    try {
+      final res = await _db
+          .from('bookmarks')
+          .select('id')
+          .eq('user_id', currentUserId)
+          .eq('item_type', itemType)
+          .eq('item_id', itemId)
+          .maybeSingle();
+
+      return res != null;
+    } catch (e) {
+      debugPrint('❌ Error checking bookmark: $e');
+      return false;
+    }
+  }
+
+
+
   /* ==================== FRIENDS ==================== */
 
   /// Get friendship status between current user and [otherUserId]
@@ -894,9 +1054,13 @@ class DatabaseService {
 
         await _notifications.createNotificationForUser(
           targetUserId: targetUserId,
-          title: '$displayName sent you a friend request',
-          // 🔴 IMPORTANT: special body format so UI knows this is a friend request
+          title: '$displayName sent you a friend request', // fallback
           body: 'FRIEND_REQUEST:$currentUserId',
+          data: {
+            'type': 'FRIEND_REQUEST',
+            'fromUserId': currentUserId,
+            'senderName': displayName,
+          },
         );
       } catch (e) {
         print('⚠️ Error creating friend request notification: $e');
@@ -951,9 +1115,13 @@ class DatabaseService {
 
         await _notifications.createNotificationForUser(
           targetUserId: otherUserId,
-          title: '$displayName accepted your friend request',
-          // 👇 encode who accepted it
+          title: '$displayName accepted your friend request', // fallback
           body: 'FRIEND_ACCEPTED:$currentUserId',
+          data: {
+            'type': 'FRIEND_ACCEPTED',
+            'fromUserId': currentUserId,
+            'senderName': displayName,
+          },
         );
       } catch (e) {
         print('⚠️ Error creating friend accepted notification: $e');
@@ -1121,6 +1289,98 @@ class DatabaseService {
       print('❌ Error unfriending user $otherUserId: $e');
     }
   }
+  /// ✅ Get accepted friend IDs for [userId]
+  /// Returns the "other" user for each accepted friendship.
+  Future<List<String>> getFriendIdsFromDatabase(String userId) async {
+    if (userId.isEmpty) return [];
+
+    try {
+      final res = await _db
+          .from('friendships')
+          .select('requester_id, addressee_id')
+          .eq('status', 'accepted')
+          .or('requester_id.eq.$userId,addressee_id.eq.$userId');
+
+      if (res is! List) return [];
+
+      final ids = <String>{};
+
+      for (final row in res) {
+        final requester = row['requester_id']?.toString();
+        final addressee = row['addressee_id']?.toString();
+
+        if (requester == null || addressee == null) continue;
+
+        final other = requester == userId ? addressee : requester;
+        if (other.isNotEmpty) ids.add(other);
+      }
+
+      return ids.toList();
+    } catch (e, st) {
+      debugPrint('❌ Error getFriendIdsFromDatabase: $e\n$st');
+      return [];
+    }
+  }
+
+  /// ✅ Get friends-of-friends IDs for [userId]
+  /// - Uses accepted friendships only
+  /// - Excludes [userId] and excludes direct friends (so it stays true 2nd-degree)
+  ///
+  /// Your schema:
+  /// friendships: requester_id, addressee_id, status
+  Future<Set<String>> getFriendsOfFriendsIdsFromDatabase({
+    required String userId,
+    required Set<String> friendIds,
+  }) async {
+    if (userId.isEmpty) return <String>{};
+    if (friendIds.isEmpty) return <String>{};
+
+    try {
+      // Supabase 'inFilter' needs a List
+      final friendList = friendIds.toList();
+
+      // ✅ We do two safe queries and merge results
+      // (this avoids "or requester_id.in.(...)" string formatting issues with UUIDs)
+      final resA = await _db
+          .from('friendships')
+          .select('requester_id, addressee_id')
+          .eq('status', 'accepted')
+          .inFilter('requester_id', friendList);
+
+      final resB = await _db
+          .from('friendships')
+          .select('requester_id, addressee_id')
+          .eq('status', 'accepted')
+          .inFilter('addressee_id', friendList);
+
+      final rows = <dynamic>[
+        ...(resA is List ? resA : const []),
+        ...(resB is List ? resB : const []),
+      ];
+
+      final foaf = <String>{};
+
+      for (final row in rows) {
+        final requester = row['requester_id']?.toString();
+        final addressee = row['addressee_id']?.toString();
+        if (requester == null || addressee == null) continue;
+
+        // If requester is my friend -> addressee might be a FOAF (and vice versa)
+        if (friendIds.contains(requester)) foaf.add(addressee);
+        if (friendIds.contains(addressee)) foaf.add(requester);
+      }
+
+      // remove self and direct friends
+      foaf.remove(userId);
+      foaf.removeAll(friendIds);
+
+      return foaf;
+    } catch (e, st) {
+      debugPrint('❌ Error getFriendsOfFriendsIdsFromDatabase: $e\n$st');
+      return <String>{};
+    }
+  }
+
 
   /* ==================== FOLLOW / UNFOLLOW ==================== */
 
@@ -1157,13 +1417,12 @@ class DatabaseService {
         await _notifications.createNotificationForUser(
           targetUserId: targetUserId,
           title: '$displayName started following you',
-          // DB body (machine-readable)
           body: 'FOLLOW_USER:$currentUserId',
-          // Nice text for push
           pushBody: '$displayName started following you',
           data: {
             'type': 'FOLLOW_USER',
             'fromUserId': currentUserId,
+            'senderName': displayName, // ✅ add this
           },
         );
       } catch (e) {
@@ -1268,33 +1527,65 @@ class DatabaseService {
   /* ==================== SEARCH USERS ==================== */
 
   Future<List<UserProfile>> searchUsersInDatabase(String searchTerm) async {
-    if (searchTerm.isEmpty) return [];
+    final raw = searchTerm.trim();
+    if (raw.isEmpty) return [];
 
-    // Prevent wildcard abuse (e.g. * * * returning all users)
-    if (RegExp(r'^[*]+$').hasMatch(searchTerm)) return [];
+    // Prevent wildcard / abuse (e.g. *** or %%% returning everything)
+    if (RegExp(r'^[*%_]+$').hasMatch(raw)) return [];
+
+    // Allow "@username"
+    final qNoAt = raw.startsWith('@') ? raw.substring(1) : raw;
 
     try {
-      final List data = await _db
-          .from('profiles')
-          .select()
-          .or('username.ilike.${searchTerm}%,name.ilike.${searchTerm}%');
+      // ✅ Typo-tolerant search (pg_trgm) via RPC
+      //
+      // Requires in Supabase:
+      // - create extension if not exists pg_trgm;
+      // - function search_profiles_fuzzy(q text, lim int default 60) returns setof profiles ...
+      //
+      // NOTE:
+      // Supabase Dart returns List<dynamic> for set-returning SQL functions.
+      final res = await _db.rpc(
+        'search_profiles_fuzzy',
+        params: {
+          'q': qNoAt,
+          'lim': 60,
+        },
+      );
 
-      // Sort results so exact or prefix matches appear first
-      data.sort((a, b) {
-        final nameA = (a['username'] as String).toLowerCase();
-        final nameB = (b['username'] as String).toLowerCase();
-        final term = searchTerm.toLowerCase();
-        final startsA = nameA.startsWith(term) ? 0 : 1;
-        final startsB = nameB.startsWith(term) ? 0 : 1;
-        return startsA.compareTo(startsB);
-      });
+      if (res is! List) return [];
 
-      return data.map((e) => UserProfile.fromMap(e)).toList();
-    } catch (e) {
-      print("Error searching users: $e");
-      return [];
+      return res
+          .map((e) => UserProfile.fromMap(Map<String, dynamic>.from(e)))
+          .toList();
+    } catch (e, st) {
+      debugPrint('❌ Error searching users (fuzzy rpc): $e\n$st');
+
+      // ✅ Fallback (optional): if RPC fails, still do a basic ilike search so search isn't dead
+      try {
+        final List data = await _db
+            .from('profiles')
+            .select()
+            .or(
+          [
+            'username.ilike.%$qNoAt%',
+            'name.ilike.%$raw%',
+            'city.ilike.%$raw%',
+            'country.ilike.%$raw%',
+          ].join(','),
+        )
+            .limit(60);
+
+        return data
+            .map((e) => UserProfile.fromMap(Map<String, dynamic>.from(e)))
+            .toList();
+      } catch (e2) {
+        debugPrint('❌ Fallback ilike search also failed: $e2');
+        return [];
+      }
     }
   }
+
 
   /* ==================== COMMUNITY ==================== */
 
@@ -1689,6 +1980,66 @@ class DatabaseService {
       rethrow;
     }
   }
+
+/* ==================== PRIVATE REFLECTIONS ==================== */
+
+  /// Add a private reflection (optionally linked to a post)
+  Future<void> addPrivateReflectionInDatabase({
+    required String text,
+    String? postId,
+  }) async {
+    final currentUserId = _auth.currentUser?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return;
+
+    try {
+      await _db.from('private_reflections').insert({
+        'user_id': currentUserId,
+        'post_id': postId,
+        'text': text,
+        'created_at': DateTime.now().toUtc().toIso8601String(),
+      });
+    } catch (e, st) {
+      debugPrint('❌ Error adding private reflection: $e\n$st');
+      rethrow;
+    }
+  }
+
+  /// Get all private reflections for current user
+  Future<List<Map<String, dynamic>>> getMyPrivateReflectionsFromDatabase() async {
+    final currentUserId = _auth.currentUser?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return [];
+
+    try {
+      final res = await _db
+          .from('private_reflections')
+          .select()
+          .eq('user_id', currentUserId)
+          .order('created_at', ascending: false);
+
+      return List<Map<String, dynamic>>.from(res);
+    } catch (e, st) {
+      debugPrint('❌ Error loading private reflections: $e\n$st');
+      return [];
+    }
+  }
+
+  /// Delete a reflection (RLS ensures only owner can delete)
+  Future<void> deletePrivateReflectionFromDatabase(String reflectionId) async {
+    final currentUserId = _auth.currentUser?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return;
+
+    try {
+      await _db
+          .from('private_reflections')
+          .delete()
+          .eq('id', reflectionId)
+          .eq('user_id', currentUserId); // extra safety
+    } catch (e, st) {
+      debugPrint('❌ Error deleting private reflection: $e\n$st');
+      rethrow;
+    }
+  }
+
 
 
 

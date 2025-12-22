@@ -154,35 +154,20 @@ class _MyCommentTileState extends State<MyCommentTile> {
     if (text.isEmpty) return;
 
     try {
-      // 1) Save reply as a normal comment on the same post
-      await databaseProvider.addComment(
-        widget.comment.postId,
-        text,
+      await databaseProvider.replyToComment(
+        postId: widget.comment.postId,
+        replyText: text,
+        parentCommentId: widget.comment.id,
+        parentCommentUserId: widget.comment.userId,
+        parentCommentUsername: widget.comment.username,
       );
-
-      // 2) Create notification for the user who wrote the original comment
-      final currentUserId = AuthService().getCurrentUserId();
-
-      // don't notify yourself when replying to your own comment
-      if (widget.comment.userId != currentUserId) {
-        final preview =
-        text.length > 80 ? '${text.substring(0, 80)}…' : text;
-
-        // BODY FORMAT:
-        // COMMENT_REPLY:<postId>::<commentId>::<preview>
-        await NotificationService().createNotificationForUser(
-          targetUserId: widget.comment.userId,
-          title: 'New reply on your comment'.tr(),
-          body:
-          'COMMENT_REPLY:${widget.comment.postId}::${widget.comment.id}::$preview',
-        );
-      }
     } catch (e) {
       debugPrint('Error sending reply: $e');
     } finally {
       _replyController.clear();
     }
   }
+
 
   void _handleUserTap() {
     final currentUserId = AuthService().getCurrentUserId();

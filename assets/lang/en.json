@@ -83,6 +83,12 @@
   "Onboarding_3_title": "Dua Wall",
   "Onboarding_3_sub": "Make dua for your brothers and sisters.",
   "Empty bio..": "Empty bio...",
+  "Edit bio...": "Edit bio...",
+  "Choose a song that plays on your profile": "Choose a song that plays on your profile",
+  "No profile song set": "No profile song set",
+  "Saved": "Saved",
+  "Your bookmarked posts": "Your bookmarked posts",
+  "No saved posts yet": "No saved posts yet",
   "Reply": "Reply",
   "Write a reply": "Write a reply",
   "Reply must be at least 5 characters": "Reply must be at least 5 characters",
@@ -92,9 +98,11 @@
   "Block": "Block",
   "Report Message": "Report Message",
   "Are you sure you want to report this message?": "Are you sure you want to report this message?",
-  "Block User": "Block User",
+  "Block user": "Block user",
   "Are you sure you want to block this user?": "Are you sure you want to block this user?",
   "User blocked!": "User blocked!",
+  "yes_unfriend": "Yes, unfriend",
+  "confirm_unfriend_message": "Are you sure you want to remove this person from your friends?",
   "Edit": "Edit",
   "Unfollow": "Unfollow",
   "Follow": "Follow",
@@ -316,6 +324,8 @@
   "New post": "New post",
   "new_post_in": "New post in {name}",
   "Share": "Share",
+  "Show": "Show",
+  "Hide": "Hide",
   "No photos or videos added": "No photos or videos added",
   "You can share a text-only post, or add media below.": "You can share a text-only post, or add media below.",
   "Add photos / videos": "Add photos / videos",
@@ -324,6 +334,63 @@
   "Cover": "Cover",
   "Write a caption...": "Write a caption...",
   "Write your dua here...": "Write your dua here...",
+  "Private reflections": "Private reflections",
+  "daily_ayah_title": "Daily Ayah",
+  "daily_ayah_subtitle": "Ayah {key}",
+  "daily_ayah_load_failed": "Failed to load the daily ayah.",
+  "retry": "Retry",
+  "save": "Save",
+  "saved": "Saved",
+  "share": "Share",
+  "tap_to_read_daily_ayah": "Tap to read today’s ayah",
+  "No private reflections yet": "No private reflections yet",
+  "daily_ayah_loading": "Loading today’s ayah…",
+  "daily_ayah_load_failed_compact": "Couldn’t load today’s ayah",
+  "saved_posts": "Posts",
+  "saved_ayat": "Ayat",
+  "saved_reflections": "Reflections",
+  "no_saved_ayat_yet": "No saved ayat yet",
+  "no_private_reflections_yet": "No private reflections yet",
+  "private_reflection": "Private reflection",
+  "delete": "Delete",
+
+  "saved_title": "Saved",
+
+  "saved_subtitle_all": "Your saved posts, ayat and reflections",
+  "remove_bookmark_confirm": "Remove this bookmark? You can't get it back.",
+  "remove_bookmark": "Remove bookmark",
+  "remove": "Remove",
+  "notif_group_added": "{name} added you to {group}",
+  "friends_of": "Friends of {name}",
+  "More": "More",
+
+  "are_you_sure_you_want_to_unfollow": "Are you sure you want to unfollow?",
+  "picker_select": "Select",
+  "Bio": "Bio",
+  "Save": "Save",
+  "Write a private reflection...": "Write a private reflection...",
+  "Private": "Private",
+
+
+
+
+
+
+
+
+
+  "no_saved_posts_yet": "No saved posts yet",
+  "could_not_share": "Could not share",
+
+  "add_comment_title": "Add comment",
+  "open_post": "Open post",
+  "post_no_longer_available": "This post is no longer available.",
+  "delete_private_reflection_confirm": "Are you sure you want to delete this private reflection?",
+
+
+  "Linked to a post": "Linked to a post",
+  "Could not open post.": "Could not open post.",
+  "Only you can see these": "Only you can see these",
   "Your dua should be at least 5 characters.": "Your dua should be at least 5 characters.",
   "Your dua has been shared.": "Your dua has been shared.",
   "Could not share dua. Please try again.": "Could not share dua. Please try again.",

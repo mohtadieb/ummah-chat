@@ -14,14 +14,16 @@ This is to make our code more modular, cleaner, and easier to read and test.
 */
 
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../helper/user_search_ranker.dart';
 import '../../models/comment.dart';
 import '../../models/dua.dart';
 import '../../models/post.dart';
 import '../../models/post_media.dart';
+import '../../models/private_reflection.dart';
 import '../../models/user_profile.dart';
 import '../auth/auth_service.dart';
 import 'database_service.dart';
@@ -41,7 +43,7 @@ class DatabaseProvider extends ChangeNotifier {
 
   Future<void> updateProfilePhoto(Uint8List bytes) async {
     final userId = _auth.getCurrentUserId();
-    if (userId == null) return;
+    if (userId.isEmpty) return;
 
     final url = await _db.uploadProfilePhotoToDatabase(bytes, userId);
     if (url != null) {
@@ -135,8 +137,28 @@ class DatabaseProvider extends ChangeNotifier {
           .where((post) => !blockedUserIds.contains(post.userId))
           .toList();
 
+      // ✅ Load following posts (filtered) WITHOUT notifying mid-load
+      await loadFollowingPosts(notify: false);
+
+      // ✅ Load friend IDs (needed for For You) WITHOUT notifying mid-load
+      await loadFriendIds(notify: false);
+
+      // ✅ Load likes map for For You (friends + following likes)
+      // (only for recent N posts to keep query small) WITHOUT notifying mid-load
+      final postIds = _posts
+          .take(200)
+          .map((p) => p.id)
+          .whereType<String>()
+          .toList();
+
+      await loadLikesForForYou(postIds, notify: false);
+
       // 4️⃣ Initialize like counts
       initializeLikeMap();
+
+      // ✅ Load bookmarks after posts so bookmarkedPosts can be derived from _posts
+      // WITHOUT notifying mid-load
+      await loadBookmarks(notify: false);
 
       // 5️⃣ Load which posts are liked by the current user (from post_likes)
       final currentUserId = _auth.getCurrentUserId();
@@ -149,10 +171,7 @@ class DatabaseProvider extends ChangeNotifier {
         _likedPosts = [];
       }
 
-      // 6️⃣ Load following posts (also filtered)
-      await loadFollowingPosts();
-
-      // 7️⃣ Update UI
+      // 7️⃣ Update UI once at the end
       notifyListeners();
     } catch (e) {
       debugPrint('Error loading posts: $e');
@@ -186,34 +205,75 @@ class DatabaseProvider extends ChangeNotifier {
   }
 
   /// Load following posts
-  Future<void> loadFollowingPosts() async {
+  Future<void> loadFollowingPosts({bool notify = true}) async {
     final currentUserId = _auth.getCurrentUserId();
     if (currentUserId.isEmpty) return;
 
     try {
-      // get list of user IDs that the current logged in user follows
       final followingUserIds = await _db.getFollowingFromDatabase(currentUserId);
 
-      // filter posts to be the ones for the following tab
+      // ✅ Cache for ForYou algorithm
+      _following[currentUserId] = followingUserIds;
+      _followingCount[currentUserId] = followingUserIds.length;
+
       _followingPosts = _posts
           .where((post) => followingUserIds.contains(post.userId))
           .toList();
 
-      notifyListeners();
+      if (notify) notifyListeners();
     } catch (e) {
       debugPrint('Error loading following posts: $e');
     }
   }
 
-  /// Delete post + refresh list
+  /// ✅ Delete post with optimistic UI removal + rollback
   Future<void> deletePost(Post post) async {
+    // snapshots for rollback
+    final oldPosts = List<Post>.from(_posts);
+    final oldFollowingPosts = List<Post>.from(_followingPosts);
+    final oldLikeCounts = Map<String, int>.from(_likeCounts);
+    final oldLikedPosts = List<String>.from(_likedPosts);
+    final oldBookmarkedPostIds = Set<String>.from(_bookmarkedPostIds);
+    final oldComments = Map<String, List<Comment>>.from(_comments);
+
     try {
+      // ✅ 1) optimistic local remove
+      _posts.removeWhere((p) => p.id == post.id);
+      _followingPosts.removeWhere((p) => p.id == post.id);
+
+      // remove local caches tied to this post
+      _likeCounts.remove(post.id);
+      _likedPosts.remove(post.id);
+      _bookmarkedPostIds.remove(post.id);
+      _comments.remove(post.id);
+
+      notifyListeners();
+
+      // ✅ 2) delete from DB
       await _db.deletePostFromDatabase(post.id);
 
-      // After deletion, refresh everything (filters, likes, following tab)
+      // ✅ 3) refresh server truth (filters/likes/bookmarks/following)
       await loadAllPosts();
     } catch (e) {
       debugPrint('Error deleting post: $e');
+
+      // rollback
+      _posts = oldPosts;
+      _followingPosts = oldFollowingPosts;
+      _likeCounts = oldLikeCounts;
+      _likedPosts = oldLikedPosts;
+
+      _bookmarkedPostIds
+        ..clear()
+        ..addAll(oldBookmarkedPostIds);
+
+      _comments
+        ..clear()
+        ..addAll(oldComments);
+
+      notifyListeners();
+
+      rethrow; // let UI show error if it wants
     }
   }
 
@@ -263,6 +323,97 @@ class DatabaseProvider extends ChangeNotifier {
     }
   }
 
+  /* ==================== BOOKMARKS ==================== */
+
+  final Set<String> _bookmarkedPostIds = {};
+  final Set<String> _bookmarkedAyahKeys = {};
+
+  /// ✅ IDs only (fast lookup for icons)
+  Set<String> get bookmarkedPostIds => _bookmarkedPostIds;
+
+  /// ✅ Ayah keys only (fast lookup for icons)
+  Set<String> get bookmarkedAyahKeys => _bookmarkedAyahKeys;
+
+  bool isPostBookmarkedByCurrentUser(String postId) =>
+      _bookmarkedPostIds.contains(postId);
+
+  bool isAyahBookmarkedByCurrentUser(String ayahKey) =>
+      _bookmarkedAyahKeys.contains(ayahKey);
+
+  /// ✅ Posts that are bookmarked by the current user (for Saved tab)
+  ///
+  /// IMPORTANT:
+  /// - This is derived from the current in-memory `_posts` list.
+  /// - So make sure `loadAllPosts()` runs before you rely on this.
+  List<Post> get bookmarkedPosts {
+    final idSet = _bookmarkedPostIds;
+    return _posts.where((p) => idSet.contains(p.id)).toList();
+  }
+
+  /// Load bookmarks once (call this after login / on app start / when opening Saved)
+  Future<void> loadBookmarks({bool notify = true}) async {
+    try {
+      final rows = await _db.getBookmarksFromDatabase();
+
+      _bookmarkedPostIds.clear();
+      _bookmarkedAyahKeys.clear();
+
+      for (final row in rows) {
+        final type = row['item_type']?.toString();
+        final id = row['item_id']?.toString();
+        if (type == null || id == null) continue;
+
+        if (type == 'post') _bookmarkedPostIds.add(id);
+        if (type == 'ayah') _bookmarkedAyahKeys.add(id);
+      }
+
+      if (notify) notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading bookmarks: $e');
+    }
+  }
+
+  /// Toggle bookmark (optimistic UI like your toggleLike)
+  Future<void> toggleBookmark({
+    required String itemType, // 'post' or 'ayah'
+    required String itemId,
+  }) async {
+    // snapshot for rollback
+    final oldPosts = Set<String>.from(_bookmarkedPostIds);
+    final oldAyahs = Set<String>.from(_bookmarkedAyahKeys);
+
+    // optimistic update
+    if (itemType == 'post') {
+      if (_bookmarkedPostIds.contains(itemId)) {
+        _bookmarkedPostIds.remove(itemId);
+      } else {
+        _bookmarkedPostIds.add(itemId);
+      }
+    } else if (itemType == 'ayah') {
+      if (_bookmarkedAyahKeys.contains(itemId)) {
+        _bookmarkedAyahKeys.remove(itemId);
+      } else {
+        _bookmarkedAyahKeys.add(itemId);
+      }
+    }
+
+    notifyListeners();
+
+    try {
+      await _db.toggleBookmarkInDatabase(itemType: itemType, itemId: itemId);
+    } catch (e) {
+      // rollback
+      _bookmarkedPostIds
+        ..clear()
+        ..addAll(oldPosts);
+      _bookmarkedAyahKeys
+        ..clear()
+        ..addAll(oldAyahs);
+
+      notifyListeners();
+    }
+  }
+
   /* ==================== LIKES ==================== */
 
   Map<String, int> _likeCounts = {};
@@ -308,6 +459,44 @@ class DatabaseProvider extends ChangeNotifier {
     }
   }
 
+  /* ==================== FOR YOU LIKES MAP ==================== */
+
+  Map<String, Set<String>> _likesByPostId = {};
+  Map<String, Set<String>> get likesByPostId => _likesByPostId;
+
+  Future<void> loadLikesForForYou(
+      List<String> postIds, {
+        bool notify = true,
+      }) async {
+    if (postIds.isEmpty) {
+      _likesByPostId = {};
+      if (notify) notifyListeners();
+      return;
+    }
+
+    try {
+      final relevantUserIds = <String>{
+        ...followingUserIds,
+        ...friendUserIds,
+      };
+
+      if (relevantUserIds.isEmpty) {
+        _likesByPostId = {};
+        if (notify) notifyListeners();
+        return;
+      }
+
+      _likesByPostId = await _db.getLikesByPostIdsForUsersFromDatabase(
+        postIds: postIds,
+        userIds: relevantUserIds.toList(),
+      );
+
+      if (notify) notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading likes map for For You: $e');
+    }
+  }
+
   /* ==================== COMMENTS ==================== */
 
   final Map<String, List<Comment>> _comments = {};
@@ -332,6 +521,25 @@ class DatabaseProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('Error adding comment: $e');
     }
+  }
+
+  Future<void> replyToComment({
+    required String postId,
+    required String replyText,
+    required String parentCommentId,
+    required String parentCommentUserId,
+    required String parentCommentUsername,
+  }) async {
+    await _db.replyToCommentInDatabase(
+      postId: postId,
+      replyText: replyText,
+      parentCommentId: parentCommentId,
+      parentCommentUserId: parentCommentUserId,
+      parentCommentUsername: parentCommentUsername,
+    );
+
+    await loadComments(postId);
+    notifyListeners();
   }
 
   Future<void> deleteComment(String commentId, String postId) async {
@@ -418,6 +626,28 @@ class DatabaseProvider extends ChangeNotifier {
     await _db.unfriendUserInDatabase(otherUserId);
   }
 
+  /* ==================== FRIEND IDS (For You ranking) ==================== */
+
+  Set<String> _friendIds = {};
+  Set<String> get friendUserIds => _friendIds;
+
+  Future<void> loadFriendIds({bool notify = true}) async {
+    final uid = currentUserId;
+    if (uid.isEmpty) return;
+
+    try {
+      final ids = await _db.getFriendIdsFromDatabase(uid);
+      _friendIds = ids.toSet();
+
+      // ✅ IMPORTANT: friends changed -> FOAF cache must be recomputed later
+      _friendsOfFriendsIds = {};
+
+      if (notify) notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading friend ids: $e');
+    }
+  }
+
   /* ==================== FOLLOWERS / FOLLOWING ==================== */
 
   final Map<String, List<String>> _followers = {};
@@ -502,8 +732,7 @@ class DatabaseProvider extends ChangeNotifier {
 
     if (!_followers[targetUserId]!.contains(currentUserId)) {
       _followers[targetUserId]?.add(currentUserId);
-      _followerCount[targetUserId] =
-      ((_followerCount[targetUserId] ?? 0) + 1);
+      _followerCount[targetUserId] = ((_followerCount[targetUserId] ?? 0) + 1);
 
       _following[currentUserId]?.add(targetUserId);
       _followingCount[currentUserId] =
@@ -518,8 +747,7 @@ class DatabaseProvider extends ChangeNotifier {
       await loadUserFollowing(currentUserId);
     } catch (e) {
       _followers[targetUserId]?.remove(currentUserId);
-      _followerCount[targetUserId] =
-          (_followerCount[targetUserId] ?? 0) - 1;
+      _followerCount[targetUserId] = (_followerCount[targetUserId] ?? 0) - 1;
 
       _following[currentUserId]?.remove(targetUserId);
       _followingCount[currentUserId] =
@@ -537,8 +765,7 @@ class DatabaseProvider extends ChangeNotifier {
 
     if (_followers[targetUserId]!.contains(currentUserId)) {
       _followers[targetUserId]?.remove(currentUserId);
-      _followerCount[targetUserId] =
-          (_followerCount[targetUserId] ?? 1) - 1;
+      _followerCount[targetUserId] = (_followerCount[targetUserId] ?? 1) - 1;
 
       _following[currentUserId]?.remove(targetUserId);
       _followingCount[currentUserId] =
@@ -553,12 +780,11 @@ class DatabaseProvider extends ChangeNotifier {
       await loadUserFollowing(currentUserId);
     } catch (e) {
       _followers[targetUserId]?.add(currentUserId);
-      _followerCount[targetUserId] =
-          (_followerCount[targetUserId] ?? 0) + 1;
+      _followerCount[targetUserId] = ((_followerCount[targetUserId] ?? 0) + 1);
 
       _following[currentUserId]?.add(targetUserId);
       _followingCount[currentUserId] =
-          (_followingCount[currentUserId] ?? 0) + 1;
+      ((_followingCount[currentUserId] ?? 0) + 1);
 
       notifyListeners();
     }
@@ -567,7 +793,15 @@ class DatabaseProvider extends ChangeNotifier {
   bool isFollowing(String userId) {
     final currentUserId = _auth.getCurrentUserId();
     if (currentUserId.isEmpty) return false;
-    return _followers[userId]?.contains(currentUserId) ?? false;
+
+    // ✅ FIX: following means "I follow them"
+    return (_following[currentUserId] ?? const <String>[]).contains(userId);
+  }
+
+  /// ✅ Current user's following IDs (cached)
+  Set<String> get followingUserIds {
+    final uid = currentUserId;
+    return (_following[uid] ?? const <String>[]).toSet();
   }
 
   /* ==================== SEARCH USERS ==================== */
@@ -575,18 +809,93 @@ class DatabaseProvider extends ChangeNotifier {
   List<UserProfile> _searchResults = [];
   List<UserProfile> get searchResults => _searchResults;
 
+  /// ✅ Cache friends-of-friends (2nd degree) so we can rank them higher
+  Set<String> _friendsOfFriendsIds = {};
+  Set<String> get friendsOfFriendsIds => _friendsOfFriendsIds;
+
+  /// ✅ Load FOAF ids (best-effort).
+  /// Requires:
+  /// - friendUserIds (Set<String>) already in your provider
+  /// - _db.getFriendsOfFriendsIdsFromDatabase(...) added in DatabaseService
+  Future<void> _ensureFriendsOfFriendsLoaded() async {
+    try {
+      final currentUserId = _auth.getCurrentUserId();
+      if (currentUserId.isEmpty) return;
+
+      if (friendUserIds.isEmpty) {
+        _friendsOfFriendsIds = {};
+        return;
+      }
+
+      _friendsOfFriendsIds = await _db.getFriendsOfFriendsIdsFromDatabase(
+        userId: currentUserId,
+        friendIds: friendUserIds,
+      );
+    } catch (e) {
+      debugPrint('Error loading friends-of-friends: $e');
+      _friendsOfFriendsIds = {};
+    }
+  }
+
+  /// ✅ Ensures the social graph needed for ranking is loaded:
+  /// - friends
+  /// - following
+  /// - friends-of-friends
+  Future<void> _ensureSearchGraphLoaded() async {
+    final uid = _auth.getCurrentUserId();
+    if (uid.isEmpty) return;
+
+    try {
+      // Friends not loaded yet? load them.
+      if (friendUserIds.isEmpty) {
+        await loadFriendIds();
+      }
+
+      // Following not loaded yet? load it.
+      if (followingUserIds.isEmpty) {
+        await loadUserFollowing(uid);
+      }
+
+      // FOAF not loaded yet? load it (needs friends).
+      if (_friendsOfFriendsIds.isEmpty && friendUserIds.isNotEmpty) {
+        await _ensureFriendsOfFriendsLoaded();
+      }
+    } catch (e) {
+      debugPrint('Error ensuring search graph: $e');
+    }
+  }
+
   Future<void> searchUsers(String searchTerm) async {
-    if (searchTerm.isEmpty) {
+    final query = searchTerm.trim();
+
+    if (query.isEmpty) {
       _searchResults = [];
       notifyListeners();
       return;
     }
 
     try {
-      final results = await _db.searchUsersInDatabase(searchTerm);
+      // ✅ Make sure ranking inputs exist (best-effort, cached)
+      await _ensureSearchGraphLoaded();
+
+      // 1) DB search (username/name/city/country) - from DatabaseService
+      final results = await _db.searchUsersInDatabase(query);
       final currentUserId = _auth.getCurrentUserId();
 
-      _searchResults = results.where((u) => u.id != currentUserId).toList();
+      // 2) Remove myself
+      final candidates = results.where((u) => u.id != currentUserId).toList();
+
+      // 3) Rank (friends -> FOAF -> following -> text match)
+      _searchResults = UserSearchRanker.rank(
+        candidates: candidates,
+        currentUserId: currentUserId,
+        query: query,
+        friendIds: friendUserIds,
+        friendsOfFriendsIds: _friendsOfFriendsIds,
+        followingIds: followingUserIds,
+        limit: 60,
+      );
+
       notifyListeners();
     } catch (e) {
       debugPrint('Error searching users: $e');
@@ -615,8 +924,7 @@ class DatabaseProvider extends ChangeNotifier {
       for (var community in _allCommunities) {
         final members =
         await _db.getCommunityMembersFromDatabase(community['id']);
-        community['is_joined'] =
-            members.any((m) => m['user_id'] == userId);
+        community['is_joined'] = members.any((m) => m['user_id'] == userId);
       }
     }
 
@@ -638,8 +946,7 @@ class DatabaseProvider extends ChangeNotifier {
   }
 
   Future<void> joinCommunity(String communityId) async {
-    final community =
-    _allCommunities.firstWhere((c) => c['id'] == communityId);
+    final community = _allCommunities.firstWhere((c) => c['id'] == communityId);
     community['is_joined'] = true;
     notifyListeners();
 
@@ -674,7 +981,8 @@ class DatabaseProvider extends ChangeNotifier {
   }
 
   Future<List<Map<String, dynamic>>> getCommunityMemberProfiles(
-      String communityId) async {
+      String communityId,
+      ) async {
     return await _db.getCommunityMemberProfilesFromDatabase(communityId);
   }
 
@@ -709,7 +1017,9 @@ class DatabaseProvider extends ChangeNotifier {
   }
 
   Future<void> saveStoryAnswers(
-      String storyId, List<int?> selectedIndices) async {
+      String storyId,
+      List<int?> selectedIndices,
+      ) async {
     final currentUserId = _auth.getCurrentUserId();
     if (currentUserId.isEmpty) return;
 
@@ -757,9 +1067,8 @@ class DatabaseProvider extends ChangeNotifier {
       final allDuas = await _db.getDuaWallFromDatabase();
       final blockedUserIds = await _db.getBlockedUserIdsFromDatabase();
 
-      _duaWall = allDuas
-          .where((d) => !blockedUserIds.contains(d.userId))
-          .toList();
+      _duaWall =
+          allDuas.where((d) => !blockedUserIds.contains(d.userId)).toList();
 
       notifyListeners();
     } catch (e) {
@@ -804,6 +1113,52 @@ class DatabaseProvider extends ChangeNotifier {
     }
   }
 
+  /* ==================== PRIVATE REFLECTIONS ==================== */
+
+  List<PrivateReflection> _privateReflections = [];
+  List<PrivateReflection> get privateReflections => _privateReflections;
+
+  Future<void> loadPrivateReflections() async {
+    try {
+      final rows = await _db.getMyPrivateReflectionsFromDatabase();
+      _privateReflections =
+          rows.map((r) => PrivateReflection.fromMap(r)).toList();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading private reflections (provider): $e');
+    }
+  }
+
+  Future<void> addPrivateReflection({
+    required String text,
+    String? postId,
+  }) async {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
+
+    try {
+      await _db.addPrivateReflectionInDatabase(
+        text: trimmed,
+        postId: postId,
+      );
+
+      await loadPrivateReflections();
+    } catch (e) {
+      debugPrint('Error adding private reflection (provider): $e');
+    }
+  }
+
+  Future<void> deletePrivateReflection(String reflectionId) async {
+    try {
+      await _db.deletePrivateReflectionFromDatabase(reflectionId);
+
+      _privateReflections.removeWhere((r) => r.id == reflectionId);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error deleting private reflection (provider): $e');
+    }
+  }
+
   /* ==================== LOG OUT ==================== */
 
   void clearAllCachedData() {
@@ -816,6 +1171,10 @@ class DatabaseProvider extends ChangeNotifier {
     _likeCounts.clear();
     _likedPosts.clear();
 
+    // ✅ Bookmarks (important so Saved tab doesn't show old user's saved posts)
+    _bookmarkedPostIds.clear();
+    _bookmarkedAyahKeys.clear();
+
     // Comments
     _comments.clear();
 
@@ -826,6 +1185,10 @@ class DatabaseProvider extends ChangeNotifier {
     _followingCount.clear();
     _followerProfiles.clear();
     _followingProfiles.clear();
+
+    // Friends / FOAF cache
+    _friendIds.clear();
+    _friendsOfFriendsIds.clear();
 
     // Search results
     _searchResults.clear();

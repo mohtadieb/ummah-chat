@@ -129,8 +129,11 @@ class NotificationService {
         .eq('is_read', false);
   }
 
-  /// Create an in-app notification, optionally also send a push.
-  /// ...
+  /// Create an in-app notification, optionally also send a localized push.
+  ///
+  /// ✅ Keeps your DB `body` formats as-is (NotificationPage parsing unchanged).
+  /// ✅ Push localization is handled in the Edge Function via:
+  ///     target_user_id + notif_type + args
   Future<void> createNotificationForUser({
     required String targetUserId,
     required String title,
@@ -146,12 +149,24 @@ class NotificationService {
       'body': body,
     });
 
-    // 2️⃣ Optionally send push to device
+    // 2️⃣ Optionally send push to device (localized by Edge Function)
     if (sendPush) {
-      await _sendPushToUserId(
+      // We try to infer the notif type from the stored body OR from data['type']
+      final inferredType = _inferNotifType(
+        body: body,
+        data: data,
+      );
+
+      final preview = (pushBody ?? _extractPreviewFromBody(body) ?? '').trim();
+
+      await _sendLocalizedPushToUserId(
         targetUserId: targetUserId,
-        title: title,
-        body: pushBody ?? body ?? '',
+        notifType: inferredType,
+        args: {
+          'senderName': (data?['senderName'] ?? '').trim(),
+          'groupName': (data?['groupName'] ?? '').trim(),
+          'preview': preview,
+        },
         data: data,
       );
     }
@@ -200,7 +215,9 @@ class NotificationService {
     trimmed.length > 60 ? '${trimmed.substring(0, 60)}…' : trimmed;
 
     final title = '$senderName sent you a message';
-    final bodyCode = 'CHAT_MESSAGE:$senderId::$senderName';
+
+    // ✅ IMPORTANT: use :: delimiter because NotificationPage splits by '::'
+    final bodyCode = 'CHAT_MESSAGE:$senderId::${senderName}';
 
     // 1️⃣ See if there is already an unread chat notification for this room
     final existingRows = await _db
@@ -239,13 +256,16 @@ class NotificationService {
       'unread_count': 1,
     });
 
-    // Push shows only the nice preview text
-    final pushText = truncatedPreview.isEmpty ? title : truncatedPreview;
+    // Push uses preview if available
+    final pushPreview = truncatedPreview.isEmpty ? '' : truncatedPreview;
 
-    await _sendPushToUserId(
+    await _sendLocalizedPushToUserId(
       targetUserId: targetUserId,
-      title: title,
-      body: pushText,
+      notifType: 'CHAT_MESSAGE',
+      args: {
+        'senderName': senderName,
+        'preview': pushPreview,
+      },
       data: {
         'type': 'CHAT_MESSAGE',
         'chatId': chatRoomId,
@@ -297,12 +317,13 @@ class NotificationService {
     final truncatedPreview =
     trimmed.length > 60 ? '${trimmed.substring(0, 60)}…' : trimmed;
 
-    // Example: "New message in Ummah Sisters" or "Ummah Sisters – Tas"
+    // Example: "Ummah Sisters – Tas"
     final title = '$groupName – $senderName';
 
     // 👇 This is what NotificationPage parses:
     // GROUP_MESSAGE:<chatRoomId>::<groupName>
-    final bodyCode = 'GROUP_MESSAGE:$chatRoomId::$groupName';
+    // ✅ IMPORTANT: use :: delimiter
+    final bodyCode = 'GROUP_MESSAGE:$chatRoomId::${groupName}';
 
     // 1️⃣ See if there is already an unread chat notification for this group room
     final existingRows = await _db
@@ -340,13 +361,16 @@ class NotificationService {
       'unread_count': 1,
     });
 
-    final pushText =
-    truncatedPreview.isEmpty ? 'New message in $groupName' : truncatedPreview;
+    final pushPreview = truncatedPreview.isEmpty ? '' : truncatedPreview;
 
-    await _sendPushToUserId(
+    await _sendLocalizedPushToUserId(
       targetUserId: targetUserId,
-      title: groupName,
-      body: pushText,
+      notifType: 'GROUP_MESSAGE',
+      args: {
+        'senderName': senderName,
+        'groupName': groupName,
+        'preview': pushPreview,
+      },
       data: {
         'type': 'GROUP_MESSAGE',
         'chatId': chatRoomId,
@@ -376,76 +400,146 @@ class NotificationService {
   }
 
   // -------------------------
-  // PUSH SENDER
+  // MUTATIONS – GROUP ADDED
   // -------------------------
 
-  Future<void> _sendPushToUserId({
+  Future<void> createGroupAddedNotification({
     required String targetUserId,
-    required String title,
-    String? body,
+    required String chatRoomId,
+    required String groupName,
+    required String addedByUserId,
+    required String addedByName,
+  }) async {
+    if (targetUserId.isEmpty) return;
+    if (chatRoomId.isEmpty) return;
+
+    // Don’t notify yourself
+    if (targetUserId == addedByUserId) return;
+
+    // Body format NotificationPage can parse:
+    // GROUP_ADDED:<chatRoomId>::<groupName>::<addedByName>
+    // ✅ IMPORTANT: use :: delimiter
+    final bodyCode = 'GROUP_ADDED:$chatRoomId::${groupName}::${addedByName}';
+
+    // Stored in DB as readable fallback
+    final title = '$addedByName added you to $groupName';
+
+    // Store as a normal in-app notification (NOT type=chat)
+    await _db.from('notifications').insert({
+      'user_id': targetUserId,
+      'title': title,
+      'body': bodyCode,
+      'type': 'group', // 👈 important so it won’t be filtered as "active chat"
+      'chat_room_id': chatRoomId,
+      'from_user_id': addedByUserId,
+      'unread_count': 1,
+      'is_read': false,
+    });
+
+    // Localized push (Edge uses receiver locale)
+    await _sendLocalizedPushToUserId(
+      targetUserId: targetUserId,
+      notifType: 'GROUP_ADDED',
+      args: {
+        'senderName': addedByName,
+        'groupName': groupName,
+        'preview': '',
+      },
+      data: {
+        'type': 'GROUP_ADDED',
+        'chatId': chatRoomId,
+        'groupName': groupName,
+        'fromUserId': addedByUserId,
+        'senderName': addedByName,
+      },
+    );
+  }
+
+  // -------------------------
+  // PUSH SENDER (NEW MODE)
+  // -------------------------
+
+  Future<void> _sendLocalizedPushToUserId({
+    required String targetUserId,
+    required String notifType,
+    required Map<String, String> args,
     Map<String, String>? data,
   }) async {
-    // 1) Look up FCM token from profiles
-    final profile = await _db
-        .from('profiles')
-        .select('fcm_token')
-        .eq('id', targetUserId)
-        .maybeSingle();
+    if (targetUserId.isEmpty) return;
+    if (notifType.trim().isEmpty) return;
 
-    final fcmToken = profile?['fcm_token'] as String?;
-    debugPrint('🔎 Target profile for $targetUserId: $profile');
-
-    if (fcmToken == null || fcmToken.isEmpty) {
-      debugPrint('⚠️ No fcm_token stored on profile for user $targetUserId');
-      return;
-    }
-
-    // 2) Decide what text the PUSH should show
-    String pushBody;
-
-    if (body == null || body.isEmpty) {
-      pushBody = title;
-    } else if (body.startsWith('FOLLOW_USER:')) {
-      pushBody = title;
-    } else if (body.startsWith('FRIEND_REQUEST:')) {
-      pushBody = 'You received a new friend request.';
-    } else if (body.startsWith('FRIEND_ACCEPTED:')) {
-      pushBody = 'Your friend request was accepted.';
-    } else if (body.startsWith('LIKE_POST:')) {
-      final parts = body.split('::');
-      final preview = parts.length == 2 ? parts[1].trim() : '';
-      if (preview.isNotEmpty) {
-        pushBody = '“$preview”';
-      } else {
-        pushBody = 'Someone liked your post.';
-      }
-    } else if (body.startsWith('COMMENT_POST:')) {
-      final parts = body.split('::');
-      final preview = parts.length == 2 ? parts[1].trim() : '';
-      if (preview.isNotEmpty) {
-        pushBody = '“$preview”';
-      } else {
-        pushBody = 'Someone commented on your post.';
-      }
-    } else {
-      pushBody = body;
-    }
+    // Clean args: remove empty keys
+    final cleanArgs = <String, String>{};
+    args.forEach((k, v) {
+      final vv = v.trim();
+      if (vv.isNotEmpty) cleanArgs[k] = vv;
+    });
 
     try {
       final response = await _db.functions.invoke(
         'send_push',
         body: {
-          'fcm_token': fcmToken,
-          'title': title,
-          'body': pushBody,
-          'data': data ?? {},
+          'target_user_id': targetUserId,
+          'notif_type': notifType,
+          'args': cleanArgs,
+          'data': data ?? <String, String>{},
         },
       );
 
       debugPrint('✅ send_push response: ${response.data}');
-    } catch (e) {
-      debugPrint('❌ send_push error: $e');
+    } catch (e, st) {
+      debugPrint('❌ send_push error: $e\n$st');
     }
+  }
+
+  // -------------------------
+  // Helpers: infer type + preview from your existing DB body formats
+  // -------------------------
+
+  String _inferNotifType({
+    String? body,
+    Map<String, String>? data,
+  }) {
+    final t = (data?['type'] ?? '').trim();
+    if (t.isNotEmpty) return t;
+
+    final b = (body ?? '').trim();
+    if (b.startsWith('FOLLOW_USER:')) return 'FOLLOW_USER';
+    if (b.startsWith('FRIEND_REQUEST:')) return 'FRIEND_REQUEST';
+    if (b.startsWith('FRIEND_ACCEPTED:')) return 'FRIEND_ACCEPTED';
+    if (b.startsWith('LIKE_POST:')) return 'LIKE_POST';
+    if (b.startsWith('COMMENT_POST:')) return 'COMMENT_POST';
+    if (b.startsWith('COMMENT_REPLY:')) return 'COMMENT_REPLY'; // ✅ NEW
+    if (b.startsWith('CHAT_MESSAGE:')) return 'CHAT_MESSAGE';
+    if (b.startsWith('GROUP_MESSAGE:')) return 'GROUP_MESSAGE';
+    if (b.startsWith('GROUP_ADDED:')) return 'GROUP_ADDED';
+
+    // safe fallback
+    return 'FOLLOW_USER';
+  }
+
+  /// Extract preview from DB body formats that embed "::<preview>"
+  /// Examples:
+  /// - LIKE_POST:<postId>::<preview>
+  /// - COMMENT_POST:<postId>::<preview>
+  /// - COMMENT_REPLY:<postId>::<commentId>::<preview>
+  String? _extractPreviewFromBody(String? body) {
+    final b = (body ?? '').trim();
+    if (b.isEmpty) return null;
+
+    if (b.startsWith('LIKE_POST:') || b.startsWith('COMMENT_POST:')) {
+      final parts = b.split('::');
+      // expected: [LIKE_POST:<id>, <preview>]
+      if (parts.length >= 2) return parts[1].trim();
+    }
+
+    if (b.startsWith('COMMENT_REPLY:')) {
+      final parts = b.split('::');
+      // expected: [COMMENT_REPLY:<postId>, <commentId>, <preview>]
+      if (parts.length >= 3) return parts[2].trim();
+    }
+
+    return null;
   }
 
   // -------------------------
@@ -485,41 +579,23 @@ class NotificationService {
     if (userAId.isEmpty || userBId.isEmpty) return;
 
     // For userA, delete any notifications about userB
-    await _db
-        .from('notifications')
-        .delete()
-        .eq('user_id', userAId)
-        .inFilter('body', [
-      'FRIEND_REQUEST:$userBId',
-      'FRIEND_ACCEPTED:$userBId',
-      'FOLLOW_USER:$userBId',
-    ]);
+    await _db.from('notifications').delete().eq('user_id', userAId).inFilter(
+      'body',
+      [
+        'FRIEND_REQUEST:$userBId',
+        'FRIEND_ACCEPTED:$userBId',
+        'FOLLOW_USER:$userBId',
+      ],
+    );
 
     // For userB, delete any notifications about userA
-    await _db
-        .from('notifications')
-        .delete()
-        .eq('user_id', userBId)
-        .inFilter('body', [
-      'FRIEND_REQUEST:$userAId',
-      'FRIEND_ACCEPTED:$userAId',
-      'FOLLOW_USER:$userAId',
-    ]);
+    await _db.from('notifications').delete().eq('user_id', userBId).inFilter(
+      'body',
+      [
+        'FRIEND_REQUEST:$userAId',
+        'FRIEND_ACCEPTED:$userAId',
+        'FOLLOW_USER:$userAId',
+      ],
+    );
   }
-
-// Future<void> sendTestPushToUser() async {
-//   final user = _auth.currentUser;
-//   if (user == null) {
-//     debugPrint('⚠️ No logged-in user, cannot send test push.');
-//     return;
-//   }
-//
-//   await createNotificationForUser(
-//     targetUserId: user.id,
-//     title: 'Test from settings',
-//     body: 'This is a test push from Settings page',
-//     data: {'screen': 'notifications'},
-//     sendPush: true,
-//   );
-// }
 }

@@ -155,7 +155,7 @@ class _MyVoiceMessageBubbleState extends State<MyVoiceMessageBubble> {
     final Color textColor;
 
     if (widget.isCurrentUser) {
-      bubbleColor = theme.colorScheme.primary;
+      bubbleColor = const Color(0xFF467E55);
       textColor = theme.colorScheme.onPrimary;
     } else {
       // Use a filled, contrasting color for received audio bubbles

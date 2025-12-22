@@ -12,6 +12,7 @@ import '../helper/navigate_pages.dart';
 import '../services/auth/auth_gate.dart';
 import '../services/auth/auth_service.dart';
 import '../services/database/database_provider.dart';
+import '../services/localization/locale_sync_service.dart';
 import '../services/notifications/notification_service.dart';
 import '../themes/theme_provider.dart';
 
@@ -180,11 +181,22 @@ class _SettingsPageState extends State<SettingsPage> {
                     child: Text(_localeLabel(locale)),
                   );
                 }).toList(),
-                onChanged: (newLocale) {
-                  if (newLocale != null) {
-                    context.setLocale(newLocale);
-                  }
+
+                // ✅ IMPORTANT: await locale save + rebuild
+                onChanged: (newLocale) async {
+                  if (newLocale == null) return;
+
+                  if (newLocale.languageCode == context.locale.languageCode) return;
+
+                  await context.setLocale(newLocale);
+
+                  // ✅ NEW: store language for push localization
+                  await LocaleSyncService.syncLocaleToSupabase(context);
+
+                  if (!mounted) return;
+                  setState(() {});
                 },
+
               ),
             ),
 
@@ -271,6 +283,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     .withValues(alpha: 0.9),
               ),
             ),
+
             const SizedBox(height: 10),
 
             MySettingsTile(

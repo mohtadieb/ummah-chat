@@ -1,6 +1,5 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 // Pages
 import 'package:ummah_chat/pages/chat_tabs_page.dart';
@@ -49,10 +48,10 @@ class _MainLayoutState extends State<MainLayout> {
 
     // Order must match BottomNavigationBar items
     _pages = [
-      const HomePage(),              // 0
-      const ChatTabsPage(),          // 1
-      SelectStoriesPage(),           // 2
-      DuaWallPage(),
+      const HomePage(), // 0
+      const ChatTabsPage(), // 1
+      SelectStoriesPage(), // 2
+      const DuaWallPage(), // 3
       ProfilePage(userId: currentUserId), // 4
     ];
   }
@@ -65,6 +64,8 @@ class _MainLayoutState extends State<MainLayout> {
     final bottomNav = Provider.of<BottomNavProvider>(context);
     final selectedIndex = bottomNav.currentIndex;
 
+    // ✅ Previously we only showed actions on Profile tab.
+    // ✅ Now: show Notification + Settings actions ALWAYS.
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
@@ -74,7 +75,7 @@ class _MainLayoutState extends State<MainLayout> {
         backgroundColor: colorScheme.surface,
         surfaceTintColor: Colors.transparent,
 
-        // 🔥 Only show actions on Profile tab
+        // 🔥 Show actions on ALL tabs
         actions: [
           // 🔔 Notification bell with unread badge
           StreamBuilder<int>(
@@ -94,8 +95,7 @@ class _MainLayoutState extends State<MainLayout> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) =>
-                          const NotificationPage(),
+                          builder: (context) => const NotificationPage(),
                         ),
                       );
                     },
@@ -132,7 +132,7 @@ class _MainLayoutState extends State<MainLayout> {
           ),
 
           const SizedBox(width: 7),
-        ]
+        ],
       ),
 
       body: IndexedStack(
@@ -147,14 +147,26 @@ class _MainLayoutState extends State<MainLayout> {
         },
         type: BottomNavigationBarType.fixed,
         items: [
-          BottomNavigationBarItem(icon: const Icon(Icons.home), label: 'Home'.tr()),
-          BottomNavigationBarItem(icon: const Icon(Icons.groups), label: 'Social'.tr()),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.home),
+            label: 'Home'.tr(),
+          ),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.groups),
+            label: 'Social'.tr(),
+          ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.menu_book_rounded),
             label: 'Stories'.tr(),
           ),
-          BottomNavigationBarItem(icon: const Icon(Icons.view_list), label: 'Dua Wall'.tr()),
-          BottomNavigationBarItem(icon: const Icon(Icons.person), label: 'Profile'.tr()),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.view_list),
+            label: 'Dua Wall'.tr(),
+          ),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.person),
+            label: 'Profile'.tr(),
+          ),
         ],
       ),
     );

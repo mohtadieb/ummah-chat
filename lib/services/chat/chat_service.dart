@@ -742,15 +742,44 @@ class ChatService {
     if (otherMembers.isNotEmpty) {
       final rows = otherMembers
           .map(
-            (uid) =>
-        {'chat_room_id': roomId, 'user_id': uid, 'role': 'member'},
+            (uid) => {
+          'chat_room_id': roomId,
+          'user_id': uid,
+          'role': 'member',
+        },
       )
           .toList();
 
       await _supabase.from('chat_room_members').insert(rows);
+
+      // -------------------------------
+      // 🔔 NEW: notify each added member
+      // -------------------------------
+      try {
+        // who added them? (creator)
+        final creatorProfile = await _db.getUserFromDatabase(creatorId);
+        final addedByName = (creatorProfile?.username.isNotEmpty ?? false)
+            ? creatorProfile!.username
+            : (creatorProfile?.name.isNotEmpty ?? false)
+            ? creatorProfile!.name
+            : 'Someone';
+
+        for (final targetUserId in otherMembers) {
+          await _notifications.createGroupAddedNotification(
+            targetUserId: targetUserId,
+            chatRoomId: roomId,
+            groupName: name,
+            addedByUserId: creatorId,
+            addedByName: addedByName,
+          );
+        }
+      } catch (e) {
+        debugPrint('⚠️ createGroupRoom: failed to send group-added notifications: $e');
+      }
     }
 
     return roomId;
+
   }
 
   /// Add one or more users to an existing group chat IN DATABASE.

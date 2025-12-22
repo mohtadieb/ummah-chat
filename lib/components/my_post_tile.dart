@@ -1,8 +1,11 @@
 // lib/components/my_post_tile.dart
-
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/gestures.dart'; // ✅ NEW: for TapGestureRecognizer
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
+
+import 'package:url_launcher/url_launcher.dart'; // ✅ NEW: open links
 
 import '../helper/time_ago_text.dart';
 import '../models/post.dart';
@@ -11,26 +14,23 @@ import '../services/database/database_provider.dart';
 import '../components/my_input_alert_box.dart';
 import '../services/auth/auth_service.dart';
 import 'my_confirmation_box.dart';
-import '../pages/profile_page.dart'; // existing
 import '../services/navigation/bottom_nav_provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
-// 👇 adjust this path if your fullscreen page lives somewhere else
 import '../pages/fullscreen_image_page.dart';
 
-/// ✅ Optional UI toggles (easy to keep or remove)
-/// - Adaptive media ratio: uses real image ratio when possible; falls back to 4/5
-/// - Subtle separator: adds a small background spacer between posts (feed looks smoother)
 const bool kUseAdaptiveMediaAspectRatio = true;
 const bool kShowSubtlePostSeparator = true;
 
 class MyPostTile extends StatefulWidget {
   final Post post;
   final void Function()? onUserTap;
-  final void Function()? onPostTap; // used for "View all comments", share, etc.
+  final void Function()? onPostTap; // navigation ("view post")
   final BuildContext scaffoldContext;
   final bool isInPostPage;
+
+  final void Function(bool isSaved)? onBookmarkChanged;
 
   const MyPostTile({
     super.key,
@@ -39,26 +39,39 @@ class MyPostTile extends StatefulWidget {
     required this.onPostTap,
     required this.scaffoldContext,
     this.isInPostPage = false,
+    this.onBookmarkChanged,
   });
 
   @override
   State<MyPostTile> createState() => _MyPostTileState();
 }
 
-class _MyPostTileState extends State<MyPostTile> {
-  late final listeningProvider = Provider.of<DatabaseProvider>(context);
+// ✅ FIX: Keep tiles alive after scrolling past them (prevents rebuild/reload jitter)
+class _MyPostTileState extends State<MyPostTile>
+    with AutomaticKeepAliveClientMixin {
+  late final listeningProvider =
+  Provider.of<DatabaseProvider>(context, listen: true);
   late final databaseProvider =
   Provider.of<DatabaseProvider>(context, listen: false);
 
   final _commentController = TextEditingController();
 
-  // media state
   List<PostMedia> _media = [];
   bool _mediaLoading = true;
   int _currentMediaIndex = 0;
 
-  // ✅ Optional: cache aspect ratios for image URLs (so PageView doesn’t jump)
   final Map<String, double> _imageAspectRatios = {};
+
+  bool? _optimisticBookmarked;
+
+  // ✅ NEW: keep recognizers and dispose them properly
+  final List<TapGestureRecognizer> _linkRecognizers = [];
+
+  // ✅ NEW: prevent double delete taps
+  bool _deleting = false;
+
+  @override
+  bool get wantKeepAlive => true; // ✅ keep alive!
 
   @override
   void initState() {
@@ -71,12 +84,12 @@ class _MyPostTileState extends State<MyPostTile> {
   void didUpdateWidget(covariant MyPostTile oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // 👇 if this tile is now showing a *different* post, reset media
     if (oldWidget.post.id != widget.post.id) {
       _media = [];
       _mediaLoading = true;
       _currentMediaIndex = 0;
-      _imageAspectRatios.clear(); // ✅ reset aspect cache for new post
+      _imageAspectRatios.clear();
+      _optimisticBookmarked = null;
       _loadMedia();
     }
   }
@@ -84,6 +97,13 @@ class _MyPostTileState extends State<MyPostTile> {
   @override
   void dispose() {
     _commentController.dispose();
+
+    // ✅ dispose recognizers to avoid memory leaks
+    for (final r in _linkRecognizers) {
+      r.dispose();
+    }
+    _linkRecognizers.clear();
+
     super.dispose();
   }
 
@@ -100,12 +120,9 @@ class _MyPostTileState extends State<MyPostTile> {
         _mediaLoading = false;
       });
 
-      // ✅ Optional: warm up aspect ratios for images (prevents visual “jump”)
       if (kUseAdaptiveMediaAspectRatio) {
         for (final m in items) {
-          if (m.type == 'image') {
-            _precacheImageAspectRatio(m.url);
-          }
+          if (m.type == 'image') _precacheImageAspectRatio(m.url);
         }
       }
     } catch (e) {
@@ -126,6 +143,69 @@ class _MyPostTileState extends State<MyPostTile> {
     }
   }
 
+  Future<void> _toggleBookmarkPost() async {
+    final bool wasSaved = _optimisticBookmarked ??
+        listeningProvider.isPostBookmarkedByCurrentUser(widget.post.id);
+
+    final bool newSaved = !wasSaved;
+
+    if (mounted) {
+      setState(() => _optimisticBookmarked = newSaved);
+    }
+
+    widget.onBookmarkChanged?.call(newSaved);
+
+    try {
+      await databaseProvider.toggleBookmark(
+        itemType: 'post',
+        itemId: widget.post.id,
+      );
+    } catch (e) {
+      debugPrint('Error toggling bookmark: $e');
+
+      if (!mounted) return;
+      setState(() => _optimisticBookmarked = wasSaved);
+      widget.onBookmarkChanged?.call(wasSaved);
+
+      ScaffoldMessenger.maybeOf(widget.scaffoldContext)?.showSnackBar(
+        SnackBar(content: Text("Could not update bookmark".tr())),
+      );
+    }
+  }
+
+  // ✅ Share post (text + first media URL if available)
+  Future<void> _sharePost() async {
+    try {
+      final name = widget.post.name.trim();
+      final username = widget.post.username.trim();
+      final message = widget.post.message.trim();
+
+      String? firstUrl;
+      if (_media.isNotEmpty) {
+        firstUrl = _media.first.url.trim();
+        if (firstUrl.isEmpty) firstUrl = null;
+      }
+
+      final text = [
+        if (name.isNotEmpty) name,
+        if (username.isNotEmpty) '@$username',
+        if (message.isNotEmpty) '',
+        if (message.isNotEmpty) message,
+        if (firstUrl != null) '',
+        if (firstUrl != null) firstUrl!,
+        '',
+        '— Ummah Chat',
+      ].join('\n');
+
+      await Share.share(text);
+    } catch (e) {
+      debugPrint('Error sharing post: $e');
+      ScaffoldMessenger.maybeOf(widget.scaffoldContext)?.showSnackBar(
+        SnackBar(content: Text('could_not_share'.tr())),
+      );
+    }
+  }
+
   void _openNewCommentBox() {
     final messenger = ScaffoldMessenger.maybeOf(widget.scaffoldContext);
 
@@ -133,7 +213,9 @@ class _MyPostTileState extends State<MyPostTile> {
       context: context,
       builder: (dialogContext) => MyInputAlertBox(
         textController: _commentController,
+        title: 'add_comment_title'.tr(),
         hintText: "Type a comment".tr(),
+        onPressedText: "Post".tr(),
         onPressed: () async {
           final comment = _commentController.text.trim();
 
@@ -148,7 +230,6 @@ class _MyPostTileState extends State<MyPostTile> {
 
           await _addComment();
         },
-        onPressedText: "Post".tr(),
       ),
     );
   }
@@ -168,6 +249,27 @@ class _MyPostTileState extends State<MyPostTile> {
     }
   }
 
+  // ✅ FIXED: No external controller, so nothing can be disposed too early.
+  Future<void> _openPrivateReflectionDialog() async {
+    final messenger = ScaffoldMessenger.maybeOf(widget.scaffoldContext);
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => MyInputAlertBox(
+        title: 'private_reflection'.tr(), // translation key
+        hintText: "Write a private reflection...".tr(),
+        onPressedText: "Save".tr(),
+        onPressedWithText: (text) async {
+          await databaseProvider.addPrivateReflection(
+            text: text,
+            postId: widget.post.id,
+          );
+          messenger?.showSnackBar(SnackBar(content: Text("Saved".tr())));
+        },
+      ),
+    );
+  }
+
   void _showOptions() {
     final currentUserId = AuthService().getCurrentUserId();
     final isOwnPost = widget.post.userId == currentUserId;
@@ -184,7 +286,9 @@ class _MyPostTileState extends State<MyPostTile> {
               ListTile(
                 leading: const Icon(Icons.delete_outline),
                 title: Text("Delete".tr()),
-                onTap: () async {
+                onTap: _deleting
+                    ? null
+                    : () async {
                   Navigator.pop(sheetContext);
                   final messenger =
                   ScaffoldMessenger.maybeOf(widget.scaffoldContext);
@@ -201,11 +305,13 @@ class _MyPostTileState extends State<MyPostTile> {
                       ),
                       actions: [
                         TextButton(
-                          onPressed: () => Navigator.pop(dialogContext, false),
+                          onPressed: () =>
+                              Navigator.pop(dialogContext, false),
                           child: Text("Cancel".tr()),
                         ),
                         TextButton(
-                          onPressed: () => Navigator.pop(dialogContext, true),
+                          onPressed: () =>
+                              Navigator.pop(dialogContext, true),
                           child: Text("Delete".tr()),
                         ),
                       ],
@@ -213,13 +319,28 @@ class _MyPostTileState extends State<MyPostTile> {
                   );
 
                   if (confirm == true) {
-                    await databaseProvider.deletePost(widget.post);
-
                     if (!mounted) return;
+                    setState(() => _deleting = true);
 
-                    messenger?.showSnackBar(
-                      SnackBar(content: Text("Post deleted".tr())),
-                    );
+                    try {
+                      await databaseProvider.deletePost(widget.post);
+
+                      if (!mounted) return;
+                      messenger?.showSnackBar(
+                        SnackBar(content: Text("Post deleted".tr())),
+                      );
+                    } catch (e) {
+                      if (!mounted) return;
+                      messenger?.showSnackBar(
+                        SnackBar(
+                          content: Text("Could not delete post".tr()),
+                        ),
+                      );
+                    } finally {
+                      if (mounted) {
+                        setState(() => _deleting = false);
+                      }
+                    }
                   }
                 },
               )
@@ -295,22 +416,15 @@ class _MyPostTileState extends State<MyPostTile> {
     );
   }
 
-  /// Handle tapping on avatar/name
   void _handleUserTap() {
     final currentUserId = AuthService().getCurrentUserId();
 
-    // If it's someone else → use parent-provided navigation
     if (widget.post.userId != currentUserId) {
-      if (widget.onUserTap != null) {
-        widget.onUserTap!();
-      }
+      widget.onUserTap?.call();
       return;
     }
 
-    // 👉 If it's your own post → switch bottom nav to Profile tab
     final bottomNav = Provider.of<BottomNavProvider>(context, listen: false);
-
-    // 4 = index of Profile tab in MainLayout's BottomNavigationBar
     bottomNav.setIndex(4);
   }
 
@@ -374,7 +488,6 @@ class _MyPostTileState extends State<MyPostTile> {
     );
   }
 
-  // Open fullscreen gallery for images in _media
   void _openFullscreenForMedia(PostMedia media) {
     final imageMedias =
     _media.where((m) => m.type == 'image').toList(growable: false);
@@ -395,7 +508,6 @@ class _MyPostTileState extends State<MyPostTile> {
     );
   }
 
-  /// ✅ Optional: resolve and cache an image aspect ratio for a URL
   void _precacheImageAspectRatio(String url) {
     if (_imageAspectRatios.containsKey(url)) return;
 
@@ -410,9 +522,7 @@ class _MyPostTileState extends State<MyPostTile> {
         if (w > 0 && h > 0) {
           final ratio = w / h;
           if (mounted) {
-            setState(() {
-              _imageAspectRatios[url] = ratio;
-            });
+            setState(() => _imageAspectRatios[url] = ratio);
           } else {
             _imageAspectRatios[url] = ratio;
           }
@@ -427,10 +537,6 @@ class _MyPostTileState extends State<MyPostTile> {
     stream.addListener(listener);
   }
 
-  /// Decide the media aspect ratio for the current page index
-  /// - If image ratio known → use it (clamped)
-  /// - If video → default to 4/5 (keeps your existing style)
-  /// - Else fallback → 4/5
   double _currentMediaAspectRatio() {
     const fallback = 4 / 5;
 
@@ -442,45 +548,125 @@ class _MyPostTileState extends State<MyPostTile> {
     if (media.type == 'image') {
       final ratio = _imageAspectRatios[media.url];
       if (ratio == null) return fallback;
-
-      // clamp so it doesn’t get ridiculous tall/wide
-      // (prevents super wide panoramas or super tall images breaking the feed)
       return ratio.clamp(0.8, 1.25);
     }
 
-    // video fallback (you can tune this later if you want)
     return fallback;
   }
 
-  // swipable media (images + videos) OR text-only
+  // ✅ NEW: URL parsing + clickable spans
+  static final RegExp _urlRegex = RegExp(
+    r'((https?:\/\/)|(www\.))[^\s]+',
+    caseSensitive: false,
+  );
+
+  Future<void> _openUrl(String raw) async {
+    var url = raw.trim();
+
+    // allow "www.example.com"
+    if (url.toLowerCase().startsWith('www.')) {
+      url = 'https://$url';
+    }
+
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+
+    final ok = await canLaunchUrl(uri);
+    if (!ok) return;
+
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Widget _buildSelectableLinkText(
+      BuildContext context, {
+        required String text,
+        TextStyle? style,
+        int? maxLines,
+        TextOverflow? overflow,
+        VoidCallback? onTapNonLink,
+      }) {
+    for (final r in _linkRecognizers) {
+      r.dispose();
+    }
+    _linkRecognizers.clear();
+
+    final spans = <TextSpan>[];
+    final matches = _urlRegex.allMatches(text);
+
+    int currentIndex = 0;
+
+    for (final m in matches) {
+      if (m.start > currentIndex) {
+        spans.add(TextSpan(text: text.substring(currentIndex, m.start)));
+      }
+
+      final urlText = text.substring(m.start, m.end);
+      final recognizer = TapGestureRecognizer()
+        ..onTap = () async {
+          await _openUrl(urlText);
+        };
+
+      _linkRecognizers.add(recognizer);
+
+      spans.add(
+        TextSpan(
+          text: urlText,
+          recognizer: recognizer,
+          style: style?.copyWith(
+            decoration: TextDecoration.underline,
+            color: Theme.of(context).colorScheme.primary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+
+      currentIndex = m.end;
+    }
+
+    if (currentIndex < text.length) {
+      spans.add(TextSpan(text: text.substring(currentIndex)));
+    }
+
+    final baseStyle = style ?? Theme.of(context).textTheme.bodyMedium;
+
+    return GestureDetector(
+      onTap: onTapNonLink,
+      behavior: HitTestBehavior.opaque,
+      child: SelectionArea(
+        child: RichText(
+          maxLines: maxLines,
+          overflow: overflow ?? TextOverflow.clip,
+          text: TextSpan(
+            style: baseStyle,
+            children: spans,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildImageOrText(BuildContext context) {
     final theme = Theme.of(context);
 
-    // 1️⃣ If we have media items → show PageView
     if (!_mediaLoading && _media.isNotEmpty) {
-      // - No rounded corners on media
-      // - Media expands to the full screen width
-      // - (Optional) Adaptive aspect ratio
       final aspectRatio = _currentMediaAspectRatio();
 
       return AspectRatio(
         aspectRatio: aspectRatio,
         child: PageView.builder(
+          // ✅ stable key per-post helps Flutter keep internal page state
+          key: PageStorageKey<String>('post_media_${widget.post.id}'),
           itemCount: _media.length,
           onPageChanged: (index) {
-            setState(() {
-              _currentMediaIndex = index;
-            });
+            setState(() => _currentMediaIndex = index);
           },
           itemBuilder: (context, index) {
             final media = _media[index];
 
             if (media.type == 'video') {
-              // keep current behavior: tap = play/pause only
               return _VideoPostPlayer(videoUrl: media.url);
             }
 
-            // default = image (tap → fullscreen, not post page)
             return GestureDetector(
               onTap: () => _openFullscreenForMedia(media),
               child: Image.network(
@@ -510,7 +696,6 @@ class _MyPostTileState extends State<MyPostTile> {
       );
     }
 
-    // 2️⃣ Text-only post (no media rows)
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
@@ -518,17 +703,18 @@ class _MyPostTileState extends State<MyPostTile> {
         color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(18),
       ),
-      child: Text(
-        widget.post.message,
+      child: _buildSelectableLinkText(
+        context,
+        text: widget.post.message,
         style: theme.textTheme.bodyMedium?.copyWith(
           color: theme.colorScheme.onSurface,
           height: 1.4,
         ),
+        onTapNonLink: widget.onPostTap,
       ),
     );
   }
 
-  // dots indicator under the media
   Widget _buildMediaIndicator(BuildContext context) {
     if (_media.length <= 1) return const SizedBox.shrink();
 
@@ -562,6 +748,12 @@ class _MyPostTileState extends State<MyPostTile> {
 
     final likedByCurrentUser =
     listeningProvider.isPostLikedByCurrentUser(widget.post.id);
+
+    final providerBookmarked =
+    listeningProvider.isPostBookmarkedByCurrentUser(widget.post.id);
+
+    final bookmarkedByCurrentUser = _optimisticBookmarked ?? providerBookmarked;
+
     final iconColor = theme.colorScheme.onSurface.withValues(alpha: 0.9);
 
     return Padding(
@@ -583,17 +775,25 @@ class _MyPostTileState extends State<MyPostTile> {
             splashRadius: 20,
           ),
           IconButton(
-            onPressed: widget.onPostTap,
+            onPressed: _openPrivateReflectionDialog,
+            icon: const Icon(Icons.lock_outline_rounded),
+            color: iconColor,
+            splashRadius: 20,
+            tooltip: 'private_reflection'.tr(),
+          ),
+          IconButton(
+            onPressed: _sharePost,
             icon: const Icon(Icons.send_outlined),
             color: iconColor,
             splashRadius: 20,
+            tooltip: 'share'.tr(),
           ),
           const Spacer(),
           IconButton(
-            onPressed: () {
-              // TODO: implement save/bookmark
-            },
-            icon: const Icon(Icons.bookmark_border),
+            onPressed: _toggleBookmarkPost,
+            icon: Icon(
+              bookmarkedByCurrentUser ? Icons.bookmark : Icons.bookmark_border,
+            ),
             color: iconColor,
             splashRadius: 20,
           ),
@@ -604,12 +804,11 @@ class _MyPostTileState extends State<MyPostTile> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // ✅ REQUIRED for AutomaticKeepAliveClientMixin
     final theme = Theme.of(context);
     final likeCount = listeningProvider.getLikeCount(widget.post.id);
     final commentCount = listeningProvider.getComments(widget.post.id).length;
 
-    // ✅ Updated:
-    // Full-width layout + optional subtle separator between posts.
     return Column(
       children: [
         if (kShowSubtlePostSeparator)
@@ -617,36 +816,23 @@ class _MyPostTileState extends State<MyPostTile> {
             height: 10,
             color: theme.colorScheme.surfaceContainerLowest,
           ),
-
         Material(
-          // Using Material instead of Card here allows full-width content
-          // without rounded clipping affecting the media.
           color: theme.colorScheme.surface,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // header stays nicely padded
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: _buildHeader(context),
               ),
               const SizedBox(height: 4),
-
-              // media goes full width
               _buildImageOrText(context),
-
-              // dots indicator if multiple media
               _buildMediaIndicator(context),
-
               const SizedBox(height: 6),
-
-              // actions stay padded
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: _buildActionsRow(context),
               ),
-
-              // likes
               if (likeCount > 0)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -661,41 +847,21 @@ class _MyPostTileState extends State<MyPostTile> {
                     ),
                   ),
                 ),
-
               const SizedBox(height: 4),
-
-              // caption ONLY when there is media (to avoid double text on text-only posts)
               if (_media.isNotEmpty && widget.post.message.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: GestureDetector(
-                    onTap: widget.onPostTap, // 👈 go to PostPage
-                    behavior: HitTestBehavior.opaque,
-                    child: RichText(
-                      text: TextSpan(
-                        children: [
-                          TextSpan(
-                            text: '${widget.post.username} ',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: theme.colorScheme.onSurface,
-                            ),
-                          ),
-                          TextSpan(
-                            text: widget.post.message,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurface,
-                            ),
-                          ),
-                        ],
-                      ),
+                  child: _buildSelectableLinkText(
+                    context,
+                    text: '${widget.post.username} ${widget.post.message}',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface,
+                      height: 1.35,
                     ),
+                    onTapNonLink: widget.onPostTap,
                   ),
                 ),
-
               const SizedBox(height: 4),
-
-              // view all comments → ONLY place that opens post page
               if (!widget.isInPostPage && commentCount > 0)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -713,12 +879,10 @@ class _MyPostTileState extends State<MyPostTile> {
                     ),
                   ),
                 ),
-
               const SizedBox(height: 4),
-
-              // time ago
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 child: TimeAgoText(
                   createdAt: widget.post.createdAt,
                   style: theme.textTheme.labelSmall?.copyWith(
@@ -756,9 +920,7 @@ class _VideoPostPlayerState extends State<_VideoPostPlayer> {
     _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
       ..initialize().then((_) {
         if (!mounted) return;
-        setState(() {
-          _initialized = true;
-        });
+        setState(() => _initialized = true);
 
         _controller.setLooping(true);
         _controller.setVolume(_muted ? 0.0 : 1.0);
@@ -778,7 +940,7 @@ class _VideoPostPlayerState extends State<_VideoPostPlayer> {
     } else {
       _controller.play();
     }
-    setState(() {}); // update play icon
+    setState(() {});
   }
 
   void _toggleMute() {
@@ -790,9 +952,7 @@ class _VideoPostPlayerState extends State<_VideoPostPlayer> {
       _controller.setVolume(0.0);
     }
 
-    setState(() {
-      _muted = !_muted;
-    });
+    setState(() => _muted = !_muted);
   }
 
   @override
@@ -814,26 +974,22 @@ class _VideoPostPlayerState extends State<_VideoPostPlayer> {
         final visibleFraction = info.visibleFraction;
         if (!_initialized) return;
 
-        // ▶️ Auto-play when mostly visible
         if (visibleFraction >= 0.6 && !_controller.value.isPlaying) {
           _controller.play();
           setState(() {});
         }
 
-        // ⏸️ Pause when mostly off-screen
         if (visibleFraction < 0.3 && _controller.value.isPlaying) {
           _controller.pause();
           setState(() {});
         }
       },
       child: GestureDetector(
-        // tapping anywhere on the video only plays/pauses, no navigation
         onTap: _togglePlay,
         behavior: HitTestBehavior.opaque,
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // Video background
             Positioned.fill(
               child: FittedBox(
                 fit: BoxFit.cover,
@@ -844,8 +1000,6 @@ class _VideoPostPlayerState extends State<_VideoPostPlayer> {
                 ),
               ),
             ),
-
-            // Center play button (only when paused)
             if (!isPlaying)
               Container(
                 padding: const EdgeInsets.all(8),
@@ -859,8 +1013,6 @@ class _VideoPostPlayerState extends State<_VideoPostPlayer> {
                   color: Colors.white,
                 ),
               ),
-
-            // Top-right mute/unmute, always tappable
             Positioned(
               top: 12,
               right: 12,

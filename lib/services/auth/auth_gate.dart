@@ -6,6 +6,7 @@ import 'package:ummah_chat/layouts/main_layout.dart';
 import 'package:ummah_chat/services/auth/login_or_register.dart';
 import 'package:ummah_chat/pages/complete_profile_page.dart';
 
+import '../localization/locale_sync_service.dart';
 import '../notifications/push_notification_service.dart';
 
 /// AUTH GATE
@@ -129,6 +130,10 @@ class _ProfileGateState extends State<_ProfileGate> {
 
     // 🔔 NEW: make sure FCM token is synced now that we know who the user is
     await PushNotificationService.syncFcmTokenWithSupabase();
+
+    // 🌍 NEW: sync selected app language to Supabase (so pushes can localize)
+    await LocaleSyncService.syncLocaleToSupabase(context);
+
 
     try {
       // 👇 Make sure these columns exist in your "profiles" table:

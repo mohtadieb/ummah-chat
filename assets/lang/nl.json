@@ -32,7 +32,9 @@
   "Home": "Home",
   "Stories": "Verhalen",
   "Chats": "Chats",
-  "Communities": "Communities",
+  "Communities": "Gemeenschappen",
+  "yes_unfriend": "Ja, verwijderen",
+  "confirm_unfriend_message": "Weet je zeker dat je deze persoon uit je vrienden wilt verwijderen?",
   "Profile": "Profiel",
   "Dua Wall": "Dua Muur",
   "Social": "Sociaal",
@@ -52,7 +54,7 @@
   "Error_loading_friends": "Fout bij laden van vrienden",
   "Loading": "Laden...",
   "No_data": "Geen gegevens beschikbaar",
-  "Post": "Bericht",
+  "Post": "Plaats",
   "Posts": "Berichten",
   "Follower": "Volger",
   "Followers": "Volgers",
@@ -76,6 +78,9 @@
   "Onboarding_3_title": "Dua Muur",
   "Onboarding_3_sub": "Maak dua voor je broeders en zusters.",
   "Empty bio..": "Geen bio ingesteld...",
+  "Edit bio...": "Bio bewerken...",
+  "Choose a song that plays on your profile": "Kies een nummer dat op je profiel wordt afgespeeld",
+  "No profile song set": "Geen profielnummer ingesteld",
   "Reply": "Antwoorden",
   "Write a reply": "Schrijf een reactie",
   "Reply must be at least 5 characters": "De reactie moet minimaal 5 tekens bevatten",
@@ -85,7 +90,7 @@
   "Block": "Blokkeren",
   "Report Message": "Bericht melden",
   "Are you sure you want to report this message?": "Weet je zeker dat je dit bericht wilt melden?",
-  "Block User": "Gebruiker blokkeren",
+  "Block user": "Gebruiker blokkeren",
   "Are you sure you want to block this user?": "Weet je zeker dat je deze gebruiker wilt blokkeren?",
   "User blocked!": "Gebruiker geblokkeerd!",
   "Edit": "Bewerken",
@@ -105,6 +110,11 @@
   "Are you sure you want to delete this post?": "Weet je zeker dat je dit bericht wilt verwijderen?",
   "Post deleted": "Bericht verwijderd",
   "Failed to load media": "Media laden is mislukt",
+  "Saved": "Opgeslagen",
+  "Your bookmarked posts": "Jouw opgeslagen berichten",
+  "No saved posts yet": "Nog geen opgeslagen berichten",
+  "Show": "Tonen",
+  "Hide": "Verbergen",
   "View all": "Alles weergeven",
   "comment": "reactie",
   "comments": "reacties",
@@ -405,6 +415,71 @@
     "one": "{count} bericht • tik om te bekijken",
     "other": "{count} berichten • tik om te bekijken"
   },
+  "Linked to a post": "Gekoppeld aan een bericht",
+  "Could not open post.": "Kon het bericht niet openen.",
+  "Private reflections": "Privé reflecties",
+
+  "daily_ayah_title": "Dagelijkse Ayah",
+  "daily_ayah_subtitle": "Ayah {key}",
+  "daily_ayah_load_failed": "Het laden van de dagelijkse ayah is mislukt.",
+  "retry": "Opnieuw",
+  "save": "Opslaan",
+  "saved": "Opgeslagen",
+  "share": "Delen",
+  "open_post": "Open bericht",
+  "post_no_longer_available": "Dit bericht is niet meer beschikbaar.",
+  "delete_private_reflection_confirm": "Weet je zeker dat je deze reflectie wilt verwijderen?",
+  "remove_bookmark_confirm": "Deze bookmark verwijderen? Je kunt het niet terugkrijgen.",
+  "remove_bookmark": "Bookmark verwijderen",
+  "remove": "Verwijderen",
+  "notif_group_added": "{name} heeft je toegevoegd aan {group}",
+  "friends_of": "Vrienden van {name}",
+  "More": "Meer",
+
+  "are_you_sure_you_want_to_unfollow": "Weet je zeker dat je wilt ontvolgen?",
+  "picker_select": "Selecteren",
+  "Write a private reflection...": "Schrijf een privéreflectie...",
+
+
+
+  "Bio": "Bio",
+  "Save": "Opslaan",
+
+
+
+
+
+
+
+
+  "No private reflections yet": "Nog geen privéreflecties",
+  "tap_to_read_daily_ayah": "Tik om de ayah van vandaag te lezen",
+  "daily_ayah_loading": "Ayah van vandaag laden…",
+  "daily_ayah_load_failed_compact": "Kon de ayah van vandaag niet laden",
+  "saved_posts": "Berichten",
+  "saved_ayat": "Ayat",
+  "saved_reflections": "Reflecties",
+  "no_saved_ayat_yet": "Nog geen opgeslagen ayat",
+  "no_private_reflections_yet": "Nog geen privéreflecties",
+  "private_reflection": "Privéreflectie",
+  "delete": "Verwijderen",
+  "Private": "Privé",
+
+
+  "saved_title": "Opgeslagen",
+  "could_not_share": "Kon niet delen",
+
+  "saved_subtitle_all": "Jouw opgeslagen berichten, ayat en reflecties",
+
+  "no_saved_posts_yet": "Nog geen opgeslagen berichten",
+
+  "add_comment_title": "Reactie toevoegen",
+
+
+
+
+
+  "Only you can see these": "Alleen jij kunt deze zien",
   "asset_not_found": "Bestand niet gevonden: {path}",
   "muhammad": "Muhammad (ﷺ)",
   "Muhammad (ﷺ) series completed": "Muhammad (ﷺ)-serie voltooid",

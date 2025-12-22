@@ -83,6 +83,14 @@
   "Onboarding_3_title": "جدار الدعاء",
   "Onboarding_3_sub": "ادعُ لإخوانك وأخواتك.",
   "Empty bio..": "لا توجد نبذة...",
+  "Edit bio...": "تعديل النبذة...",
+  "Choose a song that plays on your profile": "اختر أغنية يتم تشغيلها على ملفك الشخصي",
+  "No profile song set": "لم يتم تعيين أغنية للملف الشخصي",
+  "Saved": "المحفوظات",
+  "Your bookmarked posts": "منشوراتك المحفوظة",
+  "No saved posts yet": "لا توجد منشورات محفوظة بعد",
+  "Show": "إظهار",
+  "Hide": "إخفاء",
   "Reply": "رد",
   "Write a reply": "اكتب ردًا",
   "Reply must be at least 5 characters": "يجب ألا يقل الرد عن 5 أحرف",
@@ -92,9 +100,11 @@
   "Block": "حظر",
   "Report Message": "الإبلاغ عن رسالة",
   "Are you sure you want to report this message?": "هل أنت متأكد أنك تريد الإبلاغ عن هذه الرسالة؟",
-  "Block User": "حظر المستخدم",
+  "Block user": "حظر المستخدم",
   "Are you sure you want to block this user?": "هل أنت متأكد أنك تريد حظر هذا المستخدم؟",
   "User blocked!": "تم حظر المستخدم!",
+  "yes_unfriend": "نعم، إزالة الصديق",
+  "confirm_unfriend_message": "هل أنت متأكد أنك تريد إزالة هذا الشخص من قائمة أصدقائك؟",
   "Edit": "تعديل",
   "Unfollow": "إلغاء المتابعة",
   "Follow": "متابعة",
@@ -324,6 +334,26 @@
   "Cover": "غلاف",
   "Write a caption...": "اكتب وصفًا...",
   "Write your dua here...": "اكتب دعاءك هنا...",
+  "open_post": "فتح المنشور",
+  "post_no_longer_available": "هذا المنشور لم يعد متاحًا.",
+  "delete_private_reflection_confirm": "هل أنت متأكد أنك تريد حذف هذا التأمل؟",
+  "remove_bookmark_confirm": "هل تريد إزالة هذه الإشارة المرجعية؟ لا يمكنك استعادتها.",
+  "remove_bookmark": "إزالة الإشارة المرجعية",
+  "remove": "إزالة",
+  "notif_group_added": "قام {name} بإضافتك إلى {group}",
+  "friends_of": "أصدقاء {name}",
+  "More": "المزيد",
+
+  "are_you_sure_you_want_to_unfollow": "هل أنت متأكد أنك تريد إلغاء المتابعة؟",
+  "picker_select": "تحديد",
+  "Bio": "نبذة",
+
+
+
+
+
+
+
   "Your dua should be at least 5 characters.": "يجب ألا يقل دعاؤك عن 5 أحرف.",
   "Your dua has been shared.": "تم مشاركة دعائك.",
   "Could not share dua. Please try again.": "تعذّر مشاركة الدعاء. يرجى المحاولة مرة أخرى.",
@@ -406,6 +436,42 @@
     "one": "{count} منشور • اضغط للعرض",
     "other": "{count} منشورات • اضغط للعرض"
   },
+  "Linked to a post": "مرتبط بمنشور",
+  "Could not open post.": "تعذر فتح المنشور.",
+  "Private reflections": "تأملات خاصة",
+  "daily_ayah_title": "آية اليوم",
+  "daily_ayah_subtitle": "الآية {key}",
+  "daily_ayah_load_failed": "تعذر تحميل آية اليوم.",
+  "retry": "إعادة المحاولة",
+  "save": "حفظ",
+  "Save": "حفظ",
+  "Write a private reflection...": "اكتب تأملًا خاصًا...",
+  "Private": "خاص",
+
+
+
+  "saved": "تم الحفظ",
+  "share": "مشاركة",
+  "tap_to_read_daily_ayah": "اضغط لقراءة آية اليوم",
+  "daily_ayah_loading": "جارٍ تحميل آية اليوم…",
+  "daily_ayah_load_failed_compact": "تعذّر تحميل آية اليوم",
+  "saved_posts": "المنشورات",
+  "saved_ayat": "الآيات",
+  "saved_reflections": "التأملات",
+  "no_saved_ayat_yet": "لا توجد آيات محفوظة بعد",
+  "no_private_reflections_yet": "لا توجد تأملات خاصة بعد",
+  "private_reflection": "تأمل خاص",
+  "delete": "حذف",
+  "saved_title": "المحفوظات",
+  "saved_subtitle_all": "منشوراتك المحفوظة، والآيات، وتأملاتك",
+
+  "no_saved_posts_yet": "لا توجد منشورات محفوظة بعد",
+
+  "add_comment_title": "أضف تعليقًا",
+  "could_not_share": "تعذّر المشاركة",
+
+  "No private reflections yet": "لا توجد تأملات خاصة بعد",
+  "Only you can see these": "أنت فقط من يمكنه رؤيتها",
   "asset_not_found": "الملف غير موجود: {path}",
   "muhammad": "محمد (ﷺ)",
   "Muhammad (ﷺ) series completed": "اكتملت سلسلة النبي محمد ﷺ",
