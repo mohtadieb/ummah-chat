@@ -300,7 +300,7 @@ class _PostPageState extends State<PostPage> {
                     child: Padding(
                       padding: const EdgeInsets.all(16.0),
                       child: Text(
-                        "No comments yet...".tr(),
+                        "No comments yet".tr(),
                         style: TextStyle(
                           color: theme.colorScheme.primary,
                         ),

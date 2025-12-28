@@ -879,18 +879,22 @@ class _MyPostTileState extends State<MyPostTile>
               // - plural uses your "View all comments" key:
               //   one: "View 1 comment"
               //   other: "View all {count} comments"
-              if (!widget.isInPostPage && commentCount > 0)
+              if (!widget.isInPostPage)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   child: GestureDetector(
-                    onTap: widget.onPostTap,
+                    onTap: commentCount > 0 ? widget.onPostTap : null,
                     child: Text(
-                      "View all comments".plural(
+                      commentCount == 0
+                          ? 'No comments yet'.tr()
+                          : 'View all comments'.plural(
                         commentCount,
-                        namedArgs: {"count": commentCount.toString()},
+                        namedArgs: {'count': commentCount.toString()},
                       ),
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.primary,
+                        color: commentCount == 0
+                            ? theme.colorScheme.onSurfaceVariant
+                            : theme.colorScheme.primary,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
