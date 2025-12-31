@@ -1,5 +1,5 @@
 class Notification {
-  final int id;
+  final String id;
   final String userId;
   final String title;
   final String? body;
@@ -18,7 +18,7 @@ class Notification {
   // ✅ Supabase -> App
   factory Notification.fromMap(Map<String, dynamic> map) {
     return Notification(
-      id: map['id'] as int,
+      id: map['id'].toString(), // ✅ key line
       userId: map['user_id']?.toString() ?? '',
       title: map['title']?.toString() ?? '',
       body: map['body']?.toString(),
@@ -43,7 +43,7 @@ class Notification {
 
   // ✅ Copy with updated fields
   Notification copyWith({
-    int? id,
+    String? id,
     String? userId,
     String? title,
     String? body,

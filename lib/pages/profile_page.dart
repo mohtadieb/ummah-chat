@@ -601,6 +601,18 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() => _friendStatus = updated);
   }
 
+  void _goToMyProfileInMainLayout() {
+    // If we're already on the root Profile tab (no pushed routes), do nothing.
+    if (!Navigator.of(context).canPop()) return;
+
+    // 1) Switch bottom nav to Profile tab
+    Provider.of<BottomNavProvider>(context, listen: false).setIndex(4);
+
+    // 2) Pop everything above MainLayout (root route)
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
+
   /// FRIENDS SECTION – horizontal row of friends
   Widget _buildFriendsSection(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -876,9 +888,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     return GestureDetector(
                       onTap: () {
                         if (friend.id == currentUserId) {
-                          // IMPORTANT: Avoid trapping user without an appbar.
-                          // If you're already inside a pushed route stack, just pop to previous page.
-                          Navigator.pop(context);
+                          _goToMyProfileInMainLayout();
                         } else {
                           Navigator.push(
                             context,
@@ -887,6 +897,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             ),
                           );
                         }
+
                       },
                       child: Column(
                         mainAxisSize: MainAxisSize.min,

@@ -116,7 +116,7 @@ class NotificationService {
   // MUTATIONS – GENERIC
   // -------------------------
 
-  Future<void> markAsRead(int id) async {
+  Future<void> markAsRead(String id) async {
     await _db.from('notifications').update({'is_read': true}).eq('id', id);
   }
 
