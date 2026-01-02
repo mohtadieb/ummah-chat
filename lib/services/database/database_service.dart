@@ -1054,14 +1054,21 @@ class DatabaseService {
 
         await _notifications.createNotificationForUser(
           targetUserId: targetUserId,
-          title: '$displayName sent you a friend request', // fallback
+          title: '$displayName sent you a friend request',
           body: 'FRIEND_REQUEST:$currentUserId',
+
+          // ✅ IMPORTANT:
+          fromUserId: currentUserId,
+          type: 'social',
+          unreadCount: 1,
+          isRead: false,
+
           data: {
             'type': 'FRIEND_REQUEST',
-            'fromUserId': currentUserId,
             'senderName': displayName,
           },
         );
+
       } catch (e) {
         print('⚠️ Error creating friend request notification: $e');
       }

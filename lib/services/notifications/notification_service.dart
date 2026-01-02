@@ -124,22 +124,38 @@ class NotificationService {
     Map<String, String>? data,
     bool sendPush = true,
     String? pushBody,
+
+    // ✅ NEW (so RLS can allow sender delete)
+    String? fromUserId,
+    String? type,
+    String? chatRoomId,
+    int? unreadCount,
+    bool? isRead,
   }) async {
     // 1️⃣ Store notification in DB (for in-app list)
-    await _db.from('notifications').insert({
+    final insertMap = <String, dynamic>{
       'user_id': targetUserId,
       'title': title,
       'body': body,
-    });
+    };
 
-    // 2️⃣ Optionally send push to device (localized by Edge Function)
+    if (fromUserId != null && fromUserId.trim().isNotEmpty) {
+      insertMap['from_user_id'] = fromUserId.trim();
+    }
+    if (type != null && type.trim().isNotEmpty) {
+      insertMap['type'] = type.trim();
+    }
+    if (chatRoomId != null && chatRoomId.trim().isNotEmpty) {
+      insertMap['chat_room_id'] = chatRoomId.trim();
+    }
+    if (unreadCount != null) insertMap['unread_count'] = unreadCount;
+    if (isRead != null) insertMap['is_read'] = isRead;
+
+    await _db.from('notifications').insert(insertMap);
+
+    // 2️⃣ Optionally send push
     if (sendPush) {
-      // We try to infer the notif type from the stored body OR from data['type']
-      final inferredType = _inferNotifType(
-        body: body,
-        data: data,
-      );
-
+      final inferredType = _inferNotifType(body: body, data: data);
       final preview = (pushBody ?? _extractPreviewFromBody(body) ?? '').trim();
 
       await _sendLocalizedPushToUserId(
@@ -154,6 +170,7 @@ class NotificationService {
       );
     }
   }
+
 
   // -------------------------
   // MUTATIONS – CHAT-SPECIFIC (DM)
