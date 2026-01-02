@@ -48,8 +48,10 @@ class _ChatPageState extends State<ChatPage> {
 
   final AuthService _authService = AuthService();
   final DatabaseService _dbService = DatabaseService();
-  late final ChatProvider _chatProvider;
   final NotificationService _notifService = NotificationService();
+
+  late final ChatProvider _chatProvider;
+  late final String _currentUserId;
 
   String? _chatRoomId;
 
@@ -94,13 +96,12 @@ class _ChatPageState extends State<ChatPage> {
     super.initState();
 
     _chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    _currentUserId = _authService.getCurrentUserId() ?? '';
 
     _voiceRecorder = VoiceRecorderController(
       debugTag: 'DM',
       onTick: () {
-        if (mounted) {
-          setState(() {});
-        }
+        if (mounted) setState(() {});
       },
     );
 
@@ -126,11 +127,8 @@ class _ChatPageState extends State<ChatPage> {
     // Periodically refresh *our* last_seen_at while chat is open
     _presenceTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
       if (!mounted) return;
-      final currentUserId = _authService.getCurrentUserId();
-      if (currentUserId != null && currentUserId.isNotEmpty) {
-        final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-        await chatProvider.updateLastSeen(currentUserId);
-      }
+      if (_currentUserId.isEmpty) return;
+      await _chatProvider.updateLastSeen(_currentUserId);
     });
   }
 
@@ -144,10 +142,9 @@ class _ChatPageState extends State<ChatPage> {
     _voiceRecorder.dispose();
 
     // Clear active chat presence (no Provider.of in dispose)
-    final currentUserId = _authService.getCurrentUserId();
-    if (currentUserId != null && currentUserId.isNotEmpty) {
+    if (_currentUserId.isNotEmpty) {
       _chatProvider.setActiveChatRoom(
-        userId: currentUserId,
+        userId: _currentUserId,
         chatRoomId: null,
       );
 
@@ -155,13 +152,13 @@ class _ChatPageState extends State<ChatPage> {
       if (_chatRoomId != null) {
         _chatProvider.setTypingStatus(
           chatRoomId: _chatRoomId!,
-          userId: currentUserId,
+          userId: _currentUserId,
           isTyping: false,
         );
       }
     }
 
-    // Clear active chat for notification UI
+    // ✅ UI-only suppression: clear when leaving DM
     _notifService.setActiveChatRoomId(null);
     _notifService.setActiveDmFriendId(null);
 
@@ -177,13 +174,10 @@ class _ChatPageState extends State<ChatPage> {
   // ---------------------------------------------------------------------------
 
   Future<void> _initChatRoom() async {
-    final currentUserId = _authService.getCurrentUserId();
-    if (currentUserId == null || currentUserId.isEmpty) return;
+    if (_currentUserId.isEmpty) return;
 
-    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-
-    final chatRoomId = await chatProvider.getOrCreateChatRoomId(
-      currentUserId,
+    final chatRoomId = await _chatProvider.getOrCreateChatRoomId(
+      _currentUserId,
       widget.friendId,
     );
 
@@ -193,29 +187,23 @@ class _ChatPageState extends State<ChatPage> {
       _chatRoomId = chatRoomId;
     });
 
-    // Let NotificationService know which chat is currently active
+    // ✅ UI-only suppression: hide notif while this DM is open
     _notifService.setActiveChatRoomId(chatRoomId);
     _notifService.setActiveDmFriendId(widget.friendId);
 
-    // Mark that this user is currently viewing this chat (presence)
-    await chatProvider.setActiveChatRoom(
-      userId: currentUserId,
+    // Presence: mark this room active
+    await _chatProvider.setActiveChatRoom(
+      userId: _currentUserId,
       chatRoomId: chatRoomId,
     );
 
-    await chatProvider.listenToRoom(chatRoomId);
+    await _chatProvider.listenToRoom(chatRoomId);
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollDown());
 
-    await chatProvider.markRoomMessagesAsRead(chatRoomId, currentUserId);
+    await _chatProvider.markRoomMessagesAsRead(chatRoomId, _currentUserId);
 
-    // Also mark chat notifications for this room as read
-    await _notifService.markChatNotificationsAsRead(
-      chatRoomId: chatRoomId,
-      userId: currentUserId,
-    );
-
-    await chatProvider.updateLastSeen(currentUserId);
+    await _chatProvider.updateLastSeen(_currentUserId);
 
     _subscribeToFriendTyping(chatRoomId);
   }
@@ -223,15 +211,12 @@ class _ChatPageState extends State<ChatPage> {
   void _subscribeToFriendTyping(String chatRoomId) {
     _friendTypingSub?.cancel();
 
-    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-
-    _friendTypingSub = chatProvider
+    _friendTypingSub = _chatProvider
         .friendTypingStream(
       chatRoomId: chatRoomId,
       friendId: widget.friendId,
     )
         .listen((isTyping) {
-      debugPrint('👀 friendTypingStream emitted: $isTyping');
       if (!mounted) return;
       setState(() {
         _isFriendTyping = isTyping;
@@ -250,26 +235,24 @@ class _ChatPageState extends State<ChatPage> {
 
   void _handleTypingChange() async {
     if (_chatRoomId == null) return;
-    final currentUserId = _authService.getCurrentUserId();
-    if (currentUserId == null || currentUserId.isEmpty) return;
+    if (_currentUserId.isEmpty) return;
 
-    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
     final hasText = _messageController.text.trim().isNotEmpty;
 
     if (hasText && !_sentTypingTrue) {
       _sentTypingTrue = true;
-      await chatProvider.setTypingStatus(
+      await _chatProvider.setTypingStatus(
         chatRoomId: _chatRoomId!,
-        userId: currentUserId,
+        userId: _currentUserId,
         isTyping: true,
       );
     }
 
     if (!hasText && _sentTypingTrue) {
       _sentTypingTrue = false;
-      await chatProvider.setTypingStatus(
+      await _chatProvider.setTypingStatus(
         chatRoomId: _chatRoomId!,
-        userId: currentUserId,
+        userId: _currentUserId,
         isTyping: false,
       );
     }
@@ -277,15 +260,14 @@ class _ChatPageState extends State<ChatPage> {
     _typingDebounce?.cancel();
     if (hasText) {
       _typingDebounce = Timer(const Duration(seconds: 4), () async {
-        if (_chatRoomId == null || !mounted) return;
-        final uid = _authService.getCurrentUserId();
-        if (uid == null || uid.isEmpty) return;
+        if (!mounted) return;
+        if (_chatRoomId == null) return;
+        if (_currentUserId.isEmpty) return;
 
         _sentTypingTrue = false;
-        final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-        await chatProvider.setTypingStatus(
+        await _chatProvider.setTypingStatus(
           chatRoomId: _chatRoomId!,
-          userId: uid,
+          userId: _currentUserId,
           isTyping: false,
         );
       });
@@ -341,9 +323,7 @@ class _ChatPageState extends State<ChatPage> {
     if (_voiceRecorder.isRecording) return;
 
     _voiceRecorder.start().then((_) {
-      if (mounted) {
-        setState(() {});
-      }
+      if (mounted) setState(() {});
     });
   }
 
@@ -354,13 +334,9 @@ class _ChatPageState extends State<ChatPage> {
   Future<void> _handleMicCancel() async {
     if (!_voiceRecorder.isRecording) return;
 
-    // Stop recording and discard result
     try {
       await _voiceRecorder.stop();
-      if (mounted) {
-        setState(() {});
-      }
-      debugPrint('🎤 Voice recording cancelled by slide');
+      if (mounted) setState(() {});
     } catch (e) {
       debugPrint('Error cancelling voice recording: $e');
     }
@@ -368,30 +344,22 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> _stopRecordingAndSend() async {
     final recorded = await _voiceRecorder.stop();
-    if (recorded == null) {
-      // Either too short or failed
-      return;
-    }
+    if (recorded == null) return;
 
-    final currentUserId = _authService.getCurrentUserId();
-    if (currentUserId == null || currentUserId.isEmpty || _chatRoomId == null) {
-      return;
-    }
-
-    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    if (_currentUserId.isEmpty || _chatRoomId == null) return;
 
     try {
       final messageId = const Uuid().v4();
 
-      final audioUrl = await chatProvider.uploadVoiceFile(
+      final audioUrl = await _chatProvider.uploadVoiceFile(
         chatRoomId: _chatRoomId!,
         messageId: messageId,
         filePath: recorded.filePath,
       );
 
-      await chatProvider.sendVoiceMessageDM(
+      await _chatProvider.sendVoiceMessageDM(
         chatRoomId: _chatRoomId!,
-        senderId: currentUserId,
+        senderId: _currentUserId,
         receiverId: widget.friendId,
         audioUrl: audioUrl,
         durationSeconds: recorded.durationSeconds,
@@ -399,12 +367,10 @@ class _ChatPageState extends State<ChatPage> {
       );
 
       setState(() {
-        _replyTo = null; // clear reply target after sending voice
+        _replyTo = null;
       });
 
-      await chatProvider.updateLastSeen(currentUserId);
-
-      debugPrint('✅ Voice message sent');
+      await _chatProvider.updateLastSeen(_currentUserId);
     } catch (e) {
       debugPrint('Error sending voice message: $e');
     }
@@ -417,20 +383,16 @@ class _ChatPageState extends State<ChatPage> {
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty || _chatRoomId == null) return;
-
-    final currentUserId = _authService.getCurrentUserId();
-    if (currentUserId == null || currentUserId.isEmpty) return;
-
-    final provider = Provider.of<ChatProvider>(context, listen: false);
+    if (_currentUserId.isEmpty) return;
 
     final replyId = _replyTo?.id;
 
     _messageController.clear();
     _scrollDown();
 
-    await provider.sendMessage(
+    await _chatProvider.sendMessage(
       _chatRoomId!,
-      currentUserId,
+      _currentUserId,
       widget.friendId,
       text,
       replyToMessageId: replyId,
@@ -440,16 +402,14 @@ class _ChatPageState extends State<ChatPage> {
       _replyTo = null;
     });
 
-    await provider.updateLastSeen(currentUserId);
+    await _chatProvider.updateLastSeen(_currentUserId);
 
-    if (_chatRoomId != null) {
-      await provider.setTypingStatus(
-        chatRoomId: _chatRoomId!,
-        userId: currentUserId,
-        isTyping: false,
-      );
-      _sentTypingTrue = false;
-    }
+    await _chatProvider.setTypingStatus(
+      chatRoomId: _chatRoomId!,
+      userId: _currentUserId,
+      isTyping: false,
+    );
+    _sentTypingTrue = false;
   }
 
   // ---------------------------------------------------------------------------
@@ -457,10 +417,7 @@ class _ChatPageState extends State<ChatPage> {
   // ---------------------------------------------------------------------------
 
   void _startSelection(MessageModel msg) {
-    // Only allow selecting your own messages for deletion
-    final currentUserId = _authService.getCurrentUserId();
-    if (currentUserId == null || msg.senderId != currentUserId) {
-      // Fallback: normal long-press behaviour
+    if (msg.senderId != _currentUserId) {
       _onBubbleLongPress(msg, false);
       return;
     }
@@ -475,15 +432,12 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void _toggleSelection(MessageModel msg) {
-    final currentUserId = _authService.getCurrentUserId();
-    if (currentUserId == null || msg.senderId != currentUserId) return;
+    if (msg.senderId != _currentUserId) return;
 
     setState(() {
       if (_selectedMessageIds.contains(msg.id)) {
         _selectedMessageIds.remove(msg.id);
-        if (_selectedMessageIds.isEmpty) {
-          _isSelectionMode = false;
-        }
+        if (_selectedMessageIds.isEmpty) _isSelectionMode = false;
       } else {
         _selectedMessageIds.add(msg.id);
       }
@@ -492,11 +446,9 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> _confirmDeleteSelectedMessages() async {
     if (_selectedMessageIds.isEmpty) return;
+    if (_currentUserId.isEmpty) return;
 
     final colorScheme = Theme.of(context).colorScheme;
-    final currentUserId = _authService.getCurrentUserId();
-    if (currentUserId == null || currentUserId.isEmpty) return;
-
     final count = _selectedMessageIds.length;
 
     final bool? shouldDelete = await showDialog<bool>(
@@ -526,19 +478,16 @@ class _ChatPageState extends State<ChatPage> {
             ),
           ],
         );
-
       },
     );
 
     if (shouldDelete != true) return;
 
     final ids = List<String>.from(_selectedMessageIds);
-    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-
     for (final id in ids) {
-      await chatProvider.deleteMessageForEveryone(
+      await _chatProvider.deleteMessageForEveryone(
         messageId: id,
-        userId: currentUserId,
+        userId: _currentUserId,
       );
     }
 
@@ -554,9 +503,7 @@ class _ChatPageState extends State<ChatPage> {
 
     final selectedId = _selectedMessageIds.first;
 
-    final provider = Provider.of<ChatProvider>(context, listen: false);
-    final rawMessages = provider.getMessages(_chatRoomId!);
-
+    final rawMessages = _chatProvider.getMessages(_chatRoomId!);
     final messages = rawMessages.map((m) => MessageModel.fromMap(m)).toList();
 
     MessageModel? target;
@@ -565,7 +512,6 @@ class _ChatPageState extends State<ChatPage> {
     } catch (_) {
       target = null;
     }
-
     if (target == null) return;
 
     setState(() {
@@ -585,18 +531,14 @@ class _ChatPageState extends State<ChatPage> {
     final uniqueIds = userIds.toSet().where((id) => id.isNotEmpty).toList();
     if (uniqueIds.isEmpty) return;
 
-    final currentUserId = _authService.getCurrentUserId();
-
     await LikesBottomSheetHelper.show(
       context: context,
-      currentUserId: currentUserId,
+      currentUserId: _currentUserId.isEmpty ? null : _currentUserId,
       loadProfiles: () async {
         final List<UserProfile> profiles = [];
         for (final id in uniqueIds) {
           final profile = await _dbService.getUserFromDatabase(id);
-          if (profile != null) {
-            profiles.add(profile);
-          }
+          if (profile != null) profiles.add(profile);
         }
         return profiles;
       },
@@ -607,7 +549,6 @@ class _ChatPageState extends State<ChatPage> {
   // UI helpers
   // ---------------------------------------------------------------------------
 
-  // AppBar subtitle: only online / last seen (typing is shown at bottom)
   Widget? _buildSubtitle(ColorScheme colorScheme) {
     final profile = _friendProfile;
     if (profile == null) return null;
@@ -627,9 +568,7 @@ class _ChatPageState extends State<ChatPage> {
       );
     }
 
-    if (profile.lastSeenAt == null) {
-      return null;
-    }
+    if (profile.lastSeenAt == null) return null;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -640,11 +579,8 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  Widget _buildReplyPreviewBar(
-      MessageModel msg,
-      String currentUserId,
-      ) {
-    final isMine = msg.senderId == currentUserId;
+  Widget _buildReplyPreviewBar(MessageModel msg) {
+    final isMine = msg.senderId == _currentUserId;
     final author = isMine ? 'You'.tr() : widget.friendName;
 
     String label;
@@ -667,11 +603,9 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-
   Future<void> _confirmDeleteMessage(String messageId) async {
     final colorScheme = Theme.of(context).colorScheme;
-    final currentUserId = _authService.getCurrentUserId();
-    if (currentUserId == null || currentUserId.isEmpty) return;
+    if (_currentUserId.isEmpty) return;
 
     final bool? shouldDelete = await showDialog<bool>(
       context: context,
@@ -700,18 +634,13 @@ class _ChatPageState extends State<ChatPage> {
 
     if (shouldDelete != true) return;
 
-    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-
-    await chatProvider.deleteMessageForEveryone(
+    await _chatProvider.deleteMessageForEveryone(
       messageId: messageId,
-      userId: currentUserId,
+      userId: _currentUserId,
     );
   }
 
-  Future<void> _onBubbleLongPress(
-      MessageModel msg,
-      bool isCurrentUser,
-      ) async {
+  Future<void> _onBubbleLongPress(MessageModel msg, bool isCurrentUser) async {
     if (msg.isDeleted) return;
 
     HapticFeedback.mediumImpact();
@@ -759,16 +688,12 @@ class _ChatPageState extends State<ChatPage> {
   void _handleBubbleLongPress(MessageModel msg, bool isCurrentUser) {
     if (msg.isDeleted) return;
 
-    final currentUserId = _authService.getCurrentUserId();
-
-    if (_isSelectionMode &&
-        currentUserId != null &&
-        msg.senderId == currentUserId) {
+    if (_isSelectionMode && msg.senderId == _currentUserId) {
       _toggleSelection(msg);
       return;
     }
 
-    if (currentUserId != null && msg.senderId == currentUserId) {
+    if (msg.senderId == _currentUserId) {
       _startSelection(msg);
       return;
     }
@@ -782,9 +707,7 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUserId = _authService.getCurrentUserId();
     final colorScheme = Theme.of(context).colorScheme;
-
     final subtitleWidget = _buildSubtitle(colorScheme);
 
     return PopScope(
@@ -810,11 +733,9 @@ class _ChatPageState extends State<ChatPage> {
               ? Text(
             "selected_messages".plural(
               _selectedMessageIds.length,
-              namedArgs: {
-                "count": _selectedMessageIds.length.toString(),
-              },
+              namedArgs: {"count": _selectedMessageIds.length.toString()},
             ),
-            style: TextStyle(fontWeight: FontWeight.w600),
+            style: const TextStyle(fontWeight: FontWeight.w600),
           )
               : Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -825,17 +746,13 @@ class _ChatPageState extends State<ChatPage> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => ProfilePage(
-                        userId: widget.friendId,
-                      ),
+                      builder: (_) => ProfilePage(userId: widget.friendId),
                     ),
                   );
                 },
                 child: Text(
                   widget.friendName,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
               if (subtitleWidget != null) subtitleWidget,
@@ -861,39 +778,31 @@ class _ChatPageState extends State<ChatPage> {
           top: false,
           child: Column(
             children: [
-              // Messages
               Expanded(
                 child: _chatRoomId == null
                     ? const Center(child: CircularProgressIndicator())
                     : Consumer<ChatProvider>(
                   builder: (context, provider, _) {
-                    final rawMessages = provider.getMessages(
-                      _chatRoomId!,
-                    );
+                    final rawMessages = provider.getMessages(_chatRoomId!);
 
                     if (rawMessages.isEmpty) {
-                      return Center(
-                        child: Text("No messages yet".tr()),
-                      );
+                      return Center(child: Text("No messages yet".tr()));
                     }
 
                     final messages = rawMessages
                         .map((m) => MessageModel.fromMap(m))
                         .toList()
-                      ..sort(
-                            (a, b) => a.createdAt.compareTo(b.createdAt),
-                      );
+                      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
                     int unreadCount = 0;
                     int? firstUnreadIndexFromStart;
-                    if (currentUserId != null) {
-                      for (int i = 0; i < messages.length; i++) {
-                        final m = messages[i];
-                        final isMine = m.senderId == currentUserId;
-                        if (!m.isRead && !isMine) {
-                          unreadCount++;
-                          firstUnreadIndexFromStart ??= i;
-                        }
+
+                    for (int i = 0; i < messages.length; i++) {
+                      final m = messages[i];
+                      final isMine = m.senderId == _currentUserId;
+                      if (!m.isRead && !isMine) {
+                        unreadCount++;
+                        firstUnreadIndexFromStart ??= i;
                       }
                     }
 
@@ -917,42 +826,33 @@ class _ChatPageState extends State<ChatPage> {
                       messageIndexToGroupIndex[firstUnreadIndexFromStart];
                     }
 
-                    // Capture initial unread index + count once
                     if (!_hasCapturedInitialUnreadIndex) {
                       _initialUnreadGroupIndex = firstUnreadGroupIndex;
                       _initialUnreadCount = unreadCount;
                       _hasCapturedInitialUnreadIndex = true;
                     }
 
-                    // Detect new messages while chat is open
-                    if (currentUserId != null &&
-                        currentUserId.isNotEmpty &&
+                    if (_currentUserId.isNotEmpty &&
                         messages.length != _lastMessageCount) {
                       if (_lastMessageCount > 0 &&
                           messages.length > _lastMessageCount) {
-                        // New messages after initial load → hide separator from now on
                         _hideUnreadSeparatorForNewMessages = true;
                       }
 
-                      if (_isNearBottom()) {
-                        _scrollDown();
-                      }
+                      if (_isNearBottom()) _scrollDown();
 
                       _lastMessageCount = messages.length;
 
-                      // Mark as read whenever messages change while open
                       provider.markRoomMessagesAsRead(
                         _chatRoomId!,
-                        currentUserId,
+                        _currentUserId,
                       );
                     }
 
                     return ListView.builder(
                       controller: _scrollController,
                       reverse: true,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 8,
-                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
                       itemCount: groups.length,
                       itemBuilder: (context, index) {
                         final groupIndex = groups.length - 1 - index;
@@ -961,15 +861,13 @@ class _ChatPageState extends State<ChatPage> {
                         final firstMsg = group.first;
                         final lastMsg = group.last;
 
-                        final isCurrentUser = currentUserId != null &&
-                            firstMsg.senderId == currentUserId;
+                        final isCurrentUser =
+                            firstMsg.senderId == _currentUserId;
 
                         final imageUrls = group.messages
                             .map((m) => m.imageUrl)
                             .whereType<String>()
-                            .where(
-                              (u) => u.trim().isNotEmpty,
-                        )
+                            .where((u) => u.trim().isNotEmpty)
                             .toList();
 
                         final String? groupVideoUrl = group.messages
@@ -979,6 +877,7 @@ class _ChatPageState extends State<ChatPage> {
                               (u) => u.trim().isNotEmpty,
                           orElse: () => '',
                         );
+
                         final String? effectiveVideoUrl =
                         (groupVideoUrl != null &&
                             groupVideoUrl.trim().isNotEmpty)
@@ -986,18 +885,17 @@ class _ChatPageState extends State<ChatPage> {
                             : null;
 
                         final likedBy = lastMsg.likedBy;
-                        final isLikedByMe = currentUserId != null &&
-                            likedBy.contains(currentUserId);
+                        final isLikedByMe =
+                        likedBy.contains(_currentUserId);
                         final likeCount = likedBy.length;
 
                         final msgDate = firstMsg.createdAt;
                         DateTime? prevDate;
                         if (groupIndex > 0) {
-                          prevDate =
-                              groups[groupIndex - 1].first.createdAt;
+                          prevDate = groups[groupIndex - 1].first.createdAt;
                         }
-                        final showDayDivider = prevDate == null ||
-                            !isSameDay(msgDate, prevDate);
+                        final showDayDivider =
+                            prevDate == null || !isSameDay(msgDate, prevDate);
 
                         final showUnreadSeparator =
                             _initialUnreadGroupIndex != null &&
@@ -1006,9 +904,7 @@ class _ChatPageState extends State<ChatPage> {
 
                         MessageModel? repliedTo;
                         if (lastMsg.replyToMessageId != null &&
-                            lastMsg.replyToMessageId!
-                                .trim()
-                                .isNotEmpty) {
+                            lastMsg.replyToMessageId!.trim().isNotEmpty) {
                           try {
                             repliedTo = messages.firstWhere(
                                   (m) => m.id == lastMsg.replyToMessageId,
@@ -1023,8 +919,8 @@ class _ChatPageState extends State<ChatPage> {
                         bool replyHasMedia = false;
 
                         if (repliedTo != null) {
-                          final isMineReply = currentUserId != null &&
-                              repliedTo.senderId == currentUserId;
+                          final isMineReply =
+                              repliedTo.senderId == _currentUserId;
                           replyAuthorName =
                           isMineReply ? 'You'.tr() : widget.friendName;
 
@@ -1051,7 +947,6 @@ class _ChatPageState extends State<ChatPage> {
                           }
                         }
 
-                        // Inner bubble
                         Widget innerBubble;
                         if (lastMsg.isAudio &&
                             (lastMsg.audioUrl ?? '').trim().isNotEmpty) {
@@ -1059,17 +954,15 @@ class _ChatPageState extends State<ChatPage> {
                             key: ValueKey(lastMsg.id),
                             audioUrl: lastMsg.audioUrl!,
                             isCurrentUser: isCurrentUser,
-                            durationSeconds:
-                            lastMsg.audioDurationSeconds,
+                            durationSeconds: lastMsg.audioDurationSeconds,
                           );
                         } else {
                           innerBubble = MyChatBubble(
                             key: ValueKey(lastMsg.id),
                             message: lastMsg.message,
                             imageUrls: imageUrls,
-                            imageUrl: imageUrls.isNotEmpty
-                                ? imageUrls.first
-                                : null,
+                            imageUrl:
+                            imageUrls.isNotEmpty ? imageUrls.first : null,
                             videoUrl: effectiveVideoUrl,
                             isCurrentUser: isCurrentUser,
                             createdAt: lastMsg.createdAt,
@@ -1079,31 +972,18 @@ class _ChatPageState extends State<ChatPage> {
                             likeCount: likeCount,
                             isUploading: lastMsg.isUploading,
                             isDeleted: lastMsg.isDeleted,
-                            senderName: isCurrentUser
-                                ? 'You'.tr()
-                                : widget.friendName,
+                            senderName:
+                            isCurrentUser ? 'You'.tr() : widget.friendName,
                             onDoubleTap: () async {
                               if (_isSelectionMode) return;
+                              if (_currentUserId.isEmpty) return;
 
-                              final String? uid =
-                              _authService.getCurrentUserId();
-                              if (uid == null || uid.isEmpty) {
-                                return;
-                              }
-
-                              final chatProvider =
-                              Provider.of<ChatProvider>(
-                                context,
-                                listen: false,
-                              );
-
-                              await chatProvider.toggleLikeMessage(
+                              await _chatProvider.toggleLikeMessage(
                                 messageId: lastMsg.id,
-                                userId: uid,
+                                userId: _currentUserId,
                               );
                             },
-                            onLongPress: !_isSelectionMode &&
-                                !lastMsg.isDeleted
+                            onLongPress: !_isSelectionMode && !lastMsg.isDeleted
                                 ? () => _handleBubbleLongPress(
                               lastMsg,
                               isCurrentUser,
@@ -1114,11 +994,7 @@ class _ChatPageState extends State<ChatPage> {
                                 : () {
                               if (_isSelectionMode) return;
                               _openLikesBottomSheet(
-                                likedBy
-                                    .map(
-                                      (e) => e.toString(),
-                                )
-                                    .toList(),
+                                likedBy.map((e) => e.toString()).toList(),
                               );
                             },
                             replyAuthorName: replyAuthorName,
@@ -1138,8 +1014,7 @@ class _ChatPageState extends State<ChatPage> {
                           ),
                           onTap: () {
                             if (_isSelectionMode &&
-                                currentUserId != null &&
-                                lastMsg.senderId == currentUserId) {
+                                lastMsg.senderId == _currentUserId) {
                               _toggleSelection(lastMsg);
                             }
                           },
@@ -1156,8 +1031,7 @@ class _ChatPageState extends State<ChatPage> {
                             if (showUnreadSeparator)
                               buildUnreadBubble(
                                 context: context,
-                                unreadCount:
-                                _initialUnreadCount ?? unreadCount,
+                                unreadCount: _initialUnreadCount ?? unreadCount,
                               ),
                             Padding(
                               padding: const EdgeInsets.symmetric(
@@ -1179,21 +1053,14 @@ class _ChatPageState extends State<ChatPage> {
                 ),
               ),
 
-              // Input + bottom typing indicator
               SafeArea(
                 top: false,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (_replyTo != null &&
-                        currentUserId != null &&
-                        currentUserId.isNotEmpty)
-                      _buildReplyPreviewBar(
-                        _replyTo!,
-                        currentUserId,
-                      ),
+                    if (_replyTo != null && _currentUserId.isNotEmpty)
+                      _buildReplyPreviewBar(_replyTo!),
 
-                    // 👇 Typing indicator at the bottom of the chat
                     if (_isFriendTyping)
                       Padding(
                         padding: const EdgeInsets.only(
@@ -1216,7 +1083,6 @@ class _ChatPageState extends State<ChatPage> {
                                   .withValues(alpha: 0.7),
                             ),
                           ),
-
                         ),
                       ),
 
@@ -1226,21 +1092,15 @@ class _ChatPageState extends State<ChatPage> {
                         controller: _messageController,
                         focusNode: _focusNode,
                         onSendPressed: _sendMessage,
-                        onEmojiPressed: () =>
-                            debugPrint('Emoji pressed'),
+                        onEmojiPressed: () => debugPrint('Emoji pressed'),
                         onAttachmentPressed: () async {
                           if (_chatRoomId == null) return;
-                          final currentUserId =
-                          _authService.getCurrentUserId();
-                          if (currentUserId == null ||
-                              currentUserId.isEmpty) {
-                            return;
-                          }
+                          if (_currentUserId.isEmpty) return;
 
                           await ChatMediaHelper.openAttachmentSheetForDM(
                             context: context,
                             chatRoomId: _chatRoomId!,
-                            currentUserId: currentUserId,
+                            currentUserId: _currentUserId,
                             otherUserId: widget.friendId,
                           );
                         },
@@ -1248,9 +1108,7 @@ class _ChatPageState extends State<ChatPage> {
                         isRecording: _voiceRecorder.isRecording,
                         recordingLabel: _voiceRecorder.isRecording
                             ? 'recording_label'.tr(
-                          namedArgs: {
-                            "time": _voiceRecorder.formattedDuration,
-                          },
+                          namedArgs: {"time": _voiceRecorder.formattedDuration},
                         )
                             : null,
                         onMicLongPressStart: _handleMicLongPressStart,

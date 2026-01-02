@@ -61,18 +61,7 @@ class NotificationService {
         .map((rows) {
       final unread = rows.where((r) {
         final isUnread = r['is_read'] == false || r['is_read'] == 0;
-        if (!isUnread) return false;
-
-        // 🆕 If user is currently viewing this chat (DM or group),
-        // hide its chat notifications from the bell badge
-        if (_activeChatRoomId != null &&
-            _activeChatRoomId!.isNotEmpty &&
-            (r['type'] == 'chat') &&
-            r['chat_room_id'] == _activeChatRoomId) {
-          return false;
-        }
-
-        return true;
+        return isUnread;
       }).length;
 
       debugPrint('🔔 unreadCountStream rows=${rows.length}, unread=$unread');
@@ -80,37 +69,31 @@ class NotificationService {
     });
   }
 
+
   /// 📄 Full notifications list
   Stream<List<models.Notification>> notificationsStream() {
-    if (_currentUserId.isEmpty) return Stream.value([]);
+    final userId = _currentUserId;
+    if (userId.isEmpty) return Stream.value([]);
 
     return _db
         .from('notifications')
         .stream(primaryKey: ['id'])
-        .eq('user_id', _currentUserId)
+        .eq('user_id', userId)
         .map((rows) {
-      // 🆕 Filter out chat notifications for the currently open chat
-      final filtered = rows.where((r) {
-        if (_activeChatRoomId != null &&
-            _activeChatRoomId!.isNotEmpty &&
-            (r['type'] == 'chat') &&
-            r['chat_room_id'] == _activeChatRoomId) {
-          return false;
-        }
-        return true;
-      }).toList();
+      final sorted = [...rows];
 
-      filtered.sort(
+      sorted.sort(
             (a, b) => DateTime.parse(b['created_at']).compareTo(
           DateTime.parse(a['created_at']),
         ),
       );
 
-      return filtered
+      return sorted
           .map((data) => models.Notification.fromMap(data))
           .toList();
     });
   }
+
 
   // -------------------------
   // MUTATIONS – GENERIC
@@ -184,79 +167,43 @@ class NotificationService {
     required String messagePreview,
   }) async {
     if (targetUserId.isEmpty) return;
-
-    // 🆕 0) Check presence: if user is already in this chat, DO NOT notify
-    try {
-      final presence = await _db
-          .from('user_chat_presence')
-          .select('active_chat_room_id')
-          .eq('user_id', targetUserId)
-          .maybeSingle();
-
-      final String? activeRoomId =
-      presence == null ? null : presence['active_chat_room_id'] as String?;
-
-      if (activeRoomId != null && activeRoomId == chatRoomId) {
-        debugPrint(
-          'ℹ️ Skipping chat notification: user $targetUserId is currently in $chatRoomId',
-        );
-        return;
-      }
-    } catch (e) {
-      // Fail CLOSED: if we can't confirm presence, don't send a notification
-      debugPrint(
-        '⚠️ Presence lookup failed in createOrUpdateChatNotification, skipping notification: $e',
-      );
-      return;
-    }
+    if (chatRoomId.isEmpty) return;
+    if (senderId.isEmpty) return;
 
     final trimmed = messagePreview.trim();
-    final truncatedPreview =
-    trimmed.length > 60 ? '${trimmed.substring(0, 60)}…' : trimmed;
+    final truncatedPreview = trimmed.length > 60 ? '${trimmed.substring(0, 60)}…' : trimmed;
 
     final title = '$senderName sent you a message';
 
-    // ✅ IMPORTANT: use :: delimiter because NotificationPage splits by '::'
-    final bodyCode = 'CHAT_MESSAGE:$senderId::${senderName}';
+    // NotificationPage expects: CHAT_MESSAGE:<senderId>::<senderName>
+    final bodyCode = 'CHAT_MESSAGE:$senderId::$senderName';
 
-    // 1️⃣ See if there is already an unread chat notification for this room
-    final existingRows = await _db
-        .from('notifications')
-        .select('id, unread_count')
-        .eq('user_id', targetUserId)
-        .eq('type', 'chat')
-        .eq('chat_room_id', chatRoomId)
-        .eq('is_read', false)
-        .order('created_at', ascending: false); // newest first
+    bool shouldSendPush = false;
 
-    if (existingRows.isNotEmpty) {
-      // 🔄 Update the newest existing notification, don't send another push
-      final existing = existingRows.first;
-      final id = existing['id'] as int;
-      final currentCount = (existing['unread_count'] as int?) ?? 1;
+    try {
+      final res = await _db.rpc(
+        'upsert_room_chat_notification_checked',
+        params: {
+          'p_user_id': targetUserId,
+          'p_chat_room_id': chatRoomId,
+          'p_from_user_id': senderId,
+          'p_title': title,
+          'p_body': bodyCode,
+        },
+      );
 
-      await _db.from('notifications').update({
-        'title': title,
-        'body': bodyCode,
-        'unread_count': currentCount + 1,
-        'from_user_id': senderId,
-      }).eq('id', id);
-
+      shouldSendPush = (res is bool) ? res : (res == true);
+    } catch (e, st) {
+      debugPrint('❌ upsert_room_chat_notification_checked failed (DM): $e\n$st');
       return;
     }
 
-    // 2️⃣ No unread chat notification yet → create one & send push
-    await _db.from('notifications').insert({
-      'user_id': targetUserId,
-      'title': title,
-      'body': bodyCode,
-      'type': 'chat',
-      'chat_room_id': chatRoomId,
-      'from_user_id': senderId,
-      'unread_count': 1,
-    });
+    // If receiver is active, DB returned false -> no DB notif + no push
+    if (!shouldSendPush) {
+      debugPrint('ℹ️ Skipped DM notif+push: receiver active in $chatRoomId');
+      return;
+    }
 
-    // Push uses preview if available
     final pushPreview = truncatedPreview.isEmpty ? '' : truncatedPreview;
 
     await _sendLocalizedPushToUserId(
@@ -275,6 +222,7 @@ class NotificationService {
     );
   }
 
+
   // -------------------------
   // MUTATIONS – GROUP CHAT-SPECIFIC
   // -------------------------
@@ -288,78 +236,41 @@ class NotificationService {
     required String messagePreview,
   }) async {
     if (targetUserId.isEmpty) return;
-
-    // 0️⃣ Presence check: if user is already in this group chat, skip notification
-    try {
-      final presence = await _db
-          .from('user_chat_presence')
-          .select('active_chat_room_id')
-          .eq('user_id', targetUserId)
-          .maybeSingle();
-
-      final String? activeRoomId =
-      presence == null ? null : presence['active_chat_room_id'] as String?;
-
-      if (activeRoomId != null && activeRoomId == chatRoomId) {
-        debugPrint(
-          'ℹ️ Skipping group chat notification: user $targetUserId is currently in $chatRoomId',
-        );
-        return;
-      }
-    } catch (e) {
-      debugPrint(
-        '⚠️ Presence lookup failed in createOrUpdateGroupChatNotification, skipping notification: $e',
-      );
-      return;
-    }
+    if (chatRoomId.isEmpty) return;
+    if (senderId.isEmpty) return;
 
     final trimmed = messagePreview.trim();
-    final truncatedPreview =
-    trimmed.length > 60 ? '${trimmed.substring(0, 60)}…' : trimmed;
+    final truncatedPreview = trimmed.length > 60 ? '${trimmed.substring(0, 60)}…' : trimmed;
 
-    // Example: "Ummah Sisters – Tas"
     final title = '$groupName – $senderName';
 
-    // 👇 This is what NotificationPage parses:
-    // GROUP_MESSAGE:<chatRoomId>::<groupName>
-    // ✅ IMPORTANT: use :: delimiter
-    final bodyCode = 'GROUP_MESSAGE:$chatRoomId::${groupName}';
+    // NotificationPage expects: GROUP_MESSAGE:<chatRoomId>::<groupName>
+    final bodyCode = 'GROUP_MESSAGE:$chatRoomId::$groupName';
 
-    // 1️⃣ See if there is already an unread chat notification for this group room
-    final existingRows = await _db
-        .from('notifications')
-        .select('id, unread_count')
-        .eq('user_id', targetUserId)
-        .eq('type', 'chat')
-        .eq('chat_room_id', chatRoomId)
-        .eq('is_read', false)
-        .order('created_at', ascending: false);
+    bool shouldSendPush = false;
 
-    if (existingRows.isNotEmpty) {
-      final existing = existingRows.first;
-      final id = existing['id'] as int;
-      final currentCount = (existing['unread_count'] as int?) ?? 1;
+    try {
+      final res = await _db.rpc(
+        'upsert_room_chat_notification_checked',
+        params: {
+          'p_user_id': targetUserId,
+          'p_chat_room_id': chatRoomId,
+          'p_from_user_id': senderId, // store last sender
+          'p_title': title,
+          'p_body': bodyCode,
+        },
+      );
 
-      await _db.from('notifications').update({
-        'title': title,
-        'body': bodyCode,
-        'unread_count': currentCount + 1,
-        'from_user_id': senderId,
-      }).eq('id', id);
-
+      shouldSendPush = (res is bool) ? res : (res == true);
+    } catch (e, st) {
+      debugPrint('❌ upsert_room_chat_notification_checked failed (GROUP): $e\n$st');
       return;
     }
 
-    // 2️⃣ No unread group notification yet → create one & send push
-    await _db.from('notifications').insert({
-      'user_id': targetUserId,
-      'title': title,
-      'body': bodyCode,
-      'type': 'chat',
-      'chat_room_id': chatRoomId,
-      'from_user_id': senderId,
-      'unread_count': 1,
-    });
+    if (!shouldSendPush) {
+      debugPrint('ℹ️ Skipped GROUP notif+push: receiver active in $chatRoomId');
+      return;
+    }
 
     final pushPreview = truncatedPreview.isEmpty ? '' : truncatedPreview;
 
@@ -380,6 +291,8 @@ class NotificationService {
       },
     );
   }
+
+
 
   Future<void> markChatNotificationsAsRead({
     required String chatRoomId,

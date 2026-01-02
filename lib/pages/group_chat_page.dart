@@ -1,3 +1,4 @@
+// lib/pages/group_chat_page.dart
 import 'dart:async';
 
 import 'package:easy_localization/easy_localization.dart';
@@ -86,6 +87,10 @@ class _GroupChatPageState extends State<GroupChatPage> {
   Timer? _typingDebounce;
   bool _sentTypingTrue = false;
 
+  // ✅ NEW (like DM): make sure we only do the initial mark-as-read once,
+  // AFTER the unread separator captured.
+  bool _didInitialMarkRead = false;
+
   @override
   void initState() {
     super.initState();
@@ -94,57 +99,44 @@ class _GroupChatPageState extends State<GroupChatPage> {
     debugPrint(
       '🟢 GroupChatPage opened for room=${widget.chatRoomId}, user=$_currentUserId',
     );
+
+    // Cache provider like DM page does
     _chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
     _voiceRecorder = VoiceRecorderController(
       debugTag: 'Group',
       onTick: () {
-        if (mounted) {
-          setState(() {});
-        }
+        if (mounted) setState(() {});
       },
     );
 
+    // Load members list (UI only)
     _loadMembers();
 
-    final provider = _chatProvider;
-    provider.listenToRoom(widget.chatRoomId);
+    // Init room (presence + listen) — DO NOT mark read here immediately
+    _initGroupRoom();
 
-    if (_currentUserId.isNotEmpty) {
-      provider.markGroupMessagesAsRead(widget.chatRoomId, _currentUserId);
-
-      // Mark that this user is currently viewing this group chat
-      provider.setActiveChatRoom(
-        userId: _currentUserId,
-        chatRoomId: widget.chatRoomId,
-      );
-      // Also mark chat notifications for this group room as read
-      _notifService.markChatNotificationsAsRead(
-        chatRoomId: widget.chatRoomId,
-        userId: _currentUserId,
-      );
-    }
-
-    // Tell NotificationService that this chat is active
-    _notifService.setActiveChatRoomId(widget.chatRoomId);
-
+    // Auto-scroll when keyboard opens
     _focusNode.addListener(() {
       if (_focusNode.hasFocus) {
         Future.delayed(const Duration(milliseconds: 300), _scrollDown);
       }
     });
 
-    // 🟢 NEW: Watch the textfield to update typing status (like DM)
+    // Watch the textfield to update typing status (like DM)
     _messageController.addListener(_handleTypingChange);
 
-    _presenceTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
-      if (_currentUserId.isNotEmpty) {
-        await provider.updateLastSeen(_currentUserId);
-      }
-    });
-
-    // 🟢 NEW: Subscribe to group typing users
+    // Subscribe to group typing users
     _subscribeToGroupTyping(widget.chatRoomId);
+
+    // Periodically refresh *our* last_seen_at while chat is open (same as DM)
+    _presenceTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
+      if (!mounted) return;
+      if (_currentUserId.isEmpty) return;
+
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+      await chatProvider.updateLastSeen(_currentUserId);
+    });
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollDown());
   }
@@ -173,18 +165,50 @@ class _GroupChatPageState extends State<GroupChatPage> {
       );
     }
 
-    // Clear active chat id for notification UI
+    // ✅ UI-only suppression: clear when leaving group
     _notifService.setActiveChatRoomId(null);
 
     _focusNode.dispose();
-    _messageController.removeListener(_handleTypingChange); // 🟢 NEW
+    _messageController.removeListener(_handleTypingChange);
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
   // ---------------------------------------------------------------------------
-  // 🟢 NEW: Typing handling (group)
+  // Group chat room init + typing
+  // ---------------------------------------------------------------------------
+
+  Future<void> _initGroupRoom() async {
+    if (_currentUserId.isEmpty) return;
+
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
+    // ✅ UI-only suppression: hide notif while this group is open
+    _notifService.setActiveChatRoomId(widget.chatRoomId);
+
+    // ✅ Presence: mark this room active (like DM)
+    await chatProvider.setActiveChatRoom(
+      userId: _currentUserId,
+      chatRoomId: widget.chatRoomId,
+    );
+
+    // ✅ Important: wait for messages to be fetched / ready
+    await chatProvider.listenToRoom(widget.chatRoomId);
+
+    if (!mounted) return;
+
+    // ✅ Let first frame build (like DM) — but do NOT mark read here.
+    // Mark read will happen once the unread separator captured in build().
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      _scrollDown();
+      await chatProvider.updateLastSeen(_currentUserId);
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // 🟢 Typing handling (group)
   // ---------------------------------------------------------------------------
 
   void _subscribeToGroupTyping(String chatRoomId) {
@@ -192,11 +216,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
-    // 👉 This expects a method like:
-    // Stream<List<String>> groupTypingStream({
-    //   required String chatRoomId,
-    //   required String currentUserId,
-    // })
     _groupTypingSub = chatProvider
         .groupTypingStream(
       chatRoomId: chatRoomId,
@@ -252,33 +271,21 @@ class _GroupChatPageState extends State<GroupChatPage> {
   }
 
   String? _buildTypingLabel() {
-    // Exclude ourselves from the label if backend still includes us
     final others = _typingUserIds.where((id) => id != _currentUserId).toList();
     if (others.isEmpty) return null;
 
     final names = others.map(_displayNameForSender).toList();
 
     if (names.length == 1) {
-      // Reuse your existing "typing_indicator" key: "{{name}} is aan het typen…"
-      return 'typing_indicator'.tr(
-        namedArgs: {'name': names.first},
-      );
+      return 'typing_indicator'.tr(namedArgs: {'name': names.first});
     }
 
     if (names.length == 2) {
-      // New key: group_typing_two
-      return 'group_typing_two'.tr(
-        namedArgs: {'name1': names[0], 'name2': names[1]},
-      );
+      return 'group_typing_two'.tr(namedArgs: {'name1': names[0], 'name2': names[1]});
     }
 
-    // 3+ users
-    // New key: group_typing_many
-    return 'group_typing_many'.tr(
-      namedArgs: {'name1': names[0], 'name2': names[1]},
-    );
+    return 'group_typing_many'.tr(namedArgs: {'name1': names[0], 'name2': names[1]});
   }
-
 
   // ---------------------------------------------------------------------------
   // Members & admin
@@ -371,8 +378,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
               return ListTile(
                 leading: CircleAvatar(
                   radius: 20,
-                  backgroundColor:
-                  colorScheme.primary.withValues(alpha: 0.12),
+                  backgroundColor: colorScheme.primary.withValues(alpha: 0.12),
                   child: Text(
                     name.isNotEmpty ? name[0].toUpperCase() : '?',
                     style: TextStyle(
@@ -414,17 +420,12 @@ class _GroupChatPageState extends State<GroupChatPage> {
       builder: (_) {
         return AlertDialog(
           title: Text('Leave group?'.tr()),
-        content: Text(
-        'leave_group_warning'.tr(
-        namedArgs: {'name': widget.groupName},
-        ),
-        ),
+          content: Text(
+            'leave_group_warning'.tr(namedArgs: {'name': widget.groupName}),
+          ),
           actions: [
             TextButton(
-              child: Text(
-                'Cancel'.tr(),
-                style: TextStyle(color: colorScheme.primary),
-              ),
+              child: Text('Cancel'.tr(), style: TextStyle(color: colorScheme.primary)),
               onPressed: () => Navigator.of(context).pop(false),
             ),
             TextButton(
@@ -447,16 +448,13 @@ class _GroupChatPageState extends State<GroupChatPage> {
       );
 
       if (!mounted) return;
-
       Navigator.of(context).pop();
     } catch (e) {
       debugPrint('Error leaving group: $e');
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to leave group. Please try again.'.tr()),
-        ),
+        SnackBar(content: Text('Failed to leave group. Please try again.'.tr())),
       );
     }
   }
@@ -471,17 +469,10 @@ class _GroupChatPageState extends State<GroupChatPage> {
       builder: (_) {
         return AlertDialog(
           title: Text('Delete group?'.tr()),
-          content: Text(
-            'delete_group_warning'.tr(
-              namedArgs: {'name': widget.groupName},
-            ),
-          ),
+          content: Text('delete_group_warning'.tr(namedArgs: {'name': widget.groupName})),
           actions: [
             TextButton(
-              child: Text(
-                'Cancel'.tr(),
-                style: TextStyle(color: colorScheme.primary),
-              ),
+              child: Text('Cancel'.tr(), style: TextStyle(color: colorScheme.primary)),
               onPressed: () => Navigator.of(context).pop(false),
             ),
             TextButton(
@@ -501,16 +492,13 @@ class _GroupChatPageState extends State<GroupChatPage> {
       await chatProvider.deleteGroupAsAdmin(chatRoomId: widget.chatRoomId);
 
       if (!mounted) return;
-
       Navigator.of(context).pop();
     } catch (e) {
       debugPrint('Error deleting group: $e');
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to delete group. Please try again.'.tr()),
-        ),
+        SnackBar(content: Text('Failed to delete group. Please try again.'.tr())),
       );
     }
   }
@@ -613,9 +601,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
   Future<void> _stopRecordingAndSend() async {
     final recorded = await _voiceRecorder.stop();
-    if (recorded == null) {
-      return;
-    }
+    if (recorded == null) return;
 
     if (_currentUserId.isEmpty) return;
 
@@ -678,7 +664,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
     await provider.updateLastSeen(_currentUserId);
 
-    // 🟢 NEW: clear our typing flag after sending
     await provider.setTypingStatus(
       chatRoomId: widget.chatRoomId,
       userId: _currentUserId,
@@ -785,20 +770,15 @@ class _GroupChatPageState extends State<GroupChatPage> {
       builder: (_) {
         return AlertDialog(
           title: Text('Delete message?'.tr()),
-          content: Text(
-            'This message will be deleted for everyone in the group.'.tr(),
-          ),
+          content: Text('This message will be deleted for everyone in the group.'.tr()),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: Text(
-                'Cancel'.tr(),
-                style: TextStyle(color: colorScheme.primary),
-              ),
+              child: Text('Cancel'.tr(), style: TextStyle(color: colorScheme.primary)),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: Text('Delete'.tr(), style: TextStyle(color: Colors.red)),
+              child: Text('Delete'.tr(), style: const TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -863,20 +843,15 @@ class _GroupChatPageState extends State<GroupChatPage> {
               namedArgs: {'count': count.toString()},
             ),
           ),
-          content: Text(
-            'Selected messages will be deleted for everyone in the group.'.tr(),
-          ),
+          content: Text('Selected messages will be deleted for everyone in the group.'.tr()),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: Text(
-                'Cancel'.tr(),
-                style: TextStyle(color: colorScheme.primary),
-              ),
+              child: Text('Cancel'.tr(), style: TextStyle(color: colorScheme.primary)),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: Text('Delete'.tr(), style: TextStyle(color: Colors.red)),
+              child: Text('Delete'.tr(), style: const TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -978,7 +953,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
     );
   }
 
-  // Unified handler
   void _handleGroupBubbleLongPress(MessageModel msg, bool isCurrentUser) {
     if (msg.isDeleted) return;
 
@@ -1038,7 +1012,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
       },
     );
 
-
     final typingLabel = _buildTypingLabel();
 
     return PopScope(
@@ -1070,7 +1043,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
             children: [
               Text(
                 widget.groupName,
-                style: TextStyle(fontWeight: FontWeight.w600),
+                style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               Text(
                 subtitleText,
@@ -1115,19 +1088,14 @@ class _GroupChatPageState extends State<GroupChatPage> {
                 }
               },
               itemBuilder: (context) {
-                final items =
-                <PopupMenuEntry<_GroupMenuAction>>[];
+                final items = <PopupMenuEntry<_GroupMenuAction>>[];
 
                 items.add(
                   PopupMenuItem(
                     value: _GroupMenuAction.viewMembers,
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.group_outlined,
-                          size: 20,
-                          color: colorScheme.primary,
-                        ),
+                        Icon(Icons.group_outlined, size: 20, color: colorScheme.primary),
                         const SizedBox(width: 12),
                         Text('View members'.tr()),
                       ],
@@ -1141,11 +1109,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
                       value: _GroupMenuAction.addMembers,
                       child: Row(
                         children: [
-                          Icon(
-                            Icons.person_add_alt_1,
-                            size: 20,
-                            color: colorScheme.primary,
-                          ),
+                          Icon(Icons.person_add_alt_1, size: 20, color: colorScheme.primary),
                           const SizedBox(width: 12),
                           Text('Add members'.tr()),
                         ],
@@ -1158,11 +1122,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
                       value: _GroupMenuAction.deleteGroup,
                       child: Row(
                         children: [
-                          Icon(
-                            Icons.delete_forever_outlined,
-                            size: 20,
-                            color: Colors.red.shade600,
-                          ),
+                          Icon(Icons.delete_forever_outlined, size: 20, color: Colors.red.shade600),
                           const SizedBox(width: 12),
                           Text('Delete group'.tr()),
                         ],
@@ -1178,11 +1138,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
                     value: _GroupMenuAction.leaveGroup,
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.logout,
-                          size: 20,
-                          color: Colors.red.shade600,
-                        ),
+                        Icon(Icons.logout, size: 20, color: Colors.red.shade600),
                         const SizedBox(width: 12),
                         Text('Leave group'.tr()),
                       ],
@@ -1202,8 +1158,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
               Expanded(
                 child: Consumer<ChatProvider>(
                   builder: (context, provider, _) {
-                    final rawMessages =
-                    provider.getMessages(widget.chatRoomId);
+                    final rawMessages = provider.getMessages(widget.chatRoomId);
 
                     if (rawMessages.isEmpty) {
                       return Center(child: Text("No messages yet".tr()));
@@ -1212,9 +1167,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
                     final messages = rawMessages
                         .map((m) => MessageModel.fromMap(m))
                         .toList()
-                      ..sort(
-                            (a, b) => a.createdAt.compareTo(b.createdAt),
-                      );
+                      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
                     int unreadCount = 0;
                     int? firstUnreadIndexFromStart;
@@ -1231,8 +1184,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
                     final groups = MessageGrouping.build(messages);
 
-                    final messageIndexToGroupIndex =
-                    List<int>.filled(messages.length, 0);
+                    final messageIndexToGroupIndex = List<int>.filled(messages.length, 0);
                     for (int gi = 0; gi < groups.length; gi++) {
                       final g = groups[gi];
                       for (final m in g.messages) {
@@ -1245,22 +1197,29 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
                     int? firstUnreadGroupIndex;
                     if (firstUnreadIndexFromStart != null) {
-                      firstUnreadGroupIndex =
-                      messageIndexToGroupIndex[firstUnreadIndexFromStart];
+                      firstUnreadGroupIndex = messageIndexToGroupIndex[firstUnreadIndexFromStart];
                     }
 
-                    // Capture initial unread index + count once
+                    // ✅ Capture initial unread index + count ONCE
                     if (!_hasCapturedInitialUnreadIndex) {
                       _initialUnreadGroupIndex = firstUnreadGroupIndex;
                       _initialUnreadCount = unreadCount;
                       _hasCapturedInitialUnreadIndex = true;
                     }
 
+                    // ✅ DM-like fix: do initial mark-read ONLY after capture
+                    if (_hasCapturedInitialUnreadIndex && !_didInitialMarkRead) {
+                      _didInitialMarkRead = true;
+                      WidgetsBinding.instance.addPostFrameCallback((_) async {
+                        if (!mounted) return;
+                        if (_currentUserId.isEmpty) return;
+                        await provider.markGroupMessagesAsRead(widget.chatRoomId, _currentUserId);
+                      });
+                    }
+
                     // Detect new messages while open
-                    if (_currentUserId.isNotEmpty &&
-                        messages.length != _lastMessageCount) {
-                      if (_lastMessageCount > 0 &&
-                          messages.length > _lastMessageCount) {
+                    if (_currentUserId.isNotEmpty && messages.length != _lastMessageCount) {
+                      if (_lastMessageCount > 0 && messages.length > _lastMessageCount) {
                         _hideUnreadSeparatorForNewMessages = true;
                       }
 
@@ -1270,10 +1229,9 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
                       _lastMessageCount = messages.length;
 
-                      provider.markGroupMessagesAsRead(
-                        widget.chatRoomId,
-                        _currentUserId,
-                      );
+                      if (_hasCapturedInitialUnreadIndex) {
+                        provider.markGroupMessagesAsRead(widget.chatRoomId, _currentUserId);
+                      }
                     }
 
                     return ListView.builder(
@@ -1288,17 +1246,11 @@ class _GroupChatPageState extends State<GroupChatPage> {
                         final firstMsg = group.first;
                         final lastMsg = group.last;
 
-                        final bool isCurrentUser =
-                            firstMsg.senderId == _currentUserId;
+                        final bool isCurrentUser = firstMsg.senderId == _currentUserId;
 
-                        final String senderName = _displayNameForSender(
-                          firstMsg.senderId,
-                        );
+                        final String senderName = _displayNameForSender(firstMsg.senderId);
 
-                        final Color senderColor = _colorForSender(
-                          firstMsg.senderId,
-                          colorScheme,
-                        );
+                        final Color senderColor = _colorForSender(firstMsg.senderId, colorScheme);
 
                         final imageUrls = group.messages
                             .map((m) => m.imageUrl)
@@ -1309,45 +1261,30 @@ class _GroupChatPageState extends State<GroupChatPage> {
                         final String? groupVideoUrl = group.messages
                             .map((m) => m.videoUrl)
                             .whereType<String>()
-                            .firstWhere(
-                              (u) => u.trim().isNotEmpty,
-                          orElse: () => '',
-                        );
+                            .firstWhere((u) => u.trim().isNotEmpty, orElse: () => '');
+
                         final String? effectiveVideoUrl =
-                        (groupVideoUrl != null &&
-                            groupVideoUrl.trim().isNotEmpty)
-                            ? groupVideoUrl
-                            : null;
+                        (groupVideoUrl != null && groupVideoUrl.trim().isNotEmpty) ? groupVideoUrl : null;
 
                         final List<String> likedBy = lastMsg.likedBy;
-                        final bool isLikedByMe =
-                            _currentUserId.isNotEmpty &&
-                                likedBy.contains(_currentUserId);
+                        final bool isLikedByMe = _currentUserId.isNotEmpty && likedBy.contains(_currentUserId);
                         final int likeCount = likedBy.length;
 
                         final msgDate = firstMsg.createdAt;
                         DateTime? prevDate;
                         if (groupIndex > 0) {
-                          prevDate =
-                              groups[groupIndex - 1].first.createdAt;
+                          prevDate = groups[groupIndex - 1].first.createdAt;
                         }
-                        final showDayDivider =
-                            prevDate == null || !isSameDay(msgDate, prevDate);
+                        final showDayDivider = prevDate == null || !isSameDay(msgDate, prevDate);
 
-                        final showUnreadSeparator =
-                            _initialUnreadGroupIndex != null &&
-                                groupIndex == _initialUnreadGroupIndex &&
-                                !_hideUnreadSeparatorForNewMessages;
+                        final showUnreadSeparator = _initialUnreadGroupIndex != null &&
+                            groupIndex == _initialUnreadGroupIndex &&
+                            !_hideUnreadSeparatorForNewMessages;
 
                         MessageModel? repliedTo;
-                        if (lastMsg.replyToMessageId != null &&
-                            lastMsg.replyToMessageId!
-                                .trim()
-                                .isNotEmpty) {
+                        if (lastMsg.replyToMessageId != null && lastMsg.replyToMessageId!.trim().isNotEmpty) {
                           try {
-                            repliedTo = messages.firstWhere(
-                                  (m) => m.id == lastMsg.replyToMessageId,
-                            );
+                            repliedTo = messages.firstWhere((m) => m.id == lastMsg.replyToMessageId);
                           } catch (_) {
                             repliedTo = null;
                           }
@@ -1358,26 +1295,17 @@ class _GroupChatPageState extends State<GroupChatPage> {
                         bool replyHasMedia = false;
 
                         if (repliedTo != null) {
-                          replyAuthorName = _displayNameForSender(
-                            repliedTo.senderId,
-                          );
+                          replyAuthorName = _displayNameForSender(repliedTo.senderId);
 
                           if (repliedTo.message.trim().isNotEmpty) {
                             replySnippet = repliedTo.message.trim();
-                          } else if ((repliedTo.imageUrl ?? '')
-                              .trim()
-                              .isNotEmpty) {
+                          } else if ((repliedTo.imageUrl ?? '').trim().isNotEmpty) {
                             replySnippet = 'Photo'.tr();
                             replyHasMedia = true;
-                          } else if ((repliedTo.videoUrl ?? '')
-                              .trim()
-                              .isNotEmpty) {
+                          } else if ((repliedTo.videoUrl ?? '').trim().isNotEmpty) {
                             replySnippet = 'Video'.tr();
                             replyHasMedia = true;
-                          } else if ((repliedTo.audioUrl ?? '')
-                              .trim()
-                              .isNotEmpty ||
-                              repliedTo.isAudio) {
+                          } else if ((repliedTo.audioUrl ?? '').trim().isNotEmpty || repliedTo.isAudio) {
                             replySnippet = 'Voice message'.tr();
                             replyHasMedia = true;
                           } else {
@@ -1385,25 +1313,20 @@ class _GroupChatPageState extends State<GroupChatPage> {
                           }
                         }
 
-                        // Inner bubble
                         Widget innerBubble;
-                        if (lastMsg.isAudio &&
-                            (lastMsg.audioUrl ?? '').trim().isNotEmpty) {
+                        if (lastMsg.isAudio && (lastMsg.audioUrl ?? '').trim().isNotEmpty) {
                           innerBubble = MyVoiceMessageBubble(
                             key: ValueKey(lastMsg.id),
                             audioUrl: lastMsg.audioUrl!,
                             isCurrentUser: isCurrentUser,
-                            durationSeconds:
-                            lastMsg.audioDurationSeconds,
+                            durationSeconds: lastMsg.audioDurationSeconds,
                           );
                         } else {
                           innerBubble = MyChatBubble(
                             key: ValueKey(lastMsg.id),
                             message: lastMsg.message,
                             imageUrls: imageUrls,
-                            imageUrl: imageUrls.isNotEmpty
-                                ? imageUrls.first
-                                : null,
+                            imageUrl: imageUrls.isNotEmpty ? imageUrls.first : null,
                             videoUrl: effectiveVideoUrl,
                             isCurrentUser: isCurrentUser,
                             createdAt: lastMsg.createdAt,
@@ -1422,12 +1345,8 @@ class _GroupChatPageState extends State<GroupChatPage> {
                                 userId: _currentUserId,
                               );
                             },
-                            onLongPress: !_isSelectionMode &&
-                                !lastMsg.isDeleted
-                                ? () => _handleGroupBubbleLongPress(
-                              lastMsg,
-                              isCurrentUser,
-                            )
+                            onLongPress: !_isSelectionMode && !lastMsg.isDeleted
+                                ? () => _handleGroupBubbleLongPress(lastMsg, isCurrentUser)
                                 : null,
                             onLikeTap: likedBy.isEmpty
                                 ? null
@@ -1436,27 +1355,20 @@ class _GroupChatPageState extends State<GroupChatPage> {
                               _openLikesBottomSheet(likedBy);
                             },
                             senderName: isCurrentUser ? null : senderName,
-                            senderColor:
-                            isCurrentUser ? null : senderColor,
+                            senderColor: isCurrentUser ? null : senderColor,
                             replyAuthorName: replyAuthorName,
                             replySnippet: replySnippet,
                             replyHasMedia: replyHasMedia,
                           );
                         }
 
-                        final bool isSelected =
-                        _selectedMessageIds.contains(lastMsg.id);
+                        final bool isSelected = _selectedMessageIds.contains(lastMsg.id);
 
                         final selectableBubble = MySelectableBubble(
                           isSelected: isSelected,
-                          onLongPress: () =>
-                              _handleGroupBubbleLongPress(
-                                lastMsg,
-                                isCurrentUser,
-                              ),
+                          onLongPress: () => _handleGroupBubbleLongPress(lastMsg, isCurrentUser),
                           onTap: () {
-                            if (_isSelectionMode &&
-                                lastMsg.senderId == _currentUserId) {
+                            if (_isSelectionMode && lastMsg.senderId == _currentUserId) {
                               _toggleSelection(lastMsg);
                             }
                           },
@@ -1465,26 +1377,16 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
                         return Column(
                           children: [
-                            if (showDayDivider)
-                              buildDayBubble(
-                                context: context,
-                                date: msgDate,
-                              ),
+                            if (showDayDivider) buildDayBubble(context: context, date: msgDate),
                             if (showUnreadSeparator)
                               buildUnreadBubble(
                                 context: context,
-                                unreadCount:
-                                _initialUnreadCount ?? unreadCount,
+                                unreadCount: _initialUnreadCount ?? unreadCount,
                               ),
                             Padding(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 2,
-                                horizontal: 8,
-                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
                               child: Align(
-                                alignment: isCurrentUser
-                                    ? Alignment.centerRight
-                                    : Alignment.centerLeft,
+                                alignment: isCurrentUser ? Alignment.centerRight : Alignment.centerLeft,
                                 child: selectableBubble,
                               ),
                             ),
@@ -1500,14 +1402,9 @@ class _GroupChatPageState extends State<GroupChatPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // 🟢 NEW: bottom typing indicator (same style as DM)
                     if (typingLabel != null)
                       Padding(
-                        padding: const EdgeInsets.only(
-                          left: 16,
-                          right: 16,
-                          bottom: 4,
-                        ),
+                        padding: const EdgeInsets.only(left: 16, right: 16, bottom: 4),
                         child: Align(
                           alignment: Alignment.centerLeft,
                           child: Text(
@@ -1515,10 +1412,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
                             style: TextStyle(
                               fontSize: 12,
                               fontStyle: FontStyle.italic,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurface
-                                  .withOpacity(0.7),
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                             ),
                           ),
                         ),
@@ -1530,8 +1424,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
                         controller: _messageController,
                         focusNode: _focusNode,
                         onSendPressed: _sendMessage,
-                        onEmojiPressed: () =>
-                            debugPrint("Emoji pressed"),
+                        onEmojiPressed: () => debugPrint("Emoji pressed"),
                         onAttachmentPressed: () async {
                           if (_currentUserId.isEmpty) return;
 
