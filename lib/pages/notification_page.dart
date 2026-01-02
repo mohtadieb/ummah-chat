@@ -9,6 +9,7 @@ import 'package:ummah_chat/pages/group_chat_page.dart'; // 👈 NEW
 
 import '../helper/navigate_pages.dart';
 import '../helper/time_ago_text.dart';
+import '../services/database/database_service.dart';
 import '../services/notifications/notification_service.dart';
 import 'package:intl/intl.dart';
 
@@ -24,6 +25,7 @@ class _NotificationListItem {
   final String? headerLabel;
 
   _NotificationListItem.header(this.headerLabel) : notification = null;
+
   _NotificationListItem.notification(this.notification) : headerLabel = null;
 
   bool get isHeader => headerLabel != null;
@@ -50,7 +52,7 @@ class _NotificationPageState extends State<NotificationPage> {
 
     // Listen once to the Supabase stream and keep a local copy
     _sub = notificationService.notificationsStream().listen(
-          (data) {
+      (data) {
         setState(() {
           _notifications = data;
           _isLoading = false;
@@ -92,7 +94,9 @@ class _NotificationPageState extends State<NotificationPage> {
   void _optimisticMarkAllAsRead() async {
     // 1) Update local list immediately
     setState(() {
-      _notifications = _notifications.map((n) => n.copyWith(isRead: true)).toList();
+      _notifications = _notifications
+          .map((n) => n.copyWith(isRead: true))
+          .toList();
     });
 
     // 2) Then update DB
@@ -111,7 +115,8 @@ class _NotificationPageState extends State<NotificationPage> {
   /// Build a flattened list of header + notification items grouped by date
   List<_NotificationListItem> _buildGroupedItems() {
     // Clone and sort newest → oldest
-    final sorted = [..._notifications]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final sorted = [..._notifications]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
     final List<_NotificationListItem> items = [];
 
@@ -160,13 +165,20 @@ class _NotificationPageState extends State<NotificationPage> {
       }
     }
 
-    if (body.startsWith('LIKE_POST:')) return 'notif_like_post'.tr(namedArgs: {'name': name});
-    if (body.startsWith('COMMENT_POST:')) return 'notif_comment_post'.tr(namedArgs: {'name': name});
-    if (body.startsWith('COMMENT_REPLY:')) return 'notif_comment_reply'.tr(namedArgs: {'name': name});
-    if (body.startsWith('FOLLOW_USER:')) return 'notif_follow_user'.tr(namedArgs: {'name': name});
-    if (body.startsWith('FRIEND_REQUEST:')) return 'notif_friend_request'.tr(namedArgs: {'name': name});
-    if (body.startsWith('FRIEND_ACCEPTED:')) return 'notif_friend_accepted'.tr(namedArgs: {'name': name});
-    if (body.startsWith('CHAT_MESSAGE:')) return 'notif_chat_message'.tr(namedArgs: {'name': name});
+    if (body.startsWith('LIKE_POST:'))
+      return 'notif_like_post'.tr(namedArgs: {'name': name});
+    if (body.startsWith('COMMENT_POST:'))
+      return 'notif_comment_post'.tr(namedArgs: {'name': name});
+    if (body.startsWith('COMMENT_REPLY:'))
+      return 'notif_comment_reply'.tr(namedArgs: {'name': name});
+    if (body.startsWith('FOLLOW_USER:'))
+      return 'notif_follow_user'.tr(namedArgs: {'name': name});
+    if (body.startsWith('FRIEND_REQUEST:'))
+      return 'notif_friend_request'.tr(namedArgs: {'name': name});
+    if (body.startsWith('FRIEND_ACCEPTED:'))
+      return 'notif_friend_accepted'.tr(namedArgs: {'name': name});
+    if (body.startsWith('CHAT_MESSAGE:'))
+      return 'notif_chat_message'.tr(namedArgs: {'name': name});
     if (body.startsWith('GROUP_MESSAGE:')) return 'notif_group_message'.tr();
 
     // ✅ NEW: Group added notifications
@@ -175,8 +187,12 @@ class _NotificationPageState extends State<NotificationPage> {
       final rest = body.substring('GROUP_ADDED:'.length);
       final parts = rest.split('::');
 
-      final gName = (parts.length > 1 && parts[1].trim().isNotEmpty) ? parts[1].trim() : 'Group'.tr();
-      final adder = (parts.length > 2 && parts[2].trim().isNotEmpty) ? parts[2].trim() : 'Someone'.tr();
+      final gName = (parts.length > 1 && parts[1].trim().isNotEmpty)
+          ? parts[1].trim()
+          : 'Group'.tr();
+      final adder = (parts.length > 2 && parts[2].trim().isNotEmpty)
+          ? parts[2].trim()
+          : 'Someone'.tr();
 
       return 'notif_group_added'.tr(namedArgs: {'name': adder, 'group': gName});
     }
@@ -208,12 +224,16 @@ class _NotificationPageState extends State<NotificationPage> {
             icon: Icon(
               Icons.done_all,
               size: 18,
-              color: _notifications.isEmpty ? colorScheme.primary : colorScheme.primary,
+              color: _notifications.isEmpty
+                  ? colorScheme.primary
+                  : colorScheme.primary,
             ),
             label: Text(
               'Mark all'.tr(),
               style: TextStyle(
-                color: _notifications.isEmpty ? colorScheme.primary : colorScheme.primary,
+                color: _notifications.isEmpty
+                    ? colorScheme.primary
+                    : colorScheme.primary,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -225,7 +245,11 @@ class _NotificationPageState extends State<NotificationPage> {
     );
   }
 
-  Widget _buildBody(BuildContext context, ColorScheme colorScheme, DatabaseProvider dbProvider) {
+  Widget _buildBody(
+    BuildContext context,
+    ColorScheme colorScheme,
+    DatabaseProvider dbProvider,
+  ) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -237,15 +261,24 @@ class _NotificationPageState extends State<NotificationPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.notifications_none, size: 56, color: colorScheme.primary),
+              Icon(
+                Icons.notifications_none,
+                size: 56,
+                color: colorScheme.primary,
+              ),
               const SizedBox(height: 12),
               Text(
                 'No notifications yet'.tr(),
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: colorScheme.primary),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.primary,
+                ),
               ),
               const SizedBox(height: 6),
               Text(
-                "When something happens — likes, comments, or new followers — you'll see it here.".tr(),
+                "When something happens — likes, comments, or new followers — you'll see it here."
+                    .tr(),
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 13, color: colorScheme.primary),
               ),
@@ -414,7 +447,8 @@ class _NotificationPageState extends State<NotificationPage> {
           isFriendAccepted: isFriendAccepted,
           isChatMessage: isChatMessage,
           isGroupMessage: isGroupMessage,
-          isGroupAdded: isGroupAdded, // ✅ NEW
+          isGroupAdded: isGroupAdded,
+          // ✅ NEW
           isLike: isLike,
           isComment: isComment,
           isCommentReply: isCommentReply,
@@ -473,7 +507,6 @@ class _NotificationPageState extends State<NotificationPage> {
                 if (!mounted) return;
                 setState(() {});
               }
-
               // 2) Friend accepted → accepter profile
               else if (isFriendAccepted && friendAcceptedUserId != null) {
                 if (!mounted) return;
@@ -484,11 +517,14 @@ class _NotificationPageState extends State<NotificationPage> {
                   ),
                 );
               }
-
               // 3) Likes / comments → post
               else if ((isLike || isComment || isCommentReply) &&
-                  (likePostId != null || commentPostId != null || commentReplyPostId != null)) {
-                final postId = isLike ? likePostId : (isComment ? commentPostId : commentReplyPostId);
+                  (likePostId != null ||
+                      commentPostId != null ||
+                      commentReplyPostId != null)) {
+                final postId = isLike
+                    ? likePostId
+                    : (isComment ? commentPostId : commentReplyPostId);
                 if (postId == null) return;
 
                 final post = await dbProvider.getPostById(postId);
@@ -502,22 +538,41 @@ class _NotificationPageState extends State<NotificationPage> {
                   );
                 } else if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('This post is no longer available.'.tr())),
+                    SnackBar(
+                      content: Text('This post is no longer available.'.tr()),
+                    ),
                   );
                 }
               }
-
               // 4) Follow → follower profile
               else if (isFollow && followUserId != null) {
                 if (!mounted) return;
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => ProfilePage(userId: followUserId!)),
+                  MaterialPageRoute(
+                    builder: (_) => ProfilePage(userId: followUserId!),
+                  ),
                 );
               }
-
               // 5) Chat message → open DM ChatPage + FORCE mark read
-              else if (isChatMessage && chatFriendId != null && chatFriendId!.isNotEmpty) {
+              else if (isChatMessage &&
+                  chatFriendId != null &&
+                  chatFriendId!.isNotEmpty) {
+                if (!mounted) return;
+
+                // ✅ Fetch profile so AppBar shows real "name" (same as FriendsPage)
+                final profile = await DatabaseService().getUserFromDatabase(
+                  chatFriendId!,
+                );
+
+                final displayName = (profile?.name ?? '').trim().isNotEmpty
+                    ? profile!.name
+                    : ((profile?.username ?? '').trim().isNotEmpty
+                          ? profile!.username
+                          : ((chatFriendName ?? '').trim().isNotEmpty
+                                ? chatFriendName!
+                                : 'Chat'.tr()));
+
                 if (!mounted) return;
 
                 await Navigator.push(
@@ -525,7 +580,7 @@ class _NotificationPageState extends State<NotificationPage> {
                   MaterialPageRoute(
                     builder: (_) => ChatPage(
                       friendId: chatFriendId!,
-                      friendName: (chatFriendName != null && chatFriendName!.isNotEmpty) ? chatFriendName! : 'Chat'.tr(),
+                      friendName: displayName,
                     ),
                   ),
                 );
@@ -534,7 +589,10 @@ class _NotificationPageState extends State<NotificationPage> {
 
                 final currentUserId = AuthService().getCurrentUserId();
                 if (currentUserId.isNotEmpty) {
-                  final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+                  final chatProvider = Provider.of<ChatProvider>(
+                    context,
+                    listen: false,
+                  );
 
                   final chatRoomId = await chatProvider.getOrCreateChatRoomId(
                     currentUserId,
@@ -548,15 +606,42 @@ class _NotificationPageState extends State<NotificationPage> {
                 }
               }
 
+              if (!mounted) return;
+
+              final currentUserId = AuthService().getCurrentUserId();
+              if (currentUserId.isNotEmpty) {
+                final chatProvider = Provider.of<ChatProvider>(
+                  context,
+                  listen: false,
+                );
+
+                final chatRoomId = await chatProvider.getOrCreateChatRoomId(
+                  currentUserId,
+                  chatFriendId!,
+                );
+
+                await chatProvider.markRoomMessagesAsRead(
+                  chatRoomId,
+                  currentUserId,
+                );
+              }
               // 6) Group message → open GroupChatPage + mark group as read
-              else if (isGroupMessage && groupChatRoomId != null && groupChatRoomId!.isNotEmpty) {
+              else if (isGroupMessage &&
+                  groupChatRoomId != null &&
+                  groupChatRoomId!.isNotEmpty) {
                 if (!mounted) return;
 
                 final currentUserId = AuthService().getCurrentUserId();
-                final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+                final chatProvider = Provider.of<ChatProvider>(
+                  context,
+                  listen: false,
+                );
 
                 if (currentUserId.isNotEmpty) {
-                  await chatProvider.markGroupMessagesAsRead(groupChatRoomId!, currentUserId);
+                  await chatProvider.markGroupMessagesAsRead(
+                    groupChatRoomId!,
+                    currentUserId,
+                  );
 
                   await chatProvider.setActiveChatRoom(
                     userId: currentUserId,
@@ -583,9 +668,10 @@ class _NotificationPageState extends State<NotificationPage> {
                   );
                 }
               }
-
               // ✅ 7) Group added → open GroupChatPage (optional but nice UX)
-              else if (isGroupAdded && groupAddedRoomId != null && groupAddedRoomId!.isNotEmpty) {
+              else if (isGroupAdded &&
+                  groupAddedRoomId != null &&
+                  groupAddedRoomId!.isNotEmpty) {
                 if (!mounted) return;
 
                 await Navigator.push(
@@ -593,7 +679,8 @@ class _NotificationPageState extends State<NotificationPage> {
                   MaterialPageRoute(
                     builder: (_) => GroupChatPage(
                       chatRoomId: groupAddedRoomId!,
-                      groupName: (groupAddedName != null && groupAddedName!.isNotEmpty)
+                      groupName:
+                          (groupAddedName != null && groupAddedName!.isNotEmpty)
                           ? groupAddedName!
                           : 'Group'.tr(),
                     ),
@@ -603,12 +690,19 @@ class _NotificationPageState extends State<NotificationPage> {
             },
             child: Ink(
               decoration: BoxDecoration(
-                color: isUnread ? Theme.of(context).colorScheme.secondary : Theme.of(context).colorScheme.surface,
+                color: isUnread
+                    ? Theme.of(context).colorScheme.secondary
+                    : Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Theme.of(context).colorScheme.secondary),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.secondary,
+                ),
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
@@ -626,8 +720,12 @@ class _NotificationPageState extends State<NotificationPage> {
                                   _localizedTitleFor(n, body),
                                   style: TextStyle(
                                     fontSize: 14,
-                                    fontWeight: isUnread ? FontWeight.w600 : FontWeight.w400,
-                                    color: Theme.of(context).colorScheme.primary,
+                                    fontWeight: isUnread
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
                                   ),
                                 ),
                               ),
@@ -641,7 +739,8 @@ class _NotificationPageState extends State<NotificationPage> {
                               ),
                             ],
                           ),
-                          if (subtitleText != null && subtitleText.isNotEmpty) ...[
+                          if (subtitleText != null &&
+                              subtitleText.isNotEmpty) ...[
                             const SizedBox(height: 4),
                             Text(
                               subtitleText,
