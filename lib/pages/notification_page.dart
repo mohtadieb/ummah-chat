@@ -52,7 +52,7 @@ class _NotificationPageState extends State<NotificationPage> {
 
     // Listen once to the Supabase stream and keep a local copy
     _sub = notificationService.notificationsStream().listen(
-      (data) {
+          (data) {
         setState(() {
           _notifications = data;
           _isLoading = false;
@@ -94,9 +94,8 @@ class _NotificationPageState extends State<NotificationPage> {
   void _optimisticMarkAllAsRead() async {
     // 1) Update local list immediately
     setState(() {
-      _notifications = _notifications
-          .map((n) => n.copyWith(isRead: true))
-          .toList();
+      _notifications =
+          _notifications.map((n) => n.copyWith(isRead: true)).toList();
     });
 
     // 2) Then update DB
@@ -165,20 +164,27 @@ class _NotificationPageState extends State<NotificationPage> {
       }
     }
 
-    if (body.startsWith('LIKE_POST:'))
+    if (body.startsWith('LIKE_POST:')) {
       return 'notif_like_post'.tr(namedArgs: {'name': name});
-    if (body.startsWith('COMMENT_POST:'))
+    }
+    if (body.startsWith('COMMENT_POST:')) {
       return 'notif_comment_post'.tr(namedArgs: {'name': name});
-    if (body.startsWith('COMMENT_REPLY:'))
+    }
+    if (body.startsWith('COMMENT_REPLY:')) {
       return 'notif_comment_reply'.tr(namedArgs: {'name': name});
-    if (body.startsWith('FOLLOW_USER:'))
+    }
+    if (body.startsWith('FOLLOW_USER:')) {
       return 'notif_follow_user'.tr(namedArgs: {'name': name});
-    if (body.startsWith('FRIEND_REQUEST:'))
+    }
+    if (body.startsWith('FRIEND_REQUEST:')) {
       return 'notif_friend_request'.tr(namedArgs: {'name': name});
-    if (body.startsWith('FRIEND_ACCEPTED:'))
+    }
+    if (body.startsWith('FRIEND_ACCEPTED:')) {
       return 'notif_friend_accepted'.tr(namedArgs: {'name': name});
-    if (body.startsWith('CHAT_MESSAGE:'))
+    }
+    if (body.startsWith('CHAT_MESSAGE:')) {
       return 'notif_chat_message'.tr(namedArgs: {'name': name});
+    }
     if (body.startsWith('GROUP_MESSAGE:')) return 'notif_group_message'.tr();
 
     // ✅ NEW: Group added notifications
@@ -246,10 +252,10 @@ class _NotificationPageState extends State<NotificationPage> {
   }
 
   Widget _buildBody(
-    BuildContext context,
-    ColorScheme colorScheme,
-    DatabaseProvider dbProvider,
-  ) {
+      BuildContext context,
+      ColorScheme colorScheme,
+      DatabaseProvider dbProvider,
+      ) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -448,7 +454,6 @@ class _NotificationPageState extends State<NotificationPage> {
           isChatMessage: isChatMessage,
           isGroupMessage: isGroupMessage,
           isGroupAdded: isGroupAdded,
-          // ✅ NEW
           isLike: isLike,
           isComment: isComment,
           isCommentReply: isCommentReply,
@@ -460,7 +465,10 @@ class _NotificationPageState extends State<NotificationPage> {
           height: 40,
           decoration: BoxDecoration(
             color: isUnread
-                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.15)
+                ? Theme.of(context)
+                .colorScheme
+                .primary
+                .withValues(alpha: 0.15)
                 : Theme.of(context).colorScheme.secondary,
             shape: BoxShape.circle,
           ),
@@ -473,8 +481,6 @@ class _NotificationPageState extends State<NotificationPage> {
         );
 
         // ----- TRAILING (UPDATED) -----
-        // ✅ Removed Accept/Decline UI for friend requests.
-        // We still show the unread dot for any unread notification (except follow, as you had before).
         Widget? trailing;
         if (!n.isRead && !isFollow) {
           trailing = _UnreadDot(colorScheme: Theme.of(context).colorScheme);
@@ -491,8 +497,6 @@ class _NotificationPageState extends State<NotificationPage> {
                 _optimisticMarkOneAsRead(n);
               }
 
-              // 🔗 NAVIGATION BEHAVIOR
-
               // 1) Friend request → sender profile
               if (isFriendRequest && friendRequesterId != null) {
                 if (!mounted) return;
@@ -506,9 +510,11 @@ class _NotificationPageState extends State<NotificationPage> {
 
                 if (!mounted) return;
                 setState(() {});
+                return;
               }
+
               // 2) Friend accepted → accepter profile
-              else if (isFriendAccepted && friendAcceptedUserId != null) {
+              if (isFriendAccepted && friendAcceptedUserId != null) {
                 if (!mounted) return;
                 Navigator.push(
                   context,
@@ -516,9 +522,11 @@ class _NotificationPageState extends State<NotificationPage> {
                     builder: (_) => ProfilePage(userId: friendAcceptedUserId!),
                   ),
                 );
+                return;
               }
+
               // 3) Likes / comments → post
-              else if ((isLike || isComment || isCommentReply) &&
+              if ((isLike || isComment || isCommentReply) &&
                   (likePostId != null ||
                       commentPostId != null ||
                       commentReplyPostId != null)) {
@@ -543,9 +551,11 @@ class _NotificationPageState extends State<NotificationPage> {
                     ),
                   );
                 }
+                return;
               }
+
               // 4) Follow → follower profile
-              else if (isFollow && followUserId != null) {
+              if (isFollow && followUserId != null) {
                 if (!mounted) return;
                 Navigator.push(
                   context,
@@ -553,9 +563,11 @@ class _NotificationPageState extends State<NotificationPage> {
                     builder: (_) => ProfilePage(userId: followUserId!),
                   ),
                 );
+                return;
               }
+
               // 5) Chat message → open DM ChatPage + FORCE mark read
-              else if (isChatMessage &&
+              if (isChatMessage &&
                   chatFriendId != null &&
                   chatFriendId!.isNotEmpty) {
                 if (!mounted) return;
@@ -568,10 +580,10 @@ class _NotificationPageState extends State<NotificationPage> {
                 final displayName = (profile?.name ?? '').trim().isNotEmpty
                     ? profile!.name
                     : ((profile?.username ?? '').trim().isNotEmpty
-                          ? profile!.username
-                          : ((chatFriendName ?? '').trim().isNotEmpty
-                                ? chatFriendName!
-                                : 'Chat'.tr()));
+                    ? profile!.username
+                    : ((chatFriendName ?? '').trim().isNotEmpty
+                    ? chatFriendName!
+                    : 'Chat'.tr()));
 
                 if (!mounted) return;
 
@@ -604,29 +616,13 @@ class _NotificationPageState extends State<NotificationPage> {
                     currentUserId,
                   );
                 }
+                return;
               }
 
-              if (!mounted) return;
-
-              final currentUserId = AuthService().getCurrentUserId();
-              if (currentUserId.isNotEmpty) {
-                final chatProvider = Provider.of<ChatProvider>(
-                  context,
-                  listen: false,
-                );
-
-                final chatRoomId = await chatProvider.getOrCreateChatRoomId(
-                  currentUserId,
-                  chatFriendId!,
-                );
-
-                await chatProvider.markRoomMessagesAsRead(
-                  chatRoomId,
-                  currentUserId,
-                );
-              }
-              // 6) Group message → open GroupChatPage + mark group as read
-              else if (isGroupMessage &&
+              // 6) Group message → open GroupChatPage
+              // ✅ Keep setActiveChatRoom (presence),
+              // ❌ but DO NOT markGroupMessagesAsRead here (GroupChatPage handles it after first render)
+              if (isGroupMessage &&
                   groupChatRoomId != null &&
                   groupChatRoomId!.isNotEmpty) {
                 if (!mounted) return;
@@ -637,39 +633,42 @@ class _NotificationPageState extends State<NotificationPage> {
                   listen: false,
                 );
 
+                // Presence: mark room active before opening
                 if (currentUserId.isNotEmpty) {
-                  await chatProvider.markGroupMessagesAsRead(
-                    groupChatRoomId!,
-                    currentUserId,
-                  );
-
                   await chatProvider.setActiveChatRoom(
                     userId: currentUserId,
                     chatRoomId: groupChatRoomId!,
                   );
                 }
 
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => GroupChatPage(
-                      chatRoomId: groupChatRoomId!,
-                      groupName: groupName ?? 'Group'.tr(),
+                try {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => GroupChatPage(
+                        chatRoomId: groupChatRoomId!,
+                        groupName: (groupName != null &&
+                            groupName!.trim().isNotEmpty)
+                            ? groupName!.trim()
+                            : 'Group'.tr(),
+                      ),
                     ),
-                  ),
-                );
-
-                if (!mounted) return;
-
-                if (currentUserId.isNotEmpty) {
-                  await chatProvider.setActiveChatRoom(
-                    userId: currentUserId,
-                    chatRoomId: null,
                   );
+                } finally {
+                  // Always clear presence when leaving
+                  if (currentUserId.isNotEmpty) {
+                    await chatProvider.setActiveChatRoom(
+                      userId: currentUserId,
+                      chatRoomId: null,
+                    );
+                  }
                 }
+
+                return;
               }
-              // ✅ 7) Group added → open GroupChatPage (optional but nice UX)
-              else if (isGroupAdded &&
+
+              // 7) Group added → open GroupChatPage (optional but nice UX)
+              if (isGroupAdded &&
                   groupAddedRoomId != null &&
                   groupAddedRoomId!.isNotEmpty) {
                 if (!mounted) return;
@@ -679,13 +678,14 @@ class _NotificationPageState extends State<NotificationPage> {
                   MaterialPageRoute(
                     builder: (_) => GroupChatPage(
                       chatRoomId: groupAddedRoomId!,
-                      groupName:
-                          (groupAddedName != null && groupAddedName!.isNotEmpty)
+                      groupName: (groupAddedName != null &&
+                          groupAddedName!.isNotEmpty)
                           ? groupAddedName!
                           : 'Group'.tr(),
                     ),
                   ),
                 );
+                return;
               }
             },
             child: Ink(
@@ -723,9 +723,8 @@ class _NotificationPageState extends State<NotificationPage> {
                                     fontWeight: isUnread
                                         ? FontWeight.w600
                                         : FontWeight.w400,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
+                                    color:
+                                    Theme.of(context).colorScheme.primary,
                                   ),
                                 ),
                               ),
@@ -734,7 +733,8 @@ class _NotificationPageState extends State<NotificationPage> {
                                 createdAt: n.createdAt,
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: Theme.of(context).colorScheme.primary,
+                                  color:
+                                  Theme.of(context).colorScheme.primary,
                                 ),
                               ),
                             ],
