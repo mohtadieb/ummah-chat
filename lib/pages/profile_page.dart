@@ -623,11 +623,70 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _acceptMahramFromProfile() async {
-    await databaseProvider.acceptMahramRequest(widget.userId);
-    final updated = await databaseProvider.getFriendStatus(widget.userId);
-    if (!mounted) return;
-    setState(() => _friendStatus = updated);
+    final db = context.read<DatabaseProvider>();
+
+    // 👇 profile user id
+    final String otherUserId = widget.userId;
+    if (otherUserId.isEmpty) return;
+
+    final bool? isMahram = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('mahram_confirmation_title'.tr()),
+          content: Text('mahram_confirmation_question'.tr()),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text('no'.tr()),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text('yes'.tr()),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (isMahram == null) return;
+
+    try {
+      if (isMahram == true) {
+        // ✅ OPTIONAL but recommended: optimistic UI update
+        if (mounted) {
+          setState(() => _friendStatus = 'mahram');
+        }
+
+        await db.acceptMahramRequest(otherUserId);
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('mahram_accepted'.tr())),
+        );
+      } else {
+        // ❌ Decline
+        if (mounted) {
+          setState(() => _friendStatus = 'none');
+        }
+
+        await db.declineMahramRequest(otherUserId);
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('mahram_declined'.tr())),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('something_went_wrong'.tr())),
+      );
+    }
   }
+
+
 
   Future<void> _declineMahramFromProfile() async {
     await databaseProvider.declineMahramRequest(widget.userId);
@@ -777,10 +836,9 @@ class _ProfilePageState extends State<ProfilePage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text('Remove mahram'.tr()),
+        title: Text('remove_mahram_title'.tr()),
         content: Text(
-          'Are you sure you want to delete your mahram relationship with {name}?'
-              .tr(namedArgs: {'name': targetName}),
+          'remove_mahram_confirm'.tr(namedArgs: {'name': targetName}),
         ),
         actions: [
           TextButton(
@@ -805,7 +863,7 @@ class _ProfilePageState extends State<ProfilePage> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Mahram relationship removed'.tr()),
+        content: Text('mahram_removed'.tr()),
       ),
     );
 

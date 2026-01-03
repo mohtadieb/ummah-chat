@@ -204,6 +204,19 @@
   "mahram_request_sent": "Mahram-verzoek verzonden naar {name}",
   "notif_mahram_request": "{name} heeft je een mahram-verzoek gestuurd",
   "notif_mahram_accepted": "{name} heeft je mahram-verzoek geaccepteerd",
+  "remove_mahram_title": "Mahram verwijderen",
+  "remove_mahram_confirm": "Weet je zeker dat je de mahram-relatie met {name} wilt verwijderen?",
+  "mahram_removed": "Mahram-relatie verwijderd",
+  "mahram_accepted": "Mahram geaccepteerd",
+  "mahram_declined": "Mahram afgewezen",
+  "something_went_wrong": "Er is iets misgegaan",
+  "mahram_confirmation_title": "Mahram bevestiging",
+  "mahram_confirmation_question": "Bevestig je dat je de mahram van deze persoon bent?",
+  "yes": "Ja",
+  "no": "Nee",
+
+
+
   "1 reaction": "1 reactie",
   "reactions": "reacties",
   "Unread messages": "Ongelezen berichten",

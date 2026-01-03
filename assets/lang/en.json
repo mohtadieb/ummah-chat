@@ -268,6 +268,19 @@
   "mahram_request_sent": "Mahram request sent to {name}",
   "notif_mahram_request": "{name} sent you a mahram request",
   "notif_mahram_accepted": "{name} accepted your mahram request",
+  "remove_mahram_title": "Remove mahram",
+  "remove_mahram_confirm": "Are you sure you want to delete your mahram relationship with {name}?",
+  "mahram_removed": "Mahram relationship removed",
+  "mahram_accepted": "Mahram accepted",
+  "mahram_declined": "Mahram declined",
+  "something_went_wrong": "Something went wrong",
+  "mahram_confirmation_title": "Mahram confirmation",
+  "mahram_confirmation_question": "Do you confirm that you are this person's mahram?",
+  "yes": "Yes",
+  "no": "No",
+
+
+
   "Last seen": "Last seen",
   "Friends": "Friends",
   "Groups": "Groups",

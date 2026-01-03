@@ -1303,15 +1303,6 @@ class DatabaseService {
             'and(requester_id.eq.$otherUserId,addressee_id.eq.$currentUserId)',
       );
 
-      // 2️⃣ Clean up relationship notifications between the two users
-      try {
-        await _notifications.deleteAllRelationshipNotificationsBetween(
-          userAId: currentUserId,
-          userBId: otherUserId,
-        );
-      } catch (e) {
-        print('⚠️ Error deleting relationship notifications on unfriend: $e');
-      }
 
       print('✅ Unfriended $otherUserId');
     } catch (e) {
@@ -1567,12 +1558,6 @@ class DatabaseService {
           .eq('status', 'pending')
           .eq('relation_type', 'mahram');
 
-      // ✅ Optional: also delete the MAHRAM_REQUEST notification row if it exists
-      await _notifications.deleteMahramRequestNotification(
-        targetUserId: currentUserId, // recipient is "me" for the request notification row
-        requesterId: otherUserId,
-      );
-
       print('✅ Mahram request declined');
     } catch (e) {
       print('❌ Error declining mahram request: $e');
@@ -1595,16 +1580,6 @@ class DatabaseService {
         'and(requester_id.eq.$currentUserId,addressee_id.eq.$otherUserId),'
             'and(requester_id.eq.$otherUserId,addressee_id.eq.$currentUserId)',
       );
-
-      // Clean up relationship notifications (optional)
-      try {
-        await _notifications.deleteAllRelationshipNotificationsBetween(
-          userAId: currentUserId,
-          userBId: otherUserId,
-        );
-      } catch (e) {
-        print('⚠️ Error deleting relationship notifications on mahram delete: $e');
-      }
 
       print('✅ Mahram relationship deleted with $otherUserId');
     } catch (e) {

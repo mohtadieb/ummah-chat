@@ -161,6 +161,18 @@
   "mahram_request_sent": "تم إرسال طلب محرم إلى {name}",
   "notif_mahram_request": "أرسل لك {name} طلب محرم",
   "notif_mahram_accepted": "وافق {name} على طلب المحرم",
+  "remove_mahram_title": "إزالة المحرم",
+  "remove_mahram_confirm": "هل أنت متأكد أنك تريد حذف علاقة المحرم مع {name}؟",
+  "mahram_removed": "تمت إزالة علاقة المحرم",
+  "mahram_accepted": "تم قبول المحرم",
+  "mahram_declined": "تم رفض المحرم",
+  "something_went_wrong": "حدث خطأ ما",
+  "mahram_confirmation_title": "تأكيد المحرم",
+  "mahram_confirmation_question": "هل تؤكد أنك محرم لهذا الشخص؟",
+  "yes": "نعم",
+  "no": "لا",
+
+
 
 
   "Marriage inquiry": "طلب زواج",
