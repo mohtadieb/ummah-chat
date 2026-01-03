@@ -739,6 +739,32 @@ class DatabaseProvider extends ChangeNotifier {
     }
   }
 
+  /* ==================== MAHRAM ==================== */
+
+  // ✅ MAHRAM FLOW (Provider wrappers)
+
+  Future<void> sendMahramRequest(String targetUserId) async {
+    await _db.sendMahramRequestInDatabase(targetUserId);
+  }
+
+  Future<void> cancelMahramRequest(String otherUserId) async {
+    await _db.cancelMahramRequestInDatabase(otherUserId);
+  }
+
+  Future<void> acceptMahramRequest(String otherUserId) async {
+    await _db.acceptMahramRequestInDatabase(otherUserId);
+  }
+
+  Future<void> declineMahramRequest(String otherUserId) async {
+    await _db.declineMahramRequestInDatabase(otherUserId);
+  }
+
+  Future<void> deleteMahramRelationship(String otherUserId) async {
+    await _db.deleteMahramRelationshipInDatabase(otherUserId);
+  }
+
+
+
   /* ==================== FOLLOWERS / FOLLOWING ==================== */
 
   final Map<String, List<String>> _followers = {};

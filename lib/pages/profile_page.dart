@@ -92,6 +92,8 @@ class _ProfilePageState extends State<ProfilePage> {
   // Posts dropdown state
   bool _showPosts = false;
 
+  String? _myGender;
+
   // Scroll controller for the profile list
   final ScrollController _scrollController = ScrollController();
 
@@ -255,6 +257,9 @@ class _ProfilePageState extends State<ProfilePage> {
       if (mounted) setState(() => _isLoading = false);
       return;
     }
+
+    final me = await databaseProvider.getUserProfile(currentUserId);
+    _myGender = me?.gender; // stored lowercase in DB (good)
 
     await databaseProvider.loadUserFollowers(widget.userId);
     await databaseProvider.loadUserFollowing(widget.userId);
@@ -612,6 +617,203 @@ class _ProfilePageState extends State<ProfilePage> {
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
+  Future<void> _cancelMahramFromProfile() async {
+    await databaseProvider.cancelMahramRequest(widget.userId);
+    setState(() => _friendStatus = 'none');
+  }
+
+  Future<void> _acceptMahramFromProfile() async {
+    await databaseProvider.acceptMahramRequest(widget.userId);
+    final updated = await databaseProvider.getFriendStatus(widget.userId);
+    if (!mounted) return;
+    setState(() => _friendStatus = updated);
+  }
+
+  Future<void> _declineMahramFromProfile() async {
+    await databaseProvider.declineMahramRequest(widget.userId);
+    final updated = await databaseProvider.getFriendStatus(widget.userId);
+    if (!mounted) return;
+    setState(() => _friendStatus = updated);
+  }
+
+  bool _isOppositeGender({
+    required String? myGender,
+    required String? theirGender,
+  }) {
+    final a = (myGender ?? '').trim().toLowerCase();
+    final b = (theirGender ?? '').trim().toLowerCase();
+    if (a.isEmpty || b.isEmpty) return false;
+    if (a == b) return false;
+    // Your app uses 'male' / 'female'
+    return (a == 'male' || a == 'female') && (b == 'male' || b == 'female');
+  }
+
+  void _showOppositeGenderRequestSheet({
+    required String targetUserId,
+    required String targetName,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade400,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                ListTile(
+                  leading: const Icon(Icons.favorite_border),
+                  title: Text('Marriage inquiry'.tr()),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    // TODO later
+                  },
+                ),
+
+                ListTile(
+                  leading: const Icon(Icons.verified_user_outlined),
+                  title: Text('Mahram'.tr()),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    await _confirmAndSendMahramRequest(
+                      targetUserId: targetUserId,
+                      targetName: targetName,
+                    );
+                  },
+                ),
+
+                ListTile(
+                  leading: const Icon(Icons.block),
+                  title: Text('Neither'.tr()),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'cannot_add_opposite_gender'.tr(),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 4),
+                ListTile(
+                  leading: const Icon(Icons.close),
+                  title: Text('Cancel'.tr()),
+                  onTap: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmAndSendMahramRequest({
+    required String targetUserId,
+    required String targetName,
+  }) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Mahram confirmation'.tr()),
+        content: Text(
+          'Is this person your mahram?'.tr(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('No'.tr()),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Yes'.tr()),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true) return;
+
+    // Calls Provider → DatabaseService.sendMahramRequestInDatabase(...)
+    if (!mounted) return;
+    final dbProvider = Provider.of<DatabaseProvider>(context, listen: false);
+
+    await dbProvider.sendMahramRequest(targetUserId);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('mahram_request_sent'
+            .tr(namedArgs: {'name': targetName})),
+      ),
+    );
+
+    // ✅ refresh button state after sending
+    final updated = await databaseProvider.getFriendStatus(widget.userId);
+    if (!mounted) return;
+    setState(() => _friendStatus = updated);
+  }
+
+  Future<void> _confirmAndDeleteMahram({
+    required String targetUserId,
+    required String targetName,
+  }) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Remove mahram'.tr()),
+        content: Text(
+          'Are you sure you want to delete your mahram relationship with {name}?'
+              .tr(namedArgs: {'name': targetName}),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel'.tr()),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Delete'.tr()),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true) return;
+
+    if (!mounted) return;
+    final dbProvider = Provider.of<DatabaseProvider>(context, listen: false);
+
+    await dbProvider.deleteMahramRelationship(targetUserId);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Mahram relationship removed'.tr()),
+      ),
+    );
+
+    // ✅ refresh button state after deleting
+    final updated = await databaseProvider.getFriendStatus(widget.userId);
+    if (!mounted) return;
+    setState(() => _friendStatus = updated);
+  }
 
   /// FRIENDS SECTION – horizontal row of friends
   Widget _buildFriendsSection(BuildContext context) {
@@ -640,7 +842,9 @@ class _ProfilePageState extends State<ProfilePage> {
               elevation: 0,
               scrolledUnderElevation: 0,
             ),
-            body: isOwn ? const FriendsPage() : FriendsPage(userId: widget.userId),
+            body: isOwn
+                ? const FriendsPage()
+                : FriendsPage(userId: widget.userId),
           ),
         ),
       );
@@ -679,7 +883,8 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                     const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: colorScheme.secondary,
                         borderRadius: BorderRadius.circular(999),
@@ -698,7 +903,8 @@ class _ProfilePageState extends State<ProfilePage> {
                       onPressed: openFriendsFullScreen,
                       child: Text(
                         "View all".tr(),
-                        style: TextStyle(fontSize: 12, color: colorScheme.primary),
+                        style: TextStyle(
+                            fontSize: 12, color: colorScheme.primary),
                       ),
                     ),
                   ],
@@ -739,7 +945,8 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                     const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: colorScheme.secondary,
                         borderRadius: BorderRadius.circular(999),
@@ -758,14 +965,17 @@ class _ProfilePageState extends State<ProfilePage> {
                       onPressed: openFriendsFullScreen,
                       child: Text(
                         "View all".tr(),
-                        style: TextStyle(fontSize: 12, color: colorScheme.primary),
+                        style: TextStyle(
+                            fontSize: 12, color: colorScheme.primary),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  isOwn ? "Add friends to see them here.".tr() : "No friends to show yet.".tr(),
+                  isOwn
+                      ? "Add friends to see them here.".tr()
+                      : "No friends to show yet.".tr(),
                   style: TextStyle(
                     fontSize: 12,
                     color: colorScheme.primary.withValues(alpha: 0.7),
@@ -779,7 +989,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
           // Show 11 friends + 1 "+X" tile if needed
           final bool hasMore = allFriends.length > maxTiles;
-          final int friendTilesCount = hasMore ? (maxTiles - 1) : allFriends.length;
+          final int friendTilesCount =
+          hasMore ? (maxTiles - 1) : allFriends.length;
 
           final visibleFriends = allFriends.take(friendTilesCount).toList();
           final int remainingCount = allFriends.length - friendTilesCount;
@@ -802,7 +1013,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                   const SizedBox(width: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
                       color: colorScheme.secondary,
                       borderRadius: BorderRadius.circular(999),
@@ -821,7 +1033,8 @@ class _ProfilePageState extends State<ProfilePage> {
                     onPressed: openFriendsFullScreen,
                     child: Text(
                       "View all".tr(),
-                      style: TextStyle(fontSize: 12, color: colorScheme.primary),
+                      style:
+                      TextStyle(fontSize: 12, color: colorScheme.primary),
                     ),
                   ),
                 ],
@@ -846,9 +1059,11 @@ class _ProfilePageState extends State<ProfilePage> {
                               height: 52,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: colorScheme.primary.withValues(alpha: 0.10),
+                                color: colorScheme.primary
+                                    .withValues(alpha: 0.10),
                                 border: Border.all(
-                                  color: colorScheme.primary.withValues(alpha: 0.35),
+                                  color: colorScheme.primary
+                                      .withValues(alpha: 0.35),
                                   width: 1,
                                 ),
                               ),
@@ -897,7 +1112,6 @@ class _ProfilePageState extends State<ProfilePage> {
                             ),
                           );
                         }
-
                       },
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -907,7 +1121,8 @@ class _ProfilePageState extends State<ProfilePage> {
                               CircleAvatar(
                                 radius: 26,
                                 backgroundColor: colorScheme.secondary,
-                                backgroundImage: friend.profilePhotoUrl.isNotEmpty
+                                backgroundImage:
+                                friend.profilePhotoUrl.isNotEmpty
                                     ? NetworkImage(friend.profilePhotoUrl)
                                     : null,
                                 child: friend.profilePhotoUrl.isEmpty
@@ -997,9 +1212,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 leading: const Icon(Icons.music_note),
                 title: Text(s.title),
                 subtitle: Text(s.artist),
-                trailing: isSelected
-                    ? Icon(Icons.check_circle, color: colorScheme.primary)
-                    : null,
+                trailing:
+                isSelected ? Icon(Icons.check_circle, color: colorScheme.primary) : null,
                 onTap: () {
                   Navigator.pop(ctx);
                   _setProfileSong(s.id);
@@ -1127,8 +1341,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   shape: BoxShape.circle,
                   color: cs.primary.withValues(alpha: 0.12),
                 ),
-                child:
-                Icon(Icons.bookmark_border, size: 18, color: cs.primary),
+                child: Icon(Icons.bookmark_border, size: 18, color: cs.primary),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -1297,6 +1510,17 @@ class _ProfilePageState extends State<ProfilePage> {
     } else {
       final theme = Theme.of(context);
 
+      // ✅ opposite-gender detection (DB stores lowercase, but we still normalize)
+      final bool isOpposite = _isOppositeGender(
+        myGender: _myGender,
+        theirGender: user!.gender,
+      );
+
+      // ✅ IMPORTANT FIX:
+      // If no relationship exists AND it's opposite gender -> force button into "request" mode.
+      final String effectiveFriendStatus =
+      (_friendStatus == 'none' && isOpposite) ? 'request' : _friendStatus;
+
       bodyChild = ListView(
         controller: _scrollController,
         children: [
@@ -1410,12 +1634,47 @@ class _ProfilePageState extends State<ProfilePage> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: MyFriendButton(
-                      friendStatus: _friendStatus,
-                      onAddFriend: _addFriendFromProfile,
-                      onCancelRequest: _cancelFriendFromProfile,
-                      onAcceptRequest: _acceptFriendFromProfile,
-                      onDeclineRequest: _declineFriendFromProfile,
+                      // ✅ use effective status so opposite gender shows "Request"
+                      friendStatus: effectiveFriendStatus,
+
+                      // ✅ normal add friend only when NOT in "request" mode
+                      onAddFriend: (effectiveFriendStatus == 'request')
+                          ? null
+                          : _addFriendFromProfile,
+
+                      // ✅ cancel depends on which pending type we are in
+                      onCancelRequest: (_friendStatus == 'pending_mahram_sent')
+                          ? _cancelMahramFromProfile
+                          : _cancelFriendFromProfile,
+
+                      // ✅ accept depends on which pending type we are in
+                      onAcceptRequest:
+                      (_friendStatus == 'pending_mahram_received')
+                          ? _acceptMahramFromProfile
+                          : _acceptFriendFromProfile,
+
+                      // ✅ decline depends on which pending type we are in
+                      onDeclineRequest:
+                      (_friendStatus == 'pending_mahram_received')
+                          ? _declineMahramFromProfile
+                          : _declineFriendFromProfile,
+
+                      // ✅ normal unfriend
                       onUnfriend: _unfriendFromProfile,
+
+                      // ✅ NEW: opposite-gender “Request” sheet
+                      onOpenRequestSheet: (effectiveFriendStatus == 'request')
+                          ? () => _showOppositeGenderRequestSheet(
+                        targetUserId: widget.userId,
+                        targetName: user!.name,
+                      )
+                          : null,
+
+                      // ✅ delete mahram relationship when status == 'mahram'
+                      onDeleteMahram: () => _confirmAndDeleteMahram(
+                        targetUserId: widget.userId,
+                        targetName: user!.name,
+                      ),
                     ),
                   ),
                 ],
@@ -1744,7 +2003,8 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(999),
-                        color: theme.colorScheme.primary.withValues(alpha: 0.08),
+                        color:
+                        theme.colorScheme.primary.withValues(alpha: 0.08),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,

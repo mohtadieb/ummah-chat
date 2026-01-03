@@ -182,6 +182,12 @@ class _NotificationPageState extends State<NotificationPage> {
     if (body.startsWith('FRIEND_ACCEPTED:')) {
       return 'notif_friend_accepted'.tr(namedArgs: {'name': name});
     }
+    if (body.startsWith('MAHRAM_REQUEST:')) {
+      return 'notif_mahram_request'.tr(namedArgs: {'name': name});
+    }
+    if (body.startsWith('MAHRAM_ACCEPTED:')) {
+      return 'notif_mahram_accepted'.tr(namedArgs: {'name': name});
+    }
     if (body.startsWith('CHAT_MESSAGE:')) {
       return 'notif_chat_message'.tr(namedArgs: {'name': name});
     }
@@ -335,6 +341,9 @@ class _NotificationPageState extends State<NotificationPage> {
         final isChatMessage = body.startsWith('CHAT_MESSAGE:'); // DM
         final isGroupMessage = body.startsWith('GROUP_MESSAGE:'); // group msg
         final isGroupAdded = body.startsWith('GROUP_ADDED:'); // ✅ NEW
+        final isMahramRequest = body.startsWith('MAHRAM_REQUEST:');
+        final isMahramAccepted = body.startsWith('MAHRAM_ACCEPTED:');
+
 
         String? friendRequesterId;
         String? friendAcceptedUserId;
@@ -360,6 +369,10 @@ class _NotificationPageState extends State<NotificationPage> {
         String? groupAddedName;
         String? groupAddedByName;
 
+        String? mahramRequesterId;
+        String? mahramAcceptedUserId;
+
+
         // 🧑‍🤝‍🧑 Friend request → sender
         if (isFriendRequest) {
           final parts = body.split(':');
@@ -371,6 +384,17 @@ class _NotificationPageState extends State<NotificationPage> {
           final parts = body.split(':');
           if (parts.length > 1) friendAcceptedUserId = parts[1].trim();
         }
+
+        if (isMahramRequest) {
+          final parts = body.split(':');
+          if (parts.length > 1) mahramRequesterId = parts[1].trim();
+        }
+
+        if (isMahramAccepted) {
+          final parts = body.split(':');
+          if (parts.length > 1) mahramAcceptedUserId = parts[1].trim();
+        }
+
 
         // 👍 Like
         if (isLike) {
@@ -438,6 +462,8 @@ class _NotificationPageState extends State<NotificationPage> {
           subtitleText = commentReplyPreview;
         } else if (!isFriendRequest &&
             !isFriendAccepted &&
+            !isMahramRequest &&
+            !isMahramAccepted &&
             !isFollow &&
             !isChatMessage &&
             !isGroupMessage &&
@@ -451,6 +477,8 @@ class _NotificationPageState extends State<NotificationPage> {
         final leadingIconData = _iconForNotificationType(
           isFriendRequest: isFriendRequest,
           isFriendAccepted: isFriendAccepted,
+          isMahramRequest: isMahramRequest,
+          isMahramAccepted: isMahramAccepted,
           isChatMessage: isChatMessage,
           isGroupMessage: isGroupMessage,
           isGroupAdded: isGroupAdded,
@@ -520,6 +548,34 @@ class _NotificationPageState extends State<NotificationPage> {
                   context,
                   MaterialPageRoute(
                     builder: (_) => ProfilePage(userId: friendAcceptedUserId!),
+                  ),
+                );
+                return;
+              }
+              // 2.1) Mahram request → requester profile
+              if (isMahramRequest && mahramRequesterId != null) {
+                if (!mounted) return;
+
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProfilePage(userId: mahramRequesterId!),
+                  ),
+                );
+
+                if (!mounted) return;
+                setState(() {});
+                return;
+              }
+
+              // 2.2) Mahram accepted → accepter profile
+              if (isMahramAccepted && mahramAcceptedUserId != null) {
+                if (!mounted) return;
+
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProfilePage(userId: mahramAcceptedUserId!),
                   ),
                 );
                 return;
@@ -770,6 +826,8 @@ class _NotificationPageState extends State<NotificationPage> {
   IconData _iconForNotificationType({
     required bool isFriendRequest,
     required bool isFriendAccepted,
+    required bool isMahramRequest,
+    required bool isMahramAccepted,
     required bool isChatMessage,
     required bool isGroupMessage,
     required bool isGroupAdded, // ✅ NEW
@@ -780,6 +838,8 @@ class _NotificationPageState extends State<NotificationPage> {
   }) {
     if (isFriendRequest) return Icons.person_add_alt_1;
     if (isFriendAccepted) return Icons.handshake;
+    if (isMahramRequest) return Icons.verified_user_outlined;
+    if (isMahramAccepted) return Icons.verified_user;
     if (isGroupAdded) return Icons.group_add; // ✅ NEW
     if (isGroupMessage) return Icons.groups;
     if (isChatMessage) return Icons.chat_bubble_outline;

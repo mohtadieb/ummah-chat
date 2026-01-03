@@ -162,6 +162,48 @@
     "one": "1 ongelezen bericht",
     "other": "{count} ongelezen berichten"
   },
+  "friend": {
+    "add": "Vriend toevoegen",
+    "cancel_request": "Verzoek annuleren",
+    "accept": "Accepteren",
+    "decline": "Weigeren",
+    "unfriend": "Vriendschap beëindigen",
+    "request": "Verzoek"
+  },
+  "mahram": {
+    "label": "Mahram",
+    "request_title": "Mahram-verzoek",
+    "request_sent": "Mahram-verzoek verzonden",
+    "request_accepted": "Mahram geaccepteerd",
+    "delete_confirm_title": "Mahram verwijderen",
+    "delete_confirm_body": "Weet je zeker dat je deze mahram-relatie wilt verwijderen?",
+    "cannot_add_opposite_gender": "Je kunt niemand van het andere geslacht toevoegen."
+  },
+  "request_sheet": {
+    "title": "Kies type verzoek",
+    "marriage": "Huwelijksintentie",
+    "mahram": "Mahram",
+    "neither": "Geen van beide",
+    "cancel": "Annuleren"
+  },
+  "common": {
+    "yes": "Ja",
+    "no": "Nee"
+  },
+  "Mahram confirmation": "Mahram bevestiging",
+  "Is this person your mahram?": "Is deze persoon jouw mahram?",
+  "No": "Nee",
+  "Yes": "Ja",
+
+  "Marriage inquiry": "Huwelijksintentie",
+  "Mahram": "Mahram",
+  "Neither": "Geen van beide",
+
+  "Request": "Verzoek",
+  "Add friends to see them here.": "Voeg vrienden toe om ze hier te zien.",
+  "mahram_request_sent": "Mahram-verzoek verzonden naar {name}",
+  "notif_mahram_request": "{name} heeft je een mahram-verzoek gestuurd",
+  "notif_mahram_accepted": "{name} heeft je mahram-verzoek geaccepteerd",
   "1 reaction": "1 reactie",
   "reactions": "reacties",
   "Unread messages": "Ongelezen berichten",

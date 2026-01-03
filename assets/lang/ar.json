@@ -126,6 +126,49 @@
   "comment": "تعليق",
   "comments": "تعليقات",
   "1 like": "إعجاب واحد",
+  "friend": {
+    "add": "إضافة صديق",
+    "cancel_request": "إلغاء الطلب",
+    "accept": "قبول",
+    "decline": "رفض",
+    "unfriend": "إزالة الصداقة",
+    "request": "طلب"
+  },
+  "mahram": {
+  "label": "محرم",
+  "request_title": "طلب محرم",
+  "request_sent": "تم إرسال طلب المحرم",
+  "request_accepted": "تم قبول طلب المحرم",
+  "delete_confirm_title": "إزالة المحرم",
+  "delete_confirm_body": "هل أنت متأكد أنك تريد إزالة علاقة المحرم هذه؟",
+  "cannot_add_opposite_gender": "لا يمكنك إضافة شخص من الجنس الآخر."
+},
+  "request_sheet": {
+    "title": "اختر نوع الطلب",
+    "marriage": "طلب زواج",
+    "mahram": "محرم",
+    "neither": "لا هذا ولا ذاك",
+    "cancel": "إلغاء"
+  },
+  "common": {
+    "yes": "نعم",
+    "no": "لا"
+  },
+  "Mahram confirmation": "تأكيد المحرم",
+  "Is this person your mahram?": "هل هذا الشخص محرمك؟",
+  "No": "لا",
+  "Yes": "نعم",
+  "mahram_request_sent": "تم إرسال طلب محرم إلى {name}",
+  "notif_mahram_request": "أرسل لك {name} طلب محرم",
+  "notif_mahram_accepted": "وافق {name} على طلب المحرم",
+
+
+  "Marriage inquiry": "طلب زواج",
+  "Mahram": "محرم",
+  "Neither": "لا هذا ولا ذاك",
+
+  "Request": "طلب",
+  "Add friends to see them here.": "أضف أصدقاء لرؤيتهم هنا.",
   "You deleted this message": "لقد حذفت هذه الرسالة",
   "This message was deleted": "تم حذف هذه الرسالة",
   "Close video": "إغلاق الفيديو",

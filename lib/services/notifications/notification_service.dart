@@ -437,6 +437,8 @@ class NotificationService {
     if (b.startsWith('FOLLOW_USER:')) return 'FOLLOW_USER';
     if (b.startsWith('FRIEND_REQUEST:')) return 'FRIEND_REQUEST';
     if (b.startsWith('FRIEND_ACCEPTED:')) return 'FRIEND_ACCEPTED';
+    if (b.startsWith('MAHRAM_REQUEST:')) return 'MAHRAM_REQUEST';
+    if (b.startsWith('MAHRAM_ACCEPTED:')) return 'MAHRAM_ACCEPTED';
     if (b.startsWith('LIKE_POST:')) return 'LIKE_POST';
     if (b.startsWith('COMMENT_POST:')) return 'COMMENT_POST';
     if (b.startsWith('COMMENT_REPLY:')) return 'COMMENT_REPLY'; // ✅ NEW
@@ -476,7 +478,50 @@ class NotificationService {
   // RELATIONSHIP HELPERS
   // -------------------------
 
+  // -------------------------
+  // RELATIONSHIP HELPERS
+  // -------------------------
+
+  Future<List<dynamic>> deleteRequestNotification({
+    required String targetUserId,
+    required String requesterId,
+    required String bodyPrefix,
+  }) async {
+    if (targetUserId.isEmpty || requesterId.isEmpty) return [];
+
+    final res = await _db
+        .from('notifications')
+        .delete()
+        .eq('user_id', targetUserId)
+        .eq('type', 'social')
+        .eq('from_user_id', requesterId)
+        .eq('body', '$bodyPrefix:$requesterId')
+        .select('id, user_id, from_user_id, body');
+
+    debugPrint('🧹 delete $bodyPrefix deleted ${res.length} rows => $res');
+    return res;
+  }
+
+
+// -------------------------
+// RELATIONSHIP HELPERS
+// -------------------------
+
   Future<void> deleteFriendRequestNotification({
+    required String targetUserId,
+    required String requesterId,
+  }) async {
+    if (targetUserId.isEmpty || requesterId.isEmpty) return;
+
+    // Minimal + robust: same style as your old working flow
+    await _db
+        .from('notifications')
+        .delete()
+        .eq('user_id', targetUserId)
+        .eq('body', 'FRIEND_REQUEST:$requesterId');
+  }
+
+  Future<void> deleteMahramRequestNotification({
     required String targetUserId,
     required String requesterId,
   }) async {
@@ -486,8 +531,10 @@ class NotificationService {
         .from('notifications')
         .delete()
         .eq('user_id', targetUserId)
-        .eq('body', 'FRIEND_REQUEST:$requesterId');
+        .eq('body', 'MAHRAM_REQUEST:$requesterId');
   }
+
+
 
   Future<void> deleteFollowNotification({
     required String targetUserId,

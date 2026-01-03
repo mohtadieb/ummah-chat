@@ -11,9 +11,11 @@ type NotifType =
   | "FOLLOW_USER"
   | "FRIEND_REQUEST"
   | "FRIEND_ACCEPTED"
+  | "MAHRAM_REQUEST"     // ✅ NEW
+  | "MAHRAM_ACCEPTED"    // ✅ NEW
   | "LIKE_POST"
   | "COMMENT_POST"
-  | "COMMENT_REPLY" // ✅ NEW
+  | "COMMENT_REPLY"
   | "CHAT_MESSAGE"
   | "GROUP_MESSAGE"
   | "GROUP_ADDED";
@@ -36,7 +38,6 @@ function toStringMap(obj: unknown): Record<string, string> {
   if (!obj || typeof obj !== "object") return out;
 
   for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
-    // FCM data must be strings
     out[k] = String(v ?? "");
   }
   return out;
@@ -82,6 +83,22 @@ function template(
             : "Je vriendschapsverzoek is geaccepteerd.",
         };
 
+      case "MAHRAM_REQUEST": // ✅ NEW
+        return {
+          title: "Mahram-verzoek",
+          body: senderFirst
+            ? `${senderFirst} heeft je een mahram-verzoek gestuurd.`
+            : "Je hebt een mahram-verzoek ontvangen.",
+        };
+
+      case "MAHRAM_ACCEPTED": // ✅ NEW
+        return {
+          title: "Mahram geaccepteerd",
+          body: senderFirst
+            ? `${senderFirst} accepteerde je mahram-verzoek.`
+            : "Je mahram-verzoek is geaccepteerd.",
+        };
+
       case "LIKE_POST":
         return {
           title: "Nieuwe like",
@@ -102,7 +119,7 @@ function template(
               : "Iemand reageerde op je bericht.",
         };
 
-      case "COMMENT_REPLY": // ✅ NEW
+      case "COMMENT_REPLY":
         return {
           title: "Reactie op je reactie",
           body: preview
@@ -154,6 +171,18 @@ function template(
           body: senderFirst ? `${senderFirst} قبل طلب صداقتك.` : "تم قبول طلب صداقتك.",
         };
 
+      case "MAHRAM_REQUEST": // ✅ NEW
+        return {
+          title: "طلب محرم",
+          body: senderFirst ? `${senderFirst} أرسل لك طلب محرم.` : "لديك طلب محرم جديد.",
+        };
+
+      case "MAHRAM_ACCEPTED": // ✅ NEW
+        return {
+          title: "تم قبول طلب المحرم",
+          body: senderFirst ? `${senderFirst} قبل طلب المحرم.` : "تم قبول طلب المحرم.",
+        };
+
       case "LIKE_POST":
         return {
           title: "إعجاب جديد",
@@ -174,7 +203,7 @@ function template(
               : "علّق شخص ما على منشورك.",
         };
 
-      case "COMMENT_REPLY": // ✅ NEW
+      case "COMMENT_REPLY":
         return {
           title: "رد على تعليقك",
           body: preview
@@ -224,6 +253,18 @@ function template(
         body: senderFirst ? `${senderFirst} accepted your friend request.` : "Your friend request was accepted.",
       };
 
+    case "MAHRAM_REQUEST": // ✅ NEW
+      return {
+        title: "Mahram request",
+        body: senderFirst ? `${senderFirst} sent you a mahram request.` : "You received a new mahram request.",
+      };
+
+    case "MAHRAM_ACCEPTED": // ✅ NEW
+      return {
+        title: "Mahram request accepted",
+        body: senderFirst ? `${senderFirst} accepted your mahram request.` : "Your mahram request was accepted.",
+      };
+
     case "LIKE_POST":
       return {
         title: "New like",
@@ -244,7 +285,7 @@ function template(
             : "Someone commented on your post.",
       };
 
-    case "COMMENT_REPLY": // ✅ NEW
+    case "COMMENT_REPLY":
       return {
         title: "Reply to your comment",
         body: preview
@@ -274,17 +315,30 @@ function template(
   }
 }
 
+// ✅ Optional: extra safety so a weird notif_type never crashes the function
+function safeTemplate(
+  locale: LocaleCode,
+  notifType: string,
+  args: Record<string, string>,
+): { title: string; body: string } {
+  try {
+    return template(locale, notifType as NotifType, args);
+  } catch {
+    return { title: "New notification", body: "" };
+  }
+}
+
 serve(async (req: Request) => {
   try {
     const body = await req.json();
 
-    // ✅ NEW payload (from your Flutter NotificationService)
+    // ✅ NEW payload
     const targetUserId = body?.target_user_id as string | undefined;
-    const notifType = body?.notif_type as NotifType | undefined;
+    const notifType = body?.notif_type as string | undefined; // accept string, we validate via safeTemplate
     const args = (body?.args ?? {}) as Record<string, unknown>;
     const dataIncoming = body?.data ?? {};
 
-    // ✅ OLD payload (backwards compatibility)
+    // ✅ OLD payload
     const oldFcmToken = body?.fcm_token as string | undefined;
     const oldTitle = body?.title as string | undefined;
     const oldMessageBody = body?.body as string | undefined;
@@ -308,7 +362,6 @@ serve(async (req: Request) => {
 
       const admin = createClient(supabaseUrl, serviceRoleKey);
 
-      // profiles must have: fcm_token, locale
       const { data: profile, error } = await admin
         .from("profiles")
         .select("fcm_token, locale")
@@ -325,7 +378,6 @@ serve(async (req: Request) => {
       fcmToken = (profile?.fcm_token as string | null) ?? null;
       locale = normalizeLocale(profile?.locale);
     } else {
-      // fallback to old mode
       fcmToken = oldFcmToken ?? null;
       locale = "en";
     }
@@ -349,7 +401,7 @@ serve(async (req: Request) => {
         argsStr[k] = String(v ?? "");
       }
 
-      const res = template(locale, notifType, argsStr);
+      const res = safeTemplate(locale, notifType, argsStr);
       finalTitle = res.title;
       finalBody = res.body;
     }

@@ -225,7 +225,49 @@
     "one": "1 selected",
     "other": "{count} selected"
   },
+  "friend": {
+    "add": "Add friend",
+    "cancel_request": "Cancel request",
+    "accept": "Accept",
+    "decline": "Decline",
+    "unfriend": "Unfriend",
+    "request": "Request"
+  },
+  "mahram": {
+    "label": "Mahram",
+    "request_title": "Mahram request",
+    "request_sent": "Mahram request sent",
+    "request_accepted": "Mahram accepted",
+    "delete_confirm_title": "Remove mahram",
+    "delete_confirm_body": "Are you sure you want to remove this mahram relationship?",
+    "cannot_add_opposite_gender": "You cannot add someone from the opposite gender."
+  },
+  "request_sheet": {
+    "title": "Choose request type",
+    "marriage": "Marriage inquiry",
+    "mahram": "Mahram",
+    "neither": "Neither",
+    "cancel": "Cancel"
+  },
+  "common": {
+    "yes": "Yes",
+    "no": "No"
+  },
+  "Mahram confirmation": "Mahram confirmation",
+  "Is this person your mahram?": "Is this person your mahram?",
+  "No": "No",
+  "Yes": "Yes",
+
+  "Marriage inquiry": "Marriage inquiry",
+  "Mahram": "Mahram",
+  "Neither": "Neither",
+
+  "Request": "Request",
+  "Add friends to see them here.": "Add friends to see them here.",
   "recording_label": "Recording… {time}",
+  "mahram_request_sent": "Mahram request sent to {name}",
+  "notif_mahram_request": "{name} sent you a mahram request",
+  "notif_mahram_accepted": "{name} accepted your mahram request",
   "Last seen": "Last seen",
   "Friends": "Friends",
   "Groups": "Groups",

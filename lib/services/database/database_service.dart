@@ -980,38 +980,60 @@ class DatabaseService {
     if (currentUserId == otherUserId) return 'none';
 
     try {
-      final row = await _db
+      // ✅ Use list query (not maybeSingle) so it never crashes if multiple rows exist.
+      final res = await _db
           .from('friendships')
-          .select('requester_id, addressee_id, status')
+          .select('requester_id, addressee_id, status, relation_type, created_at')
           .or(
         'and(requester_id.eq.$currentUserId,addressee_id.eq.$otherUserId),'
             'and(requester_id.eq.$otherUserId,addressee_id.eq.$currentUserId)',
       )
-          .maybeSingle();
+          .order('created_at', ascending: false)
+          .limit(1);
 
-      if (row == null) return 'none';
+      if (res is! List || res.isEmpty) return 'none';
 
-      final status = (row['status'] as String?) ?? 'pending';
-      final requesterId = row['requester_id']?.toString();
-      final addresseeId = row['addressee_id']?.toString();
+      final row = Map<String, dynamic>.from(res.first);
 
-      if (status == 'accepted' || status == 'blocked') {
-        return status; // 'accepted' or 'blocked'
+      final status = (row['status'] ?? 'pending').toString(); // pending/accepted/blocked
+      final relationType = (row['relation_type'] ?? 'friends').toString(); // friends/mahram
+      final requesterId = (row['requester_id'] ?? '').toString();
+      final addresseeId = (row['addressee_id'] ?? '').toString();
+
+      // Accepted
+      if (status == 'accepted') {
+        if (relationType == 'mahram') return 'mahram';
+        return 'accepted';
       }
 
-      // status == 'pending'
-      if (requesterId == currentUserId) {
-        return 'pending_sent';
-      } else if (addresseeId == currentUserId) {
-        return 'pending_received';
+      // Blocked
+      if (status == 'blocked') {
+        return 'blocked';
+      }
+
+      // Pending
+      if (status == 'pending') {
+        final isRequesterMe = requesterId == currentUserId;
+        final isAddresseeMe = addresseeId == currentUserId;
+
+        if (relationType == 'mahram') {
+          if (isRequesterMe) return 'pending_mahram_sent';
+          if (isAddresseeMe) return 'pending_mahram_received';
+          return 'none';
+        }
+
+        // Normal friend pending
+        if (isRequesterMe) return 'pending_sent';
+        if (isAddresseeMe) return 'pending_received';
       }
 
       return 'none';
-    } catch (e) {
-      print('❌ Error fetching friendship status: $e');
+    } catch (e, st) {
+      debugPrint('❌ Error fetching friendship status: $e\n$st');
       return 'none';
     }
   }
+
 
   /// Send a friend request from current user to [targetUserId]
   ///
@@ -1387,6 +1409,211 @@ class DatabaseService {
       return <String>{};
     }
   }
+
+/* ==================== MAHRAM ==================== */
+
+  /// Send a MAHRAM request (mimics friend request 1:1, but relation_type='mahram')
+  Future<void> sendMahramRequestInDatabase(String targetUserId) async {
+    final currentUserId = _auth.currentUser?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return;
+    if (currentUserId == targetUserId) return;
+
+    try {
+      final existing = await _db
+          .from('friendships')
+          .select('status, relation_type')
+          .or(
+        'and(requester_id.eq.$currentUserId,addressee_id.eq.$targetUserId),'
+            'and(requester_id.eq.$targetUserId,addressee_id.eq.$currentUserId)',
+      )
+          .maybeSingle();
+
+      if (existing != null) {
+        debugPrint('ℹ️ Relationship already exists: $existing');
+        return;
+      }
+
+      await _db.from('friendships').insert({
+        'requester_id': currentUserId,
+        'addressee_id': targetUserId,
+        'status': 'pending',
+        'relation_type': 'mahram',
+      });
+
+      // ✅ EXACTLY like friend request notification
+      final me = await getUserFromDatabase(currentUserId);
+      final displayName = (me?.username.isNotEmpty ?? false)
+          ? me!.username
+          : (me?.name ?? 'Someone');
+
+      await _notifications.createNotificationForUser(
+        targetUserId: targetUserId,
+        title: '$displayName sent you a mahram request',
+        body: 'MAHRAM_REQUEST:$currentUserId',
+
+        // must be set so requester can delete via RLS
+        fromUserId: currentUserId,
+        type: 'social',
+        unreadCount: 1,
+        isRead: false,
+
+        data: {
+          'type': 'MAHRAM_REQUEST',
+          'fromUserId': currentUserId,
+          'senderName': displayName,
+        },
+      );
+
+      debugPrint('✅ Mahram request sent');
+    } catch (e, st) {
+      debugPrint('❌ Error sending mahram request: $e\n$st');
+      rethrow;
+    }
+  }
+
+  /// Cancel a pending MAHRAM request that the current user previously sent
+  Future<void> cancelMahramRequestInDatabase(String otherUserId) async {
+    final currentUserId = _auth.currentUser?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return;
+
+    try {
+      await _db
+          .from('friendships')
+          .delete()
+          .eq('requester_id', currentUserId)
+          .eq('addressee_id', otherUserId)
+          .eq('status', 'pending')
+          .eq('relation_type', 'mahram');
+
+      // ✅ EXACTLY like friend cancel: delete receiver notif by body
+      await _notifications.deleteMahramRequestNotification(
+        targetUserId: otherUserId,
+        requesterId: currentUserId,
+      );
+
+      debugPrint('✅ Mahram request cancelled (and notification removed)');
+    } catch (e, st) {
+      debugPrint('❌ Error cancelling mahram request: $e\n$st');
+      rethrow;
+    }
+  }
+
+  /// Accept a pending MAHRAM request from [otherUserId] → current user
+  Future<void> acceptMahramRequestInDatabase(String otherUserId) async {
+    final currentUserId = _auth.currentUser?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return;
+
+    try {
+      final row = await _db
+          .from('friendships')
+          .select('id')
+          .eq('requester_id', otherUserId)
+          .eq('addressee_id', currentUserId)
+          .eq('status', 'pending')
+          .eq('relation_type', 'mahram')
+          .maybeSingle();
+
+      if (row == null) {
+        print('ℹ️ No pending mahram request from $otherUserId to accept');
+        return;
+      }
+
+      await _db
+          .from('friendships')
+          .update({
+        'status': 'accepted',
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      })
+          .eq('id', row['id']);
+
+      // ✅ Nice UX: notify requester it was accepted
+      try {
+        final me = await getUserFromDatabase(currentUserId);
+        final displayName = (me?.username.isNotEmpty ?? false)
+            ? me!.username
+            : (me?.name ?? 'Someone');
+
+        await _notifications.createNotificationForUser(
+          targetUserId: otherUserId,
+          title: '$displayName accepted your mahram request',
+          body: 'MAHRAM_ACCEPTED:$currentUserId',
+          data: {
+            'type': 'MAHRAM_ACCEPTED',
+            'fromUserId': currentUserId,
+            'senderName': displayName,
+          },
+        );
+      } catch (e) {
+        print('⚠️ Error creating mahram accepted notification: $e');
+      }
+
+      print('✅ Mahram request accepted');
+    } catch (e) {
+      print('❌ Error accepting mahram request: $e');
+    }
+  }
+
+  /// Decline a pending MAHRAM request from [otherUserId] → current user
+  Future<void> declineMahramRequestInDatabase(String otherUserId) async {
+    final currentUserId = _auth.currentUser?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return;
+
+    try {
+      await _db
+          .from('friendships')
+          .delete()
+          .eq('requester_id', otherUserId)
+          .eq('addressee_id', currentUserId)
+          .eq('status', 'pending')
+          .eq('relation_type', 'mahram');
+
+      // ✅ Optional: also delete the MAHRAM_REQUEST notification row if it exists
+      await _notifications.deleteMahramRequestNotification(
+        targetUserId: currentUserId, // recipient is "me" for the request notification row
+        requesterId: otherUserId,
+      );
+
+      print('✅ Mahram request declined');
+    } catch (e) {
+      print('❌ Error declining mahram request: $e');
+    }
+  }
+
+  /// Delete an accepted MAHRAM relationship between current user and [otherUserId]
+  Future<void> deleteMahramRelationshipInDatabase(String otherUserId) async {
+    final currentUserId = _auth.currentUser?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return;
+    if (currentUserId == otherUserId) return;
+
+    try {
+      await _db
+          .from('friendships')
+          .delete()
+          .eq('status', 'accepted')
+          .eq('relation_type', 'mahram')
+          .or(
+        'and(requester_id.eq.$currentUserId,addressee_id.eq.$otherUserId),'
+            'and(requester_id.eq.$otherUserId,addressee_id.eq.$currentUserId)',
+      );
+
+      // Clean up relationship notifications (optional)
+      try {
+        await _notifications.deleteAllRelationshipNotificationsBetween(
+          userAId: currentUserId,
+          userBId: otherUserId,
+        );
+      } catch (e) {
+        print('⚠️ Error deleting relationship notifications on mahram delete: $e');
+      }
+
+      print('✅ Mahram relationship deleted with $otherUserId');
+    } catch (e) {
+      print('❌ Error deleting mahram relationship: $e');
+    }
+  }
+
+
+
 
 
   /* ==================== FOLLOW / UNFOLLOW ==================== */

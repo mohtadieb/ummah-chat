@@ -11,6 +11,13 @@ class MyFriendButton extends StatelessWidget {
   // 👇 NEW: used when already friends
   final VoidCallback? onUnfriend;
 
+  // 🆕 Opposite-gender request flow (opens bottom sheet in ProfilePage)
+  final VoidCallback? onOpenRequestSheet;
+
+// 🆕 Used when relation is mahram (accepted)
+  final VoidCallback? onDeleteMahram;
+
+
   const MyFriendButton({
     super.key,
     required this.friendStatus,
@@ -18,7 +25,10 @@ class MyFriendButton extends StatelessWidget {
     required this.onCancelRequest,
     required this.onAcceptRequest,
     required this.onDeclineRequest,
-    this.onUnfriend, // 👈 optional
+    this.onUnfriend,
+    this.onOpenRequestSheet,
+    this.onDeleteMahram,
+
   });
 
   @override
@@ -26,7 +36,7 @@ class MyFriendButton extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     // Special view for requests received → Accept + Decline
-    if (friendStatus == 'pending_received') {
+    if (friendStatus == 'pending_received' || friendStatus == 'pending_mahram_received') {
       return SizedBox(
         height: 36,
         child: Row(
@@ -102,22 +112,35 @@ class MyFriendButton extends StatelessWidget {
 
     switch (friendStatus) {
       case 'pending_sent':
+      case 'pending_mahram_sent':
         bg = Colors.transparent;
         fg = colorScheme.primary;
         side = BorderSide(color: colorScheme.primary);
-        onTap = onCancelRequest;
+        onTap = onCancelRequest; // ✅ cancels whichever request this status represents
         break;
 
       case 'accepted':
         bg = colorScheme.tertiary;
         fg = colorScheme.primary;
-        onTap = onUnfriend; // 👈 now clickable
+        onTap = onUnfriend;
+        break;
+
+      case 'mahram':
+        bg = colorScheme.tertiary;
+        fg = colorScheme.primary;
+        onTap = onDeleteMahram;
         break;
 
       case 'blocked':
         bg = Colors.grey.shade400;
         fg = Colors.white;
-        onTap = null; // disabled
+        onTap = null;
+        break;
+
+      case 'request':
+        bg = colorScheme.secondary;
+        fg = colorScheme.primary;
+        onTap = onOpenRequestSheet;
         break;
 
       case 'none':
@@ -127,22 +150,36 @@ class MyFriendButton extends StatelessWidget {
         onTap = onAddFriend;
     }
 
+
     // Determine button text
     String label;
     switch (friendStatus) {
       case 'pending_sent':
+      case 'pending_mahram_sent':
         label = 'Cancel request';
         break;
+
       case 'accepted':
-        label = 'Unfriend'; // 👈 changed
+        label = 'Unfriend';
         break;
+
+      case 'mahram':
+        label = 'Mahram';
+        break;
+
+      case 'request':
+        label = 'Request';
+        break;
+
       case 'blocked':
         label = 'Blocked';
         break;
+
       case 'none':
       default:
         label = 'Add friend';
     }
+
 
     return SizedBox(
       height: 36,
