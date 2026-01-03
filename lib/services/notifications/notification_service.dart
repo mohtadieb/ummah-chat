@@ -499,8 +499,14 @@ class NotificationService {
         .from('notifications')
         .delete()
         .eq('user_id', targetUserId)
-        .eq('body', 'FOLLOW_USER:$followerId');
+        .eq('type', 'social')
+        .eq('from_user_id', followerId)
+        .like('body', 'FOLLOW_USER:%');
   }
+
+
+
+
 
   Future<void> deleteAllRelationshipNotificationsBetween({
     required String userAId,

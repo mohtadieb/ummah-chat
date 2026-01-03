@@ -1404,38 +1404,37 @@ class DatabaseService {
         'following_id': targetUserId,
       });
 
-      // 2️⃣ Clean up any old "follow" notification from this follower
-      try {
-        await _notifications.deleteFollowNotification(
-          targetUserId: targetUserId,
-          followerId: currentUserId,
-        );
-      } catch (e) {
-        print('⚠️ Error removing old follow notification: $e');
-      }
-
       // 3️⃣ Follow notification (in-app + push)
       try {
         final followerProfile = await getUserFromDatabase(currentUserId);
+
         final displayName = (followerProfile?.username.isNotEmpty ?? false)
             ? followerProfile!.username
-            : (followerProfile?.name ?? 'Someone');
+            : ((followerProfile?.name ?? '').trim().isNotEmpty
+            ? followerProfile!.name
+            : 'Someone');
 
         await _notifications.createNotificationForUser(
           targetUserId: targetUserId,
           title: '$displayName started following you',
           body: 'FOLLOW_USER:$currentUserId',
+
+          // ✅ match friend-request style
+          fromUserId: currentUserId,
+          type: 'social',
+          unreadCount: 1,
+          isRead: false,
+
           pushBody: '$displayName started following you',
           data: {
             'type': 'FOLLOW_USER',
             'fromUserId': currentUserId,
-            'senderName': displayName, // ✅ add this
+            'senderName': displayName,
           },
         );
       } catch (e) {
         print('⚠️ Error creating follow notification: $e');
       }
-
       print("✅ Follow successful");
     } catch (e) {
       print("❌ Follow error: $e");
@@ -1462,7 +1461,7 @@ class DatabaseService {
         followerId: currentUserId,
       );
 
-      print("✅ Unfollow successful (and follow notification removed)");
+      print("✅ Unfollow successful (follow notification cleanup requested)");
     } catch (e) {
       print("❌ Unfollow error: $e");
     }
