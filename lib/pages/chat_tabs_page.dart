@@ -266,9 +266,6 @@ class _ChatTabsPageState extends State<ChatTabsPage>
               // Create on backend
               await db.createCommunity(name, desc, country);
 
-              // Refresh local list
-              await db.getAllCommunities();
-
               if (context.mounted) {
                 Navigator.pop(context);
               }

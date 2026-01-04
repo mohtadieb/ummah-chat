@@ -1808,21 +1808,42 @@ class DatabaseService {
     }
   }
 
-  // Create new community
-  Future<void> createCommunityInDatabase(
-      String name, String desc, String country) async {
+  // Create new community + auto-join creator
+  Future<Map<String, dynamic>?> createCommunityInDatabase(
+      String name,
+      String desc,
+      String country,
+      ) async {
     try {
       final userId = _auth.currentUser!.id;
-      await _db.from('communities').insert({
+
+      // 1) Create community and get the created row back (so we have the id)
+      final created = await _db
+          .from('communities')
+          .insert({
         'name': name,
         'description': desc,
         'country': country,
         'created_by': userId,
+      })
+          .select()
+          .single();
+
+      final communityId = created['id'];
+
+      // 2) Auto-join the creator
+      await _db.from('community_members').insert({
+        'community_id': communityId,
+        'user_id': userId,
       });
-    } catch (e) {
-      print("❌ Error creating community: $e");
+
+      return Map<String, dynamic>.from(created);
+    } catch (e, st) {
+      debugPrint("❌ Error creating community (auto-join): $e\n$st");
+      return null;
     }
   }
+
 
   Future<bool> isMemberInDatabase(String communityId) async {
     try {
@@ -1865,28 +1886,43 @@ class DatabaseService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> searchCommunitiesInDatabase(
-      String query) async {
+  Future<List<Map<String, dynamic>>> searchCommunitiesInDatabase(String query) async {
     try {
       final userId = _auth.currentUser!.id;
+      final q = query.trim();
+
+      if (q.isEmpty) return [];
+
+      // OR search across name, description, and country (case-insensitive via ILIKE)
       final response = await _db
           .from('communities')
-          .select('id, name, description, members:community_members(user_id)')
-          .ilike('name', '%$query%');
+          .select(
+        'id, name, description, country, members:community_members(user_id)',
+      )
+          .or(
+        'name.ilike.%$q%,'
+            'description.ilike.%$q%,'
+            'country.ilike.%$q%',
+      )
+          .limit(30);
+
       return (response as List)
-          .map((c) => {
+          .map<Map<String, dynamic>>((c) => {
         'id': c['id'],
         'name': c['name'],
         'description': c['description'],
-        'is_joined':
-        (c['members'] as List).any((m) => m['user_id'] == userId),
+        'country': c['country'],
+        'is_joined': (c['members'] as List)
+            .any((m) => m['user_id'] == userId),
       })
           .toList();
-    } catch (e) {
-      print("❌ Error searching communities: $e");
+    } catch (e, st) {
+      print("❌ Error searching communities: $e\n$st");
       return [];
     }
   }
+
+
 
   Future<List<Map<String, dynamic>>> getCommunityMembersFromDatabase(
       String communityId) async {
@@ -1932,6 +1968,23 @@ class DatabaseService {
       return [];
     }
   }
+
+  Future<List<Map<String, dynamic>>> getMyCommunityMembershipsFromDatabase() async {
+    try {
+      final userId = _auth.currentUser!.id;
+
+      final res = await _db
+          .from('community_members')
+          .select('community_id')
+          .eq('user_id', userId);
+
+      return List<Map<String, dynamic>>.from(res);
+    } catch (e) {
+      debugPrint("❌ Error fetching my community memberships: $e");
+      return [];
+    }
+  }
+
 
   /* ==================== STORY PROGRESS ==================== */
 

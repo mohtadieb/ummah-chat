@@ -1023,15 +1023,25 @@ class DatabaseProvider extends ChangeNotifier {
 
     if (includeMembership) {
       final userId = _auth.getCurrentUserId();
-      for (var community in _allCommunities) {
-        final members =
-        await _db.getCommunityMembersFromDatabase(community['id']);
-        community['is_joined'] = members.any((m) => m['user_id'] == userId);
+      if (userId.isNotEmpty) {
+        // 1 query to get ONLY my memberships
+        final myMemberships = await _db.getMyCommunityMembershipsFromDatabase();
+
+        final joinedIds = myMemberships
+            .map((r) => r['community_id']?.toString())
+            .whereType<String>()
+            .toSet();
+
+        for (final community in _allCommunities) {
+          final id = community['id']?.toString();
+          community['is_joined'] = id != null && joinedIds.contains(id);
+        }
       }
     }
 
     notifyListeners();
   }
+
 
   void addCommunityLocally(Map<String, dynamic> community) {
     _allCommunities.add(community);
@@ -1039,9 +1049,19 @@ class DatabaseProvider extends ChangeNotifier {
   }
 
   Future<void> createCommunity(String name, String desc, String country) async {
-    await _db.createCommunityInDatabase(name, desc, country);
+    final created = await _db.createCommunityInDatabase(name, desc, country);
+
+    if (created != null) {
+      // Optimistic: show instantly as joined
+      created['is_joined'] = true;
+      _allCommunities.insert(0, created);
+      notifyListeners();
+    }
+
+    // Single refresh for server truth
     await getAllCommunities();
   }
+
 
   Future<bool> isMember(String communityId) async {
     return await _db.isMemberInDatabase(communityId);
@@ -1067,15 +1087,21 @@ class DatabaseProvider extends ChangeNotifier {
   }
 
   Future<void> searchCommunities(String query) async {
-    final all = await _db.searchCommunitiesInDatabase(query);
-    final queryLower = query.toLowerCase();
+    final q = query.trim();
 
-    _communitySearchResults = all
-        .where((c) => c['name'].toLowerCase().startsWith(queryLower))
-        .toList();
+    if (q.isEmpty) {
+      _communitySearchResults = [];
+      notifyListeners();
+      return;
+    }
+
+    // Supabase ILIKE is already case-insensitive
+    _communitySearchResults =
+    await _db.searchCommunitiesInDatabase(q);
 
     notifyListeners();
   }
+
 
   void clearCommunitySearchResults() {
     _communitySearchResults.clear();
