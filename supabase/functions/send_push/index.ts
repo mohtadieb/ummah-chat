@@ -330,13 +330,18 @@ function safeTemplate(
 
 serve(async (req: Request) => {
   try {
-    const body = await req.json();
+const body = await req.json().catch(() => ({}));
 
     // ✅ NEW payload
     const targetUserId = body?.target_user_id as string | undefined;
     const notifType = body?.notif_type as string | undefined; // accept string, we validate via safeTemplate
-    const args = (body?.args ?? {}) as Record<string, unknown>;
-    const dataIncoming = body?.data ?? {};
+    const args = (body?.args && typeof body.args === "object") ? (body.args as Record<string, unknown>) : {};
+    const dataIncoming = (body?.data && typeof body.data === "object") ? body.data : {};
+
+    console.log("send_push incoming keys:", Object.keys(body ?? {}));
+    console.log("send_push new payload:", { targetUserId, notifType });
+
+
 
     // ✅ OLD payload
     const oldFcmToken = body?.fcm_token as string | undefined;
@@ -392,8 +397,8 @@ serve(async (req: Request) => {
     // -------------------------
     // Build localized title/body
     // -------------------------
-    let finalTitle = oldTitle ?? "New notification";
-    let finalBody = oldMessageBody ?? "";
+    let finalTitle = safeStr(oldTitle) || "New notification";
+    let finalBody = safeStr(oldMessageBody) || "";
 
     if (targetUserId && notifType) {
       const argsStr: Record<string, string> = {};
@@ -402,9 +407,10 @@ serve(async (req: Request) => {
       }
 
       const res = safeTemplate(locale, notifType, argsStr);
-      finalTitle = res.title;
-      finalBody = res.body;
+      finalTitle = safeStr(res?.title) || finalTitle || "New notification";
+      finalBody = safeStr(res?.body) || finalBody || "";
     }
+
 
     // -------------------------
     // Send to FCM

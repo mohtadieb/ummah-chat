@@ -214,6 +214,32 @@
   "mahram_confirmation_question": "Bevestig je dat je de mahram van deze persoon bent?",
   "yes": "Ja",
   "no": "Nee",
+  "Something went wrong": "Er is iets misgegaan",
+
+  "add_friend": "Vriend toevoegen",
+  "cancel_request": "Verzoek annuleren",
+  "unfriend": "Ontvrienden",
+  "request": "Verzoek",
+  "blocked": "Geblokkeerd",
+
+  "cancel_inquiry": "Aanvraag annuleren",
+  "end_inquiry": "Aanvraag beëindigen",
+  "marriage_inquiry_sent": "Huwelijksaanvraag verzonden",
+
+  "accept": "Accepteren",
+  "decline": "Afwijzen",
+
+
+  "marriage_inquiry": "Huwelijksaanvraag",
+  "neither": "Geen van beide",
+  "cannot_add_opposite_gender": "Je kunt deze gebruiker niet als vriend toevoegen",
+
+  "notif_marriage_inquiry_request": "{name} heeft je een huwelijksaanvraag gestuurd",
+  "notif_marriage_inquiry_mahram": "{name} heeft jou als mahram gekozen",
+  "notif_marriage_inquiry_man_decision": "Beslissing vereist voor huwelijksaanvraag",
+  "notif_marriage_inquiry_group_created": "Groep voor huwelijksaanvraag aangemaakt",
+  "notif_marriage_inquiry_accepted": "{name} heeft de huwelijksaanvraag geaccepteerd",
+  "notif_marriage_inquiry_declined": "{name} heeft de huwelijksaanvraag afgewezen",
 
 
 

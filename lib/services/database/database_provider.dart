@@ -91,12 +91,15 @@ class DatabaseProvider extends ChangeNotifier {
   List<Post> _followingPosts = [];
 
   List<Post> get posts => _posts;
+
   List<Post> get followingPosts => _followingPosts;
 
   Post? _loadingPost;
+
   Post? get loadingPost => _loadingPost;
 
   bool _isLoadingPosts = false;
+
   bool get isLoadingPosts => _isLoadingPosts;
 
   void showLoadingPost({
@@ -164,8 +167,10 @@ class DatabaseProvider extends ChangeNotifier {
       if (currentUserId.isNotEmpty && _posts.isNotEmpty) {
         final postIds = _posts.map((p) => p.id).whereType<String>().toList();
 
-        _likedPosts =
-        await _db.getLikedPostIdsFromDatabase(currentUserId, postIds);
+        _likedPosts = await _db.getLikedPostIdsFromDatabase(
+          currentUserId,
+          postIds,
+        );
       } else {
         _likedPosts = [];
       }
@@ -210,7 +215,9 @@ class DatabaseProvider extends ChangeNotifier {
     if (currentUserId.isEmpty) return;
 
     try {
-      final followingUserIds = await _db.getFollowingFromDatabase(currentUserId);
+      final followingUserIds = await _db.getFollowingFromDatabase(
+        currentUserId,
+      );
 
       // ✅ Cache for ForYou algorithm
       _following[currentUserId] = followingUserIds;
@@ -286,11 +293,11 @@ class DatabaseProvider extends ChangeNotifier {
 
   /// Create new post with media + caption
   Future<void> postMultiMediaMessage(
-      String message, {
-        required List<File> imageFiles,
-        required List<File> videoFiles,
-        String? communityId,
-      }) async {
+    String message, {
+    required List<File> imageFiles,
+    required List<File> videoFiles,
+    String? communityId,
+  }) async {
     await _db.postMultiMediaMessageInDatabase(
       message,
       imageFiles: imageFiles,
@@ -349,18 +356,24 @@ class DatabaseProvider extends ChangeNotifier {
 
     // create in-flight
     final future = getPostMedia(postId)
-        .timeout(const Duration(seconds: 12), onTimeout: () {
-      // ✅ Avoid "forever loading"
-      return <PostMedia>[];
-    }).then((items) {
-      _postMediaCache[postId] = items;
-      return items;
-    }).catchError((_) {
-      // ✅ Avoid "forever loading"
-      return <PostMedia>[];
-    }).whenComplete(() {
-      _postMediaInFlight.remove(postId);
-    });
+        .timeout(
+          const Duration(seconds: 12),
+          onTimeout: () {
+            // ✅ Avoid "forever loading"
+            return <PostMedia>[];
+          },
+        )
+        .then((items) {
+          _postMediaCache[postId] = items;
+          return items;
+        })
+        .catchError((_) {
+          // ✅ Avoid "forever loading"
+          return <PostMedia>[];
+        })
+        .whenComplete(() {
+          _postMediaInFlight.remove(postId);
+        });
 
     _postMediaInFlight[postId] = future;
     return future;
@@ -459,6 +472,7 @@ class DatabaseProvider extends ChangeNotifier {
   bool isPostLikedByCurrentUser(String postId) => _likedPosts.contains(postId);
 
   int getLikeCount(String postId) => _likeCounts[postId] ?? 0;
+
   int getCommentCount(String postId) => _commentCounts[postId] ?? 0;
 
   /// Initialize count maps locally from `_posts`
@@ -501,12 +515,13 @@ class DatabaseProvider extends ChangeNotifier {
   /* ==================== FOR YOU LIKES MAP ==================== */
 
   Map<String, Set<String>> _likesByPostId = {};
+
   Map<String, Set<String>> get likesByPostId => _likesByPostId;
 
   Future<void> loadLikesForForYou(
-      List<String> postIds, {
-        bool notify = true,
-      }) async {
+    List<String> postIds, {
+    bool notify = true,
+  }) async {
     if (postIds.isEmpty) {
       _likesByPostId = {};
       if (notify) notifyListeners();
@@ -514,10 +529,7 @@ class DatabaseProvider extends ChangeNotifier {
     }
 
     try {
-      final relevantUserIds = <String>{
-        ...followingUserIds,
-        ...friendUserIds,
-      };
+      final relevantUserIds = <String>{...followingUserIds, ...friendUserIds};
 
       if (relevantUserIds.isEmpty) {
         _likesByPostId = {};
@@ -645,13 +657,15 @@ class DatabaseProvider extends ChangeNotifier {
   /* ==================== BLOCKED USERS ==================== */
 
   List<UserProfile> _blockedUsers = [];
+
   List<UserProfile> get blockedUsers => _blockedUsers;
 
   Future<void> loadBlockedUsers() async {
     final blockedIds = await _db.getBlockedUserIdsFromDatabase();
 
-    final profiles =
-    await Future.wait(blockedIds.map((id) => _db.getUserFromDatabase(id)));
+    final profiles = await Future.wait(
+      blockedIds.map((id) => _db.getUserFromDatabase(id)),
+    );
 
     _blockedUsers = profiles.whereType<UserProfile>().toList();
 
@@ -685,10 +699,6 @@ class DatabaseProvider extends ChangeNotifier {
 
   /* ==================== FRIENDS ==================== */
 
-  Future<String> getFriendStatus(String otherUserId) {
-    return _db.getFriendshipStatusFromDatabase(otherUserId);
-  }
-
   Future<void> sendFriendRequest(String otherUserId) {
     return _db.sendFriendRequestInDatabase(otherUserId);
   }
@@ -717,9 +727,15 @@ class DatabaseProvider extends ChangeNotifier {
     await _db.unfriendUserInDatabase(otherUserId);
   }
 
+  // You referenced this in the code snippet above; you already have the service method.
+  Future<String> getFriendshipStatus(String otherUserId) =>
+      _db.getFriendshipStatusFromDatabase(otherUserId);
+
+
   /* ==================== FRIEND IDS (For You ranking) ==================== */
 
   Set<String> _friendIds = {};
+
   Set<String> get friendUserIds => _friendIds;
 
   Future<void> loadFriendIds({bool notify = true}) async {
@@ -739,32 +755,6 @@ class DatabaseProvider extends ChangeNotifier {
     }
   }
 
-  /* ==================== MAHRAM ==================== */
-
-  // ✅ MAHRAM FLOW (Provider wrappers)
-
-  Future<void> sendMahramRequest(String targetUserId) async {
-    await _db.sendMahramRequestInDatabase(targetUserId);
-  }
-
-  Future<void> cancelMahramRequest(String otherUserId) async {
-    await _db.cancelMahramRequestInDatabase(otherUserId);
-  }
-
-  Future<void> acceptMahramRequest(String otherUserId) async {
-    await _db.acceptMahramRequestInDatabase(otherUserId);
-  }
-
-  Future<void> declineMahramRequest(String otherUserId) async {
-    await _db.declineMahramRequestInDatabase(otherUserId);
-  }
-
-  Future<void> deleteMahramRelationship(String otherUserId) async {
-    await _db.deleteMahramRelationshipInDatabase(otherUserId);
-  }
-
-
-
   /* ==================== FOLLOWERS / FOLLOWING ==================== */
 
   final Map<String, List<String>> _followers = {};
@@ -775,6 +765,7 @@ class DatabaseProvider extends ChangeNotifier {
   final Map<String, List<UserProfile>> _followingProfiles = {};
 
   int getFollowerCount(String userId) => _followerCount[userId] ?? 0;
+
   int getFollowingCount(String userId) => _followingCount[userId] ?? 0;
 
   Future<void> loadUserFollowers(String userId) async {
@@ -853,7 +844,7 @@ class DatabaseProvider extends ChangeNotifier {
 
       _following[currentUserId]?.add(targetUserId);
       _followingCount[currentUserId] =
-      ((_followingCount[currentUserId] ?? 0) + 1);
+          ((_followingCount[currentUserId] ?? 0) + 1);
     }
 
     notifyListeners();
@@ -901,7 +892,7 @@ class DatabaseProvider extends ChangeNotifier {
 
       _following[currentUserId]?.add(targetUserId);
       _followingCount[currentUserId] =
-      ((_followingCount[currentUserId] ?? 0) + 1);
+          ((_followingCount[currentUserId] ?? 0) + 1);
 
       notifyListeners();
     }
@@ -921,13 +912,137 @@ class DatabaseProvider extends ChangeNotifier {
     return (_following[uid] ?? const <String>[]).toSet();
   }
 
+  /* ==================== MAHRAM ==================== */
+
+  // ✅ MAHRAM FLOW (Provider wrappers)
+
+  Future<void> sendMahramRequest(String targetUserId) async {
+    await _db.sendMahramRequestInDatabase(targetUserId);
+  }
+
+  Future<void> cancelMahramRequest(String otherUserId) async {
+    await _db.cancelMahramRequestInDatabase(otherUserId);
+  }
+
+  Future<void> acceptMahramRequest(String otherUserId) async {
+    await _db.acceptMahramRequestInDatabase(otherUserId);
+  }
+
+  Future<void> declineMahramRequest(String otherUserId) async {
+    await _db.declineMahramRequestInDatabase(otherUserId);
+  }
+
+  Future<void> deleteMahramRelationship(String otherUserId) async {
+    await _db.deleteMahramRelationshipInDatabase(otherUserId);
+  }
+
+  Future<List<UserProfile>> getMyMahrams() => _db.getMyMahramsInDatabase();
+
+
+// =========================================================
+// MARRIAGE INQUIRIES (DatabaseProvider)
+// =========================================================
+
+  Future<String> createMarriageInquiry({
+    required String manId,
+    required String womanId,
+    String? mahramId,
+    String initiatedBy = 'man', // 'man' or 'woman'
+  }) async {
+    return _db.createMarriageInquiryInDatabase(
+      manId: manId,
+      womanId: womanId,
+      mahramId: mahramId,
+      initiatedBy: initiatedBy,
+    );
+  }
+
+  /// FLOW 1 ONLY (initiated_by=man):
+  /// Woman declines the inquiry.
+  Future<void> womanDeclineInquiry({
+    required String inquiryId,
+  }) async {
+    await _db.womanDeclineInquiryInDatabase(inquiryId: inquiryId);
+  }
+
+  /// FLOW 1 ONLY (initiated_by=man):
+  /// Woman accepts AND selects mahram (single step).
+  Future<void> womanAcceptAndSelectMahramForInquiry({
+    required String inquiryId,
+    required String mahramId,
+  }) async {
+    await _db.womanAcceptAndSelectMahramForInquiryInDatabase(
+      inquiryId: inquiryId,
+      mahramId: mahramId,
+    );
+  }
+
+  /// BOTH FLOWS:
+  /// Mahram approves/declines.
+  Future<void> mahramRespondToInquiry({
+    required String inquiryId,
+    required bool approve,
+  }) async {
+    await _db.mahramRespondToInquiryInDatabase(
+      inquiryId: inquiryId,
+      approve: approve,
+    );
+  }
+
+  /// FLOW 2 ONLY (initiated_by=woman):
+  /// Man accepts/declines after mahram approval.
+  Future<void> manRespondToInquiry({
+    required String inquiryId,
+    required bool accept,
+  }) async {
+    await _db.manRespondToInquiryInDatabase(
+      inquiryId: inquiryId,
+      accept: accept,
+    );
+  }
+
+  /// Used by ProfilePage combined relationship status (button state override)
+  Future<Map<String, dynamic>?> getLatestActiveInquiryBetweenMeAnd(
+      String otherUserId,
+      ) async {
+    return _db.getLatestActiveInquiryBetweenMeAnd(otherUserId);
+  }
+
+  /// Used by ProfilePage combined relationship status (button state override)
+  String? computeInquiryUiStatus({
+    required Map<String, dynamic> inquiry,
+    required String viewerId,
+    required String otherUserId,
+  }) {
+    return _db.computeInquiryUiStatus(
+      inquiry: inquiry,
+      viewerId: viewerId,
+      otherUserId: otherUserId,
+    );
+  }
+
+  Future<String> getCombinedRelationshipStatus(String otherUserId) async {
+    return _db.getCombinedRelationshipStatus(otherUserId);
+  }
+
+  Future<void> cancelOrEndMarriageInquiry({
+    required String inquiryId,
+  }) async {
+    await _db.cancelOrEndMarriageInquiryInDatabase(inquiryId: inquiryId);
+  }
+
+  Future<Map<String, dynamic>?> getInquiryById(String inquiryId) =>
+      _db.getInquiryByIdInDatabase(inquiryId);
+
   /* ==================== SEARCH USERS ==================== */
 
   List<UserProfile> _searchResults = [];
+
   List<UserProfile> get searchResults => _searchResults;
 
   /// ✅ Cache friends-of-friends (2nd degree) so we can rank them higher
   Set<String> _friendsOfFriendsIds = {};
+
   Set<String> get friendsOfFriendsIds => _friendsOfFriendsIds;
 
   Future<void> _ensureFriendsOfFriendsLoaded() async {
@@ -1012,9 +1127,11 @@ class DatabaseProvider extends ChangeNotifier {
   /* ==================== COMMUNITIES ==================== */
 
   List<Map<String, dynamic>> _allCommunities = [];
+
   List<Map<String, dynamic>> get allCommunities => _allCommunities;
 
   List<Map<String, dynamic>> _communitySearchResults = [];
+
   List<Map<String, dynamic>> get communitySearchResults =>
       _communitySearchResults;
 
@@ -1042,7 +1159,6 @@ class DatabaseProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-
   void addCommunityLocally(Map<String, dynamic> community) {
     _allCommunities.add(community);
     notifyListeners();
@@ -1061,7 +1177,6 @@ class DatabaseProvider extends ChangeNotifier {
     // Single refresh for server truth
     await getAllCommunities();
   }
-
 
   Future<bool> isMember(String communityId) async {
     return await _db.isMemberInDatabase(communityId);
@@ -1096,12 +1211,10 @@ class DatabaseProvider extends ChangeNotifier {
     }
 
     // Supabase ILIKE is already case-insensitive
-    _communitySearchResults =
-    await _db.searchCommunitiesInDatabase(q);
+    _communitySearchResults = await _db.searchCommunitiesInDatabase(q);
 
     notifyListeners();
   }
-
 
   void clearCommunitySearchResults() {
     _communitySearchResults.clear();
@@ -1109,14 +1222,15 @@ class DatabaseProvider extends ChangeNotifier {
   }
 
   Future<List<Map<String, dynamic>>> getCommunityMemberProfiles(
-      String communityId,
-      ) async {
+    String communityId,
+  ) async {
     return await _db.getCommunityMemberProfilesFromDatabase(communityId);
   }
 
   /* ==================== STORY PROGRESS ==================== */
 
   final Set<String> _completedStoryIds = {};
+
   Set<String> get completedStoryIds => _completedStoryIds;
 
   Future<void> loadCompletedStories(String userId) async {
@@ -1145,9 +1259,9 @@ class DatabaseProvider extends ChangeNotifier {
   }
 
   Future<void> saveStoryAnswers(
-      String storyId,
-      List<int?> selectedIndices,
-      ) async {
+    String storyId,
+    List<int?> selectedIndices,
+  ) async {
     final currentUserId = _auth.getCurrentUserId();
     if (currentUserId.isEmpty) return;
 
@@ -1188,6 +1302,7 @@ class DatabaseProvider extends ChangeNotifier {
   /* ==================== DUA WALL ==================== */
 
   List<Dua> _duaWall = [];
+
   List<Dua> get duaWall => _duaWall;
 
   Future<void> loadDuaWall() async {
@@ -1195,8 +1310,9 @@ class DatabaseProvider extends ChangeNotifier {
       final allDuas = await _db.getDuaWallFromDatabase();
       final blockedUserIds = await _db.getBlockedUserIdsFromDatabase();
 
-      _duaWall =
-          allDuas.where((d) => !blockedUserIds.contains(d.userId)).toList();
+      _duaWall = allDuas
+          .where((d) => !blockedUserIds.contains(d.userId))
+          .toList();
 
       notifyListeners();
     } catch (e) {
@@ -1244,13 +1360,15 @@ class DatabaseProvider extends ChangeNotifier {
   /* ==================== PRIVATE REFLECTIONS ==================== */
 
   List<PrivateReflection> _privateReflections = [];
+
   List<PrivateReflection> get privateReflections => _privateReflections;
 
   Future<void> loadPrivateReflections() async {
     try {
       final rows = await _db.getMyPrivateReflectionsFromDatabase();
-      _privateReflections =
-          rows.map((r) => PrivateReflection.fromMap(r)).toList();
+      _privateReflections = rows
+          .map((r) => PrivateReflection.fromMap(r))
+          .toList();
       notifyListeners();
     } catch (e) {
       debugPrint('Error loading private reflections (provider): $e');
@@ -1265,10 +1383,7 @@ class DatabaseProvider extends ChangeNotifier {
     if (trimmed.isEmpty) return;
 
     try {
-      await _db.addPrivateReflectionInDatabase(
-        text: trimmed,
-        postId: postId,
-      );
+      await _db.addPrivateReflectionInDatabase(text: trimmed, postId: postId);
 
       await loadPrivateReflections();
     } catch (e) {
@@ -1337,6 +1452,7 @@ class DatabaseProvider extends ChangeNotifier {
   /* ==================== TIME ==================== */
 
   DateTime? _serverNow;
+
   DateTime get serverNow => _serverNow ?? DateTime.now().toUtc();
 
   Future<void> syncServerTime() async {

@@ -349,22 +349,27 @@ class NotificationService {
     // Body format NotificationPage can parse:
     // GROUP_ADDED:<chatRoomId>::<groupName>::<addedByName>
     // ✅ IMPORTANT: use :: delimiter
-    final bodyCode = 'GROUP_ADDED:$chatRoomId::${groupName}::${addedByName}';
+    final bodyCode = 'GROUP_ADDED:$chatRoomId::$groupName::$addedByName';
 
     // Stored in DB as readable fallback
     final title = '$addedByName added you to $groupName';
 
     // Store as a normal in-app notification (NOT type=chat)
-    await _db.from('notifications').insert({
-      'user_id': targetUserId,
-      'title': title,
-      'body': bodyCode,
-      'type': 'group', // 👈 important so it won’t be filtered as "active chat"
-      'chat_room_id': chatRoomId,
-      'from_user_id': addedByUserId,
-      'unread_count': 1,
-      'is_read': false,
-    });
+    await _db.from('notifications').upsert(
+      {
+        'user_id': targetUserId,
+        'title': title,
+        'body': bodyCode,
+        'type': 'group',
+        'chat_room_id': chatRoomId,
+        'from_user_id': addedByUserId,
+        'unread_count': 1,
+        'is_read': false,
+        'created_at': DateTime.now().toUtc().toIso8601String(),
+      },
+      onConflict: 'user_id,chat_room_id,body',
+    );
+
 
     // Localized push (Edge uses receiver locale)
     await _sendLocalizedPushToUserId(
@@ -445,6 +450,11 @@ class NotificationService {
     if (b.startsWith('CHAT_MESSAGE:')) return 'CHAT_MESSAGE';
     if (b.startsWith('GROUP_MESSAGE:')) return 'GROUP_MESSAGE';
     if (b.startsWith('GROUP_ADDED:')) return 'GROUP_ADDED';
+    if (b.startsWith('MARRIAGE_INQUIRY_REQUEST:')) return 'MARRIAGE_INQUIRY_REQUEST';
+    if (b.startsWith('MARRIAGE_INQUIRY_MAHRAM:')) return 'MARRIAGE_INQUIRY_MAHRAM';
+    if (b.startsWith('MARRIAGE_INQUIRY_MAN_DECISION:')) return 'MARRIAGE_INQUIRY_MAN_DECISION';
+    if (b.startsWith('MARRIAGE_INQUIRY_GROUP_CREATED:')) return 'MARRIAGE_INQUIRY_GROUP_CREATED';
+
 
     // safe fallback
     return 'FOLLOW_USER';
@@ -477,35 +487,6 @@ class NotificationService {
   // -------------------------
   // RELATIONSHIP HELPERS
   // -------------------------
-
-  // -------------------------
-  // RELATIONSHIP HELPERS
-  // -------------------------
-
-  Future<List<dynamic>> deleteRequestNotification({
-    required String targetUserId,
-    required String requesterId,
-    required String bodyPrefix,
-  }) async {
-    if (targetUserId.isEmpty || requesterId.isEmpty) return [];
-
-    final res = await _db
-        .from('notifications')
-        .delete()
-        .eq('user_id', targetUserId)
-        .eq('type', 'social')
-        .eq('from_user_id', requesterId)
-        .eq('body', '$bodyPrefix:$requesterId')
-        .select('id, user_id, from_user_id, body');
-
-    debugPrint('🧹 delete $bodyPrefix deleted ${res.length} rows => $res');
-    return res;
-  }
-
-
-// -------------------------
-// RELATIONSHIP HELPERS
-// -------------------------
 
   Future<void> deleteFriendRequestNotification({
     required String targetUserId,
@@ -551,7 +532,19 @@ class NotificationService {
         .like('body', 'FOLLOW_USER:%');
   }
 
+  Future<void> deleteMarriageInquiryNotifications(String inquiryId) async {
+    final id = inquiryId.trim();
+    if (id.isEmpty) return;
 
+    await _db.from('notifications').delete().or(
+      'body.like.MARRIAGE_INQUIRY_REQUEST:$id%,'
+          'body.like.MARRIAGE_INQUIRY_MAHRAM:$id%,'
+          'body.like.MARRIAGE_INQUIRY_MAN_DECISION:$id%,'
+          'body.like.MARRIAGE_INQUIRY_GROUP_CREATED:$id%,'
+          'body.like.MARRIAGE_INQUIRY_ACCEPTED:$id%,'
+          'body.like.MARRIAGE_INQUIRY_DECLINED:$id%',
+    );
+  }
 
 
 

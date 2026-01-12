@@ -278,6 +278,31 @@
   "mahram_confirmation_question": "Do you confirm that you are this person's mahram?",
   "yes": "Yes",
   "no": "No",
+  "Something went wrong": "Something went wrong",
+
+  "add_friend": "Add friend",
+  "cancel_request": "Cancel request",
+  "unfriend": "Unfriend",
+  "request": "Request",
+  "blocked": "Blocked",
+
+  "cancel_inquiry": "Cancel inquiry",
+  "end_inquiry": "End inquiry",
+  "marriage_inquiry_sent": "Marriage inquiry sent",
+
+  "accept": "Accept",
+  "decline": "Decline",
+
+  "marriage_inquiry": "Marriage inquiry",
+  "neither": "Neither",
+  "cannot_add_opposite_gender": "You cannot add this user as a friend",
+
+  "notif_marriage_inquiry_request": "{name} sent you a marriage inquiry",
+  "notif_marriage_inquiry_mahram": "{name} selected you as mahram",
+  "notif_marriage_inquiry_man_decision": "Marriage inquiry decision required",
+  "notif_marriage_inquiry_group_created": "Marriage inquiry group created",
+  "notif_marriage_inquiry_accepted": "{name} accepted the marriage inquiry",
+  "notif_marriage_inquiry_declined": "{name} declined the marriage inquiry",
 
 
 

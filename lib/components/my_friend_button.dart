@@ -2,21 +2,15 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 class MyFriendButton extends StatelessWidget {
-  final String friendStatus; // none, pending_sent, pending_received, accepted, blocked
+  final String friendStatus;
   final VoidCallback? onAddFriend;
   final VoidCallback? onCancelRequest;
   final VoidCallback? onAcceptRequest;
   final VoidCallback? onDeclineRequest;
 
-  // 👇 NEW: used when already friends
   final VoidCallback? onUnfriend;
-
-  // 🆕 Opposite-gender request flow (opens bottom sheet in ProfilePage)
   final VoidCallback? onOpenRequestSheet;
-
-// 🆕 Used when relation is mahram (accepted)
   final VoidCallback? onDeleteMahram;
-
 
   const MyFriendButton({
     super.key,
@@ -28,20 +22,32 @@ class MyFriendButton extends StatelessWidget {
     this.onUnfriend,
     this.onOpenRequestSheet,
     this.onDeleteMahram,
-
   });
+
+  bool get _isInquiryReceived =>
+      friendStatus == 'inquiry_pending_received_woman' ||
+          friendStatus == 'inquiry_pending_received_mahram' ||
+          friendStatus == 'inquiry_pending_received_man';
+
+  bool get _isInquirySentOrCancelable =>
+      friendStatus == 'inquiry_pending_sent' ||
+          friendStatus == 'inquiry_cancel_inquiry';
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    // Special view for requests received → Accept + Decline
-    if (friendStatus == 'pending_received' || friendStatus == 'pending_mahram_received') {
+    // ✅ Treat inquiry "received" role-specific statuses same as pending_received UI (Accept + Decline)
+    final isTwoButtonReceived =
+        friendStatus == 'pending_received' ||
+            friendStatus == 'pending_mahram_received' ||
+            _isInquiryReceived;
+
+    if (isTwoButtonReceived) {
       return SizedBox(
         height: 36,
         child: Row(
           children: [
-            // ACCEPT
             Expanded(
               child: TextButton(
                 onPressed: onAcceptRequest,
@@ -52,7 +58,6 @@ class MyFriendButton extends StatelessWidget {
                     borderRadius: BorderRadius.circular(18),
                   ),
                 ),
-                // ✅ Fix: make long translations fit inside the button
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.center,
@@ -61,16 +66,12 @@ class MyFriendButton extends StatelessWidget {
                     maxLines: 1,
                     softWrap: false,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
             ),
             const SizedBox(width: 8),
-            // DECLINE
             Expanded(
               child: TextButton(
                 onPressed: onDeclineRequest,
@@ -82,7 +83,6 @@ class MyFriendButton extends StatelessWidget {
                     borderRadius: BorderRadius.circular(18),
                   ),
                 ),
-                // ✅ Fix: make long translations fit inside the button
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.center,
@@ -91,10 +91,7 @@ class MyFriendButton extends StatelessWidget {
                     maxLines: 1,
                     softWrap: false,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
@@ -111,12 +108,27 @@ class MyFriendButton extends StatelessWidget {
     VoidCallback? onTap;
 
     switch (friendStatus) {
+    // ✅ Friend & mahram pending (cancel)
       case 'pending_sent':
       case 'pending_mahram_sent':
         bg = Colors.transparent;
         fg = colorScheme.primary;
         side = BorderSide(color: colorScheme.primary);
-        onTap = onCancelRequest; // ✅ cancels whichever request this status represents
+        onTap = onCancelRequest;
+        break;
+
+    // ✅ Inquiry states
+      case 'inquiry_pending_sent':
+        bg = Colors.transparent;
+        fg = colorScheme.primary;
+        side = BorderSide(color: colorScheme.primary);
+        onTap = onCancelRequest;
+        break;
+
+      case 'inquiry_cancel_inquiry':
+        bg = colorScheme.tertiary;
+        fg = colorScheme.primary;
+        onTap = onCancelRequest; // end inquiry
         break;
 
       case 'accepted':
@@ -150,13 +162,20 @@ class MyFriendButton extends StatelessWidget {
         onTap = onAddFriend;
     }
 
-
     // Determine button text
     String label;
     switch (friendStatus) {
       case 'pending_sent':
       case 'pending_mahram_sent':
-        label = 'Cancel request';
+        label = 'cancel_request';
+        break;
+
+      case 'inquiry_pending_sent':
+        label = 'cancel_inquiry';
+        break;
+
+      case 'inquiry_cancel_inquiry':
+        label = 'end_inquiry';
         break;
 
       case 'accepted':
@@ -180,7 +199,6 @@ class MyFriendButton extends StatelessWidget {
         label = 'Add friend';
     }
 
-
     return SizedBox(
       height: 36,
       child: TextButton(
@@ -193,7 +211,6 @@ class MyFriendButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(18),
           ),
         ),
-        // ✅ Fix: this is the main one — "Vriendschap beëindigen" will now scale down to fit
         child: FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.center,
@@ -202,10 +219,7 @@ class MyFriendButton extends StatelessWidget {
             maxLines: 1,
             softWrap: false,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
           ),
         ),
       ),

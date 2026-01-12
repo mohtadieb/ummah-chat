@@ -46,22 +46,101 @@ class _NotificationPageState extends State<NotificationPage> {
   List<models.Notification> _notifications = [];
   bool _isLoading = true;
 
+  // ✅ Cache names so titles show FULL NAME consistently
+  final Map<String, String> _userNameCache = {}; // userId -> display name (full name preferred)
+  final Set<String> _nameFetchInFlight = {};
+
   @override
   void initState() {
     super.initState();
 
-    // Listen once to the Supabase stream and keep a local copy
     _sub = notificationService.notificationsStream().listen(
           (data) {
         setState(() {
           _notifications = data;
           _isLoading = false;
         });
+
+        // ✅ Prefetch names for body-based notifications
+        for (final n in data) {
+          final body = (n.body ?? '').trim();
+
+          // FOLLOW_USER:<userId>
+          if (body.startsWith('FOLLOW_USER:')) {
+            final parts = body.split(':');
+            if (parts.length > 1) _cacheName(parts[1].trim());
+          }
+
+          // FRIEND_REQUEST:<userId>
+          if (body.startsWith('FRIEND_REQUEST:')) {
+            final parts = body.split(':');
+            if (parts.length > 1) _cacheName(parts[1].trim());
+          }
+
+          // FRIEND_ACCEPTED:<userId>
+          if (body.startsWith('FRIEND_ACCEPTED:')) {
+            final parts = body.split(':');
+            if (parts.length > 1) _cacheName(parts[1].trim());
+          }
+
+          // MAHRAM_REQUEST:<userId>
+          if (body.startsWith('MAHRAM_REQUEST:')) {
+            final parts = body.split(':');
+            if (parts.length > 1) _cacheName(parts[1].trim());
+          }
+
+          // MAHRAM_ACCEPTED:<userId>
+          if (body.startsWith('MAHRAM_ACCEPTED:')) {
+            final parts = body.split(':');
+            if (parts.length > 1) _cacheName(parts[1].trim());
+          }
+
+          // CHAT_MESSAGE:<senderId>::<senderName>
+          if (body.startsWith('CHAT_MESSAGE:')) {
+            final rest = body.substring('CHAT_MESSAGE:'.length);
+            final parts = rest.split('::');
+            if (parts.isNotEmpty) _cacheName(parts[0].trim());
+          }
+
+          // MARRIAGE_INQUIRY_REQUEST:<inquiryId>::<manId>
+          if (body.startsWith('MARRIAGE_INQUIRY_REQUEST:')) {
+            final rest = body.substring('MARRIAGE_INQUIRY_REQUEST:'.length);
+            final parts = rest.split('::');
+            if (parts.length > 1) _cacheName(parts[1].trim());
+          }
+
+          // MARRIAGE_INQUIRY_MAHRAM:<inquiryId>::<manId>::<womanId>
+          if (body.startsWith('MARRIAGE_INQUIRY_MAHRAM:')) {
+            final rest = body.substring('MARRIAGE_INQUIRY_MAHRAM:'.length);
+            final parts = rest.split('::');
+            if (parts.length > 1) _cacheName(parts[1].trim());
+          }
+
+          // MARRIAGE_INQUIRY_MAN_DECISION:<inquiryId>::<womanId>::<mahramId>
+          if (body.startsWith('MARRIAGE_INQUIRY_MAN_DECISION:')) {
+            final rest = body.substring('MARRIAGE_INQUIRY_MAN_DECISION:'.length);
+            final parts = rest.split('::');
+            if (parts.length > 1) _cacheName(parts[1].trim()); // ✅ womanId
+          }
+
+
+          // MARRIAGE_INQUIRY_ACCEPTED:<inquiryId>::<manId>::...
+          if (body.startsWith('MARRIAGE_INQUIRY_ACCEPTED:')) {
+            final rest = body.substring('MARRIAGE_INQUIRY_ACCEPTED:'.length);
+            final parts = rest.split('::');
+            if (parts.length > 1) _cacheName(parts[1].trim());
+          }
+
+          // MARRIAGE_INQUIRY_DECLINED:<inquiryId>::<manId>::...
+          if (body.startsWith('MARRIAGE_INQUIRY_DECLINED:')) {
+            final rest = body.substring('MARRIAGE_INQUIRY_DECLINED:'.length);
+            final parts = rest.split('::');
+            if (parts.length > 1) _cacheName(parts[1].trim());
+          }
+        }
       },
       onError: (_) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       },
     );
   }
@@ -72,10 +151,44 @@ class _NotificationPageState extends State<NotificationPage> {
     super.dispose();
   }
 
+  // ✅ Single small cache method: prefer FULL NAME, fallback to username
+  Future<void> _cacheName(String userId) async {
+    final id = userId.trim();
+    if (id.isEmpty) return;
+    if (_userNameCache.containsKey(id)) return;
+    if (_nameFetchInFlight.contains(id)) return;
+
+    _nameFetchInFlight.add(id);
+    try {
+      final profile = await DatabaseService().getUserFromDatabase(id);
+
+      final fullName = (profile?.name ?? '').trim();
+      final username = (profile?.username ?? '').trim();
+
+      final display = fullName.isNotEmpty
+          ? fullName
+          : (username.isNotEmpty ? username : '');
+
+      if (!mounted) return;
+      if (display.isNotEmpty) {
+        setState(() => _userNameCache[id] = display);
+      }
+    } catch (_) {
+      // ignore
+    } finally {
+      _nameFetchInFlight.remove(id);
+    }
+  }
+
+  String _nameFromIdOrFallback(String? userId, String fallback) {
+    final id = (userId ?? '').trim();
+    final cached = (id.isNotEmpty) ? (_userNameCache[id] ?? '').trim() : '';
+    return cached.isNotEmpty ? cached : fallback;
+  }
+
   // --------- OPTIMISTIC HELPERS ---------
 
   void _optimisticMarkOneAsRead(models.Notification n) async {
-    // 1) Update local list immediately
     setState(() {
       final idx = _notifications.indexWhere((x) => x.id == n.id);
       if (idx != -1) {
@@ -83,27 +196,19 @@ class _NotificationPageState extends State<NotificationPage> {
       }
     });
 
-    // 2) Then update DB (Supabase will re-sync anyway)
     try {
       await notificationService.markAsRead(n.id);
-    } catch (_) {
-      // Optional: show SnackBar or revert, but usually Supabase stream will correct it
-    }
+    } catch (_) {}
   }
 
   void _optimisticMarkAllAsRead() async {
-    // 1) Update local list immediately
     setState(() {
-      _notifications =
-          _notifications.map((n) => n.copyWith(isRead: true)).toList();
+      _notifications = _notifications.map((n) => n.copyWith(isRead: true)).toList();
     });
 
-    // 2) Then update DB
     try {
       await notificationService.markAllAsRead();
-    } catch (_) {
-      // Optional: handle error
-    }
+    } catch (_) {}
   }
 
   /// Format a date like "13 Dec 2025"
@@ -113,12 +218,8 @@ class _NotificationPageState extends State<NotificationPage> {
 
   /// Build a flattened list of header + notification items grouped by date
   List<_NotificationListItem> _buildGroupedItems() {
-    // Clone and sort newest → oldest
-    final sorted = [..._notifications]
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
+    final sorted = [..._notifications]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     final List<_NotificationListItem> items = [];
-
     String? lastHeader;
 
     final now = DateTime.now();
@@ -127,86 +228,154 @@ class _NotificationPageState extends State<NotificationPage> {
 
     String headerForDate(DateTime dt) {
       final d = DateTime(dt.year, dt.month, dt.day);
-
-      if (d == today) {
-        return 'Today'.tr();
-      } else if (d == yesterday) {
-        // Yesterday + formatted date
-        return 'Yesterday'.tr() + ' · ${_formatDate(d)}';
-      } else {
-        // Just the date for older notifications
-        return _formatDate(d);
-      }
+      if (d == today) return 'Today'.tr();
+      if (d == yesterday) return 'Yesterday'.tr() + ' · ${_formatDate(d)}';
+      return _formatDate(d);
     }
 
     for (final n in sorted) {
       final h = headerForDate(n.createdAt);
-
       if (h != lastHeader) {
         items.add(_NotificationListItem.header(h));
         lastHeader = h;
       }
-
       items.add(_NotificationListItem.notification(n));
     }
 
     return items;
   }
 
+  // ✅ Updated: use FULL NAME from cache where possible (consistent style)
   String _localizedTitleFor(models.Notification n, String body) {
     final rawTitle = (n.title).trim();
 
-    String name = 'Someone'.tr();
+    // Legacy fallback (only used if we truly can't derive an ID)
+    String legacyName = 'Someone'.tr();
     if (rawTitle.isNotEmpty) {
       final firstWord = rawTitle.split(' ').first.trim();
-      if (firstWord.isNotEmpty && firstWord.length < 30) {
-        name = firstWord;
-      }
+      if (firstWord.isNotEmpty && firstWord.length < 30) legacyName = firstWord;
     }
 
+    // LIKE/COMMENT/REPLY: your body does not include senderId, so we cannot fetch name reliably
     if (body.startsWith('LIKE_POST:')) {
-      return 'notif_like_post'.tr(namedArgs: {'name': name});
+      return 'notif_like_post'.tr(namedArgs: {'name': legacyName});
     }
     if (body.startsWith('COMMENT_POST:')) {
-      return 'notif_comment_post'.tr(namedArgs: {'name': name});
+      return 'notif_comment_post'.tr(namedArgs: {'name': legacyName});
     }
     if (body.startsWith('COMMENT_REPLY:')) {
-      return 'notif_comment_reply'.tr(namedArgs: {'name': name});
+      return 'notif_comment_reply'.tr(namedArgs: {'name': legacyName});
     }
+
+    // FOLLOW_USER:<userId>
     if (body.startsWith('FOLLOW_USER:')) {
+      final parts = body.split(':');
+      final userId = parts.length > 1 ? parts[1].trim() : '';
+      final name = _nameFromIdOrFallback(userId, legacyName);
       return 'notif_follow_user'.tr(namedArgs: {'name': name});
     }
+
+    // FRIEND_REQUEST:<userId>
     if (body.startsWith('FRIEND_REQUEST:')) {
+      final parts = body.split(':');
+      final userId = parts.length > 1 ? parts[1].trim() : '';
+      final name = _nameFromIdOrFallback(userId, legacyName);
       return 'notif_friend_request'.tr(namedArgs: {'name': name});
     }
+
+    // FRIEND_ACCEPTED:<userId>
     if (body.startsWith('FRIEND_ACCEPTED:')) {
+      final parts = body.split(':');
+      final userId = parts.length > 1 ? parts[1].trim() : '';
+      final name = _nameFromIdOrFallback(userId, legacyName);
       return 'notif_friend_accepted'.tr(namedArgs: {'name': name});
     }
+
+    // MAHRAM_REQUEST:<userId>
     if (body.startsWith('MAHRAM_REQUEST:')) {
+      final parts = body.split(':');
+      final userId = parts.length > 1 ? parts[1].trim() : '';
+      final name = _nameFromIdOrFallback(userId, legacyName);
       return 'notif_mahram_request'.tr(namedArgs: {'name': name});
     }
+
+    // MAHRAM_ACCEPTED:<userId>
     if (body.startsWith('MAHRAM_ACCEPTED:')) {
+      final parts = body.split(':');
+      final userId = parts.length > 1 ? parts[1].trim() : '';
+      final name = _nameFromIdOrFallback(userId, legacyName);
       return 'notif_mahram_accepted'.tr(namedArgs: {'name': name});
     }
+
+    // CHAT_MESSAGE:<senderId>::<senderName>
     if (body.startsWith('CHAT_MESSAGE:')) {
+      final rest = body.substring('CHAT_MESSAGE:'.length);
+      final parts = rest.split('::');
+      final senderId = parts.isNotEmpty ? parts[0].trim() : '';
+      final name = _nameFromIdOrFallback(senderId, legacyName);
       return 'notif_chat_message'.tr(namedArgs: {'name': name});
     }
+
     if (body.startsWith('GROUP_MESSAGE:')) return 'notif_group_message'.tr();
 
-    // ✅ NEW: Group added notifications
+    // GROUP_ADDED:<chatRoomId>::<groupName>::<addedByName>
     if (body.startsWith('GROUP_ADDED:')) {
-      // GROUP_ADDED:<chatRoomId>::<groupName>::<addedByName>
       final rest = body.substring('GROUP_ADDED:'.length);
       final parts = rest.split('::');
 
-      final gName = (parts.length > 1 && parts[1].trim().isNotEmpty)
-          ? parts[1].trim()
-          : 'Group'.tr();
-      final adder = (parts.length > 2 && parts[2].trim().isNotEmpty)
-          ? parts[2].trim()
-          : 'Someone'.tr();
+      final gName = (parts.length > 1 && parts[1].trim().isNotEmpty) ? parts[1].trim() : 'Group'.tr();
+      final adder = (parts.length > 2 && parts[2].trim().isNotEmpty) ? parts[2].trim() : 'Someone'.tr();
 
       return 'notif_group_added'.tr(namedArgs: {'name': adder, 'group': gName});
+    }
+
+    // Marriage inquiry: use manId (2nd part)
+    if (body.startsWith('MARRIAGE_INQUIRY_REQUEST:')) {
+      final rest = body.substring('MARRIAGE_INQUIRY_REQUEST:'.length);
+      final parts = rest.split('::');
+      final manId = parts.length > 1 ? parts[1].trim() : '';
+      final name = _nameFromIdOrFallback(manId, legacyName);
+      return 'notif_marriage_inquiry_request'.tr(namedArgs: {'name': name});
+    }
+
+    if (body.startsWith('MARRIAGE_INQUIRY_MAHRAM:')) {
+      final rest = body.substring('MARRIAGE_INQUIRY_MAHRAM:'.length);
+      final parts = rest.split('::');
+      final manId = parts.length > 1 ? parts[1].trim() : '';
+      final name = _nameFromIdOrFallback(manId, legacyName);
+      return 'notif_marriage_inquiry_mahram'.tr(namedArgs: {'name': name});
+    }
+
+    if (body.startsWith('MARRIAGE_INQUIRY_MAN_DECISION:')) {
+      final rest = body.substring('MARRIAGE_INQUIRY_MAN_DECISION:'.length);
+      final parts = rest.split('::');
+
+      // ✅ body format: <inquiryId>::<womanId>::<mahramId>
+      final womanId = parts.length > 1 ? parts[1].trim() : '';
+      final name = _nameFromIdOrFallback(womanId, legacyName);
+
+      return 'notif_marriage_inquiry_man_decision'.tr(namedArgs: {'name': name});
+    }
+
+
+    if (body.startsWith('MARRIAGE_INQUIRY_GROUP_CREATED:')) {
+      return 'notif_marriage_inquiry_group_created'.tr();
+    }
+
+    if (body.startsWith('MARRIAGE_INQUIRY_ACCEPTED:')) {
+      final rest = body.substring('MARRIAGE_INQUIRY_ACCEPTED:'.length);
+      final parts = rest.split('::');
+      final manId = parts.length > 1 ? parts[1].trim() : '';
+      final name = _nameFromIdOrFallback(manId, legacyName);
+      return 'notif_marriage_inquiry_accepted'.tr(namedArgs: {'name': name});
+    }
+
+    if (body.startsWith('MARRIAGE_INQUIRY_DECLINED:')) {
+      final rest = body.substring('MARRIAGE_INQUIRY_DECLINED:'.length);
+      final parts = rest.split('::');
+      final manId = parts.length > 1 ? parts[1].trim() : '';
+      final name = _nameFromIdOrFallback(manId, legacyName);
+      return 'notif_marriage_inquiry_declined'.tr(namedArgs: {'name': name});
     }
 
     return rawTitle.isNotEmpty ? rawTitle : 'Notifications'.tr();
@@ -236,16 +405,12 @@ class _NotificationPageState extends State<NotificationPage> {
             icon: Icon(
               Icons.done_all,
               size: 18,
-              color: _notifications.isEmpty
-                  ? colorScheme.primary
-                  : colorScheme.primary,
+              color: colorScheme.primary,
             ),
             label: Text(
               'Mark all'.tr(),
               style: TextStyle(
-                color: _notifications.isEmpty
-                    ? colorScheme.primary
-                    : colorScheme.primary,
+                color: colorScheme.primary,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -344,59 +509,83 @@ class _NotificationPageState extends State<NotificationPage> {
         final isMahramRequest = body.startsWith('MAHRAM_REQUEST:');
         final isMahramAccepted = body.startsWith('MAHRAM_ACCEPTED:');
 
+        final isMarriageInquiryRequest = body.startsWith('MARRIAGE_INQUIRY_REQUEST:');
+        final isMarriageInquiryMahram = body.startsWith('MARRIAGE_INQUIRY_MAHRAM:');
+        final isMarriageInquiryManDecision = body.startsWith('MARRIAGE_INQUIRY_MAN_DECISION:');
+        final isMarriageInquiryGroupCreated = body.startsWith('MARRIAGE_INQUIRY_GROUP_CREATED:');
+        final isMarriageInquiryAccepted = body.startsWith('MARRIAGE_INQUIRY_ACCEPTED:');
+        final isMarriageInquiryDeclined = body.startsWith('MARRIAGE_INQUIRY_DECLINED:');
 
         String? friendRequesterId;
         String? friendAcceptedUserId;
+        String? followUserId;
+        String? mahramRequesterId;
+        String? mahramAcceptedUserId;
+
         String? likePostId;
         String? likePreview;
         String? commentPostId;
         String? commentPreview;
         String? commentReplyPostId;
-        String? commentReplyCommentId;
         String? commentReplyPreview;
-        String? followUserId;
 
-        // DM chat fields
         String? chatFriendId;
         String? chatFriendName;
 
-        // GROUP message fields 👇
         String? groupChatRoomId;
         String? groupName;
 
-        // GROUP added fields 👇
         String? groupAddedRoomId;
         String? groupAddedName;
-        String? groupAddedByName;
 
-        String? mahramRequesterId;
-        String? mahramAcceptedUserId;
+        String? inquiryId;
+        String? inquiryRequesterId;
+        String? inquiryManId;
+        String? inquiryWomanId;
+        String? inquiryChatRoomId;
+        String? inquiryGroupName;
 
-
-        // 🧑‍🤝‍🧑 Friend request → sender
+        // Parse IDs (and cache names when possible)
         if (isFriendRequest) {
           final parts = body.split(':');
-          if (parts.length > 1) friendRequesterId = parts[1].trim();
+          if (parts.length > 1) {
+            friendRequesterId = parts[1].trim();
+            _cacheName(friendRequesterId!);
+          }
         }
 
-        // 🧑‍🤝‍🧑 Friend accepted → the one who accepted
         if (isFriendAccepted) {
           final parts = body.split(':');
-          if (parts.length > 1) friendAcceptedUserId = parts[1].trim();
+          if (parts.length > 1) {
+            friendAcceptedUserId = parts[1].trim();
+            _cacheName(friendAcceptedUserId!);
+          }
+        }
+
+        if (isFollow) {
+          final parts = body.split(':');
+          if (parts.length > 1) {
+            followUserId = parts[1].trim();
+            _cacheName(followUserId!);
+          }
         }
 
         if (isMahramRequest) {
           final parts = body.split(':');
-          if (parts.length > 1) mahramRequesterId = parts[1].trim();
+          if (parts.length > 1) {
+            mahramRequesterId = parts[1].trim();
+            _cacheName(mahramRequesterId!);
+          }
         }
 
         if (isMahramAccepted) {
           final parts = body.split(':');
-          if (parts.length > 1) mahramAcceptedUserId = parts[1].trim();
+          if (parts.length > 1) {
+            mahramAcceptedUserId = parts[1].trim();
+            _cacheName(mahramAcceptedUserId!);
+          }
         }
 
-
-        // 👍 Like
         if (isLike) {
           final rest = body.substring('LIKE_POST:'.length);
           final parts = rest.split('::');
@@ -404,7 +593,6 @@ class _NotificationPageState extends State<NotificationPage> {
           if (parts.length > 1) likePreview = parts[1];
         }
 
-        // 💬 Comment
         if (isComment) {
           final rest = body.substring('COMMENT_POST:'.length);
           final parts = rest.split('::');
@@ -412,30 +600,23 @@ class _NotificationPageState extends State<NotificationPage> {
           if (parts.length > 1) commentPreview = parts[1];
         }
 
-        // 💬 Comment reply
         if (isCommentReply) {
           final rest = body.substring('COMMENT_REPLY:'.length);
           final parts = rest.split('::');
           if (parts.isNotEmpty) commentReplyPostId = parts[0];
-          if (parts.length > 1) commentReplyCommentId = parts[1];
           if (parts.length > 2) commentReplyPreview = parts[2];
         }
 
-        // 👤 Follow
-        if (isFollow) {
-          final parts = body.split(':');
-          if (parts.length > 1) followUserId = parts[1].trim();
-        }
-
-        // 💬 Chat message (DM) – parse `CHAT_MESSAGE:<senderId>::<senderName>`
         if (isChatMessage) {
           final rest = body.substring('CHAT_MESSAGE:'.length);
           final parts = rest.split('::');
-          if (parts.isNotEmpty) chatFriendId = parts[0].trim();
+          if (parts.isNotEmpty) {
+            chatFriendId = parts[0].trim();
+            _cacheName(chatFriendId!);
+          }
           if (parts.length > 1) chatFriendName = parts[1].trim();
         }
 
-        // 👥 Group message – `GROUP_MESSAGE:<chatRoomId>::<groupName>`
         if (isGroupMessage) {
           final rest = body.substring('GROUP_MESSAGE:'.length);
           final parts = rest.split('::');
@@ -443,13 +624,77 @@ class _NotificationPageState extends State<NotificationPage> {
           if (parts.length > 1) groupName = parts[1].trim();
         }
 
-        // ✅ Group added – `GROUP_ADDED:<chatRoomId>::<groupName>::<addedByName>`
         if (isGroupAdded) {
           final rest = body.substring('GROUP_ADDED:'.length);
           final parts = rest.split('::');
           if (parts.isNotEmpty) groupAddedRoomId = parts[0].trim();
           if (parts.length > 1) groupAddedName = parts[1].trim();
-          if (parts.length > 2) groupAddedByName = parts[2].trim();
+        }
+
+        if (isMarriageInquiryRequest) {
+          final rest = body.substring('MARRIAGE_INQUIRY_REQUEST:'.length);
+          final parts = rest.split('::');
+          if (parts.isNotEmpty) inquiryId = parts[0].trim();
+          if (parts.length > 1) {
+            inquiryRequesterId = parts[1].trim();
+            _cacheName(inquiryRequesterId!);
+          }
+        }
+
+        if (isMarriageInquiryMahram) {
+          final rest = body.substring('MARRIAGE_INQUIRY_MAHRAM:'.length);
+          final parts = rest.split('::');
+          if (parts.isNotEmpty) inquiryId = parts[0].trim();
+          if (parts.length > 1) {
+            inquiryManId = parts[1].trim();
+            _cacheName(inquiryManId!);
+          }
+          if (parts.length > 2) inquiryWomanId = parts[2].trim();
+        }
+
+        if (isMarriageInquiryManDecision) {
+          final rest = body.substring('MARRIAGE_INQUIRY_MAN_DECISION:'.length);
+          final parts = rest.split('::');
+
+          if (parts.isNotEmpty) inquiryId = parts[0].trim();
+
+          // ✅ body format: <inquiryId>::<womanId>::<mahramId>
+          if (parts.length > 1) {
+            inquiryWomanId = parts[1].trim();
+            _cacheName(inquiryWomanId!);
+          }
+
+          // optional: mahram id if you ever need it later
+          // if (parts.length > 2) inquiryMahramId = parts[2].trim();
+        }
+
+
+        if (isMarriageInquiryGroupCreated) {
+          final rest = body.substring('MARRIAGE_INQUIRY_GROUP_CREATED:'.length);
+          final parts = rest.split('::');
+          if (parts.isNotEmpty) inquiryId = parts[0].trim();
+          if (parts.length > 1) inquiryChatRoomId = parts[1].trim();
+          if (parts.length > 2) inquiryGroupName = parts[2].trim();
+        }
+
+        if (isMarriageInquiryAccepted) {
+          final rest = body.substring('MARRIAGE_INQUIRY_ACCEPTED:'.length);
+          final parts = rest.split('::');
+          if (parts.isNotEmpty) inquiryId = parts[0].trim();
+          if (parts.length > 1) {
+            inquiryManId = parts[1].trim();
+            _cacheName(inquiryManId!);
+          }
+        }
+
+        if (isMarriageInquiryDeclined) {
+          final rest = body.substring('MARRIAGE_INQUIRY_DECLINED:'.length);
+          final parts = rest.split('::');
+          if (parts.isNotEmpty) inquiryId = parts[0].trim();
+          if (parts.length > 1) {
+            inquiryManId = parts[1].trim();
+            _cacheName(inquiryManId!);
+          }
         }
 
         // ----- SUBTITLE (preview) -----
@@ -468,6 +713,12 @@ class _NotificationPageState extends State<NotificationPage> {
             !isChatMessage &&
             !isGroupMessage &&
             !isGroupAdded &&
+            !isMarriageInquiryRequest &&
+            !isMarriageInquiryMahram &&
+            !isMarriageInquiryManDecision &&
+            !isMarriageInquiryGroupCreated &&
+            !isMarriageInquiryAccepted &&
+            !isMarriageInquiryDeclined &&
             rawBody.isNotEmpty &&
             !rawBody.contains(':')) {
           subtitleText = rawBody;
@@ -486,6 +737,12 @@ class _NotificationPageState extends State<NotificationPage> {
           isComment: isComment,
           isCommentReply: isCommentReply,
           isFollow: isFollow,
+          isMarriageInquiryRequest: isMarriageInquiryRequest,
+          isMarriageInquiryMahram: isMarriageInquiryMahram,
+          isMarriageInquiryManDecision: isMarriageInquiryManDecision,
+          isMarriageInquiryGroupCreated: isMarriageInquiryGroupCreated,
+          isMarriageInquiryAccepted: isMarriageInquiryAccepted,
+          isMarriageInquiryDeclined: isMarriageInquiryDeclined,
         );
 
         final leading = Container(
@@ -493,10 +750,7 @@ class _NotificationPageState extends State<NotificationPage> {
           height: 40,
           decoration: BoxDecoration(
             color: isUnread
-                ? Theme.of(context)
-                .colorScheme
-                .primary
-                .withValues(alpha: 0.15)
+                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.15)
                 : Theme.of(context).colorScheme.secondary,
             shape: BoxShape.circle,
           ),
@@ -508,7 +762,7 @@ class _NotificationPageState extends State<NotificationPage> {
           ),
         );
 
-        // ----- TRAILING (UPDATED) -----
+        // ----- TRAILING -----
         Widget? trailing;
         if (!n.isRead && !isFollow) {
           trailing = _UnreadDot(colorScheme: Theme.of(context).colorScheme);
@@ -521,21 +775,17 @@ class _NotificationPageState extends State<NotificationPage> {
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
             onTap: () async {
-              if (!n.isRead) {
-                _optimisticMarkOneAsRead(n);
-              }
+              if (!n.isRead) _optimisticMarkOneAsRead(n);
 
               // 1) Friend request → sender profile
               if (isFriendRequest && friendRequesterId != null) {
                 if (!mounted) return;
-
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => ProfilePage(userId: friendRequesterId!),
                   ),
                 );
-
                 if (!mounted) return;
                 setState(() {});
                 return;
@@ -552,17 +802,16 @@ class _NotificationPageState extends State<NotificationPage> {
                 );
                 return;
               }
+
               // 2.1) Mahram request → requester profile
               if (isMahramRequest && mahramRequesterId != null) {
                 if (!mounted) return;
-
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => ProfilePage(userId: mahramRequesterId!),
                   ),
                 );
-
                 if (!mounted) return;
                 setState(() {});
                 return;
@@ -571,7 +820,6 @@ class _NotificationPageState extends State<NotificationPage> {
               // 2.2) Mahram accepted → accepter profile
               if (isMahramAccepted && mahramAcceptedUserId != null) {
                 if (!mounted) return;
-
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -583,12 +831,8 @@ class _NotificationPageState extends State<NotificationPage> {
 
               // 3) Likes / comments → post
               if ((isLike || isComment || isCommentReply) &&
-                  (likePostId != null ||
-                      commentPostId != null ||
-                      commentReplyPostId != null)) {
-                final postId = isLike
-                    ? likePostId
-                    : (isComment ? commentPostId : commentReplyPostId);
+                  (likePostId != null || commentPostId != null || commentReplyPostId != null)) {
+                final postId = isLike ? likePostId : (isComment ? commentPostId : commentReplyPostId);
                 if (postId == null) return;
 
                 final post = await dbProvider.getPostById(postId);
@@ -622,24 +866,17 @@ class _NotificationPageState extends State<NotificationPage> {
                 return;
               }
 
-              // 5) Chat message → open DM ChatPage + FORCE mark read
-              if (isChatMessage &&
-                  chatFriendId != null &&
-                  chatFriendId!.isNotEmpty) {
+              // 5) Chat message → open DM
+              if (isChatMessage && chatFriendId != null && chatFriendId!.isNotEmpty) {
                 if (!mounted) return;
 
-                // ✅ Fetch profile so AppBar shows real "name" (same as FriendsPage)
-                final profile = await DatabaseService().getUserFromDatabase(
-                  chatFriendId!,
-                );
+                final profile = await DatabaseService().getUserFromDatabase(chatFriendId!);
 
                 final displayName = (profile?.name ?? '').trim().isNotEmpty
                     ? profile!.name
                     : ((profile?.username ?? '').trim().isNotEmpty
                     ? profile!.username
-                    : ((chatFriendName ?? '').trim().isNotEmpty
-                    ? chatFriendName!
-                    : 'Chat'.tr()));
+                    : ((chatFriendName ?? '').trim().isNotEmpty ? chatFriendName! : 'Chat'.tr()));
 
                 if (!mounted) return;
 
@@ -657,39 +894,23 @@ class _NotificationPageState extends State<NotificationPage> {
 
                 final currentUserId = AuthService().getCurrentUserId();
                 if (currentUserId.isNotEmpty) {
-                  final chatProvider = Provider.of<ChatProvider>(
-                    context,
-                    listen: false,
-                  );
-
+                  final chatProvider = Provider.of<ChatProvider>(context, listen: false);
                   final chatRoomId = await chatProvider.getOrCreateChatRoomId(
                     currentUserId,
                     chatFriendId!,
                   );
-
-                  await chatProvider.markRoomMessagesAsRead(
-                    chatRoomId,
-                    currentUserId,
-                  );
+                  await chatProvider.markRoomMessagesAsRead(chatRoomId, currentUserId);
                 }
                 return;
               }
 
-              // 6) Group message → open GroupChatPage
-              // ✅ Keep setActiveChatRoom (presence),
-              // ❌ but DO NOT markGroupMessagesAsRead here (GroupChatPage handles it after first render)
-              if (isGroupMessage &&
-                  groupChatRoomId != null &&
-                  groupChatRoomId!.isNotEmpty) {
+              // 6) Group message → open GroupChatPage with presence set/clear
+              if (isGroupMessage && groupChatRoomId != null && groupChatRoomId!.isNotEmpty) {
                 if (!mounted) return;
 
                 final currentUserId = AuthService().getCurrentUserId();
-                final chatProvider = Provider.of<ChatProvider>(
-                  context,
-                  listen: false,
-                );
+                final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
-                // Presence: mark room active before opening
                 if (currentUserId.isNotEmpty) {
                   await chatProvider.setActiveChatRoom(
                     userId: currentUserId,
@@ -703,15 +924,13 @@ class _NotificationPageState extends State<NotificationPage> {
                     MaterialPageRoute(
                       builder: (_) => GroupChatPage(
                         chatRoomId: groupChatRoomId!,
-                        groupName: (groupName != null &&
-                            groupName!.trim().isNotEmpty)
+                        groupName: (groupName != null && groupName!.trim().isNotEmpty)
                             ? groupName!.trim()
                             : 'Group'.tr(),
                       ),
                     ),
                   );
                 } finally {
-                  // Always clear presence when leaving
                   if (currentUserId.isNotEmpty) {
                     await chatProvider.setActiveChatRoom(
                       userId: currentUserId,
@@ -719,28 +938,158 @@ class _NotificationPageState extends State<NotificationPage> {
                     );
                   }
                 }
-
                 return;
               }
 
-              // 7) Group added → open GroupChatPage (optional but nice UX)
-              if (isGroupAdded &&
-                  groupAddedRoomId != null &&
-                  groupAddedRoomId!.isNotEmpty) {
+              // 7) Group added → open GroupChatPage with presence set/clear
+              if (isGroupAdded && groupAddedRoomId != null && groupAddedRoomId!.isNotEmpty) {
+                if (!mounted) return;
+
+                final currentUserId = AuthService().getCurrentUserId();
+                final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
+                if (currentUserId.isNotEmpty) {
+                  await chatProvider.setActiveChatRoom(
+                    userId: currentUserId,
+                    chatRoomId: groupAddedRoomId!,
+                  );
+                }
+
+                try {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => GroupChatPage(
+                        chatRoomId: groupAddedRoomId!,
+                        groupName: (groupAddedName != null && groupAddedName!.trim().isNotEmpty)
+                            ? groupAddedName!.trim()
+                            : 'Group'.tr(),
+                      ),
+                    ),
+                  );
+                } finally {
+                  if (currentUserId.isNotEmpty) {
+                    await chatProvider.setActiveChatRoom(
+                      userId: currentUserId,
+                      chatRoomId: null,
+                    );
+                  }
+                }
+                return;
+              }
+
+              // 💍 Marriage inquiry request → open MAN profile
+              if (isMarriageInquiryRequest &&
+                  inquiryRequesterId != null &&
+                  inquiryRequesterId!.isNotEmpty &&
+                  inquiryId != null &&
+                  inquiryId!.isNotEmpty) {
+                if (!mounted) return;
+
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProfilePage(
+                      userId: inquiryRequesterId!,
+                      inquiryId: inquiryId!,
+                    ),
+                  ),
+                );
+
+                if (!mounted) return;
+                setState(() {});
+                return;
+              }
+
+              // 💍 Marriage inquiry mahram notif → go to MAN profile
+              if (isMarriageInquiryMahram &&
+                  inquiryId != null &&
+                  inquiryId!.isNotEmpty &&
+                  inquiryManId != null &&
+                  inquiryManId!.isNotEmpty) {
+                if (!mounted) return;
+
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProfilePage(
+                      userId: inquiryManId!,
+                      inquiryId: inquiryId!,
+                    ),
+                  ),
+                );
+
+                if (!mounted) return;
+                setState(() {});
+                return;
+              }
+
+              // 💍 Man accepted/declined → open man's profile
+              if ((isMarriageInquiryAccepted || isMarriageInquiryDeclined) &&
+                  inquiryManId != null &&
+                  inquiryManId!.isNotEmpty &&
+                  inquiryId != null &&
+                  inquiryId!.isNotEmpty) {
+                if (!mounted) return;
+
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProfilePage(
+                      userId: inquiryManId!,
+                      inquiryId: inquiryId!,
+                    ),
+                  ),
+                );
+
+                if (!mounted) return;
+                setState(() {});
+                return;
+              }
+
+              // 💍 Man decision notification → go to WOMAN profile
+              if (isMarriageInquiryManDecision &&
+                  inquiryId != null &&
+                  inquiryId!.isNotEmpty &&
+                  inquiryWomanId != null &&
+                  inquiryWomanId!.isNotEmpty) {
+                if (!mounted) return;
+
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProfilePage(
+                      userId: inquiryWomanId!,
+                      inquiryId: inquiryId!,
+                    ),
+                  ),
+                );
+
+                if (!mounted) return;
+                setState(() {});
+                return;
+              }
+
+              // 💍 Marriage inquiry group created → open group chat
+              if (isMarriageInquiryGroupCreated &&
+                  inquiryChatRoomId != null &&
+                  inquiryChatRoomId!.isNotEmpty) {
                 if (!mounted) return;
 
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => GroupChatPage(
-                      chatRoomId: groupAddedRoomId!,
-                      groupName: (groupAddedName != null &&
-                          groupAddedName!.isNotEmpty)
-                          ? groupAddedName!
+                      chatRoomId: inquiryChatRoomId!,
+                      groupName: (inquiryGroupName != null && inquiryGroupName!.trim().isNotEmpty)
+                          ? inquiryGroupName!.trim()
                           : 'Group'.tr(),
                     ),
                   ),
                 );
+
+                if (!mounted) return;
+                setState(() {});
                 return;
               }
             },
@@ -755,10 +1104,7 @@ class _NotificationPageState extends State<NotificationPage> {
                 ),
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
@@ -776,11 +1122,8 @@ class _NotificationPageState extends State<NotificationPage> {
                                   _localizedTitleFor(n, body),
                                   style: TextStyle(
                                     fontSize: 14,
-                                    fontWeight: isUnread
-                                        ? FontWeight.w600
-                                        : FontWeight.w400,
-                                    color:
-                                    Theme.of(context).colorScheme.primary,
+                                    fontWeight: isUnread ? FontWeight.w600 : FontWeight.w400,
+                                    color: Theme.of(context).colorScheme.primary,
                                   ),
                                 ),
                               ),
@@ -789,14 +1132,12 @@ class _NotificationPageState extends State<NotificationPage> {
                                 createdAt: n.createdAt,
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color:
-                                  Theme.of(context).colorScheme.primary,
+                                  color: Theme.of(context).colorScheme.primary,
                                 ),
                               ),
                             ],
                           ),
-                          if (subtitleText != null &&
-                              subtitleText.isNotEmpty) ...[
+                          if (subtitleText != null && subtitleText.isNotEmpty) ...[
                             const SizedBox(height: 4),
                             Text(
                               subtitleText,
@@ -830,22 +1171,36 @@ class _NotificationPageState extends State<NotificationPage> {
     required bool isMahramAccepted,
     required bool isChatMessage,
     required bool isGroupMessage,
-    required bool isGroupAdded, // ✅ NEW
+    required bool isGroupAdded,
     required bool isLike,
     required bool isComment,
     required bool isCommentReply,
     required bool isFollow,
+    required bool isMarriageInquiryRequest,
+    required bool isMarriageInquiryMahram,
+    required bool isMarriageInquiryManDecision,
+    required bool isMarriageInquiryGroupCreated,
+    required bool isMarriageInquiryAccepted,
+    required bool isMarriageInquiryDeclined,
   }) {
     if (isFriendRequest) return Icons.person_add_alt_1;
     if (isFriendAccepted) return Icons.handshake;
     if (isMahramRequest) return Icons.verified_user_outlined;
     if (isMahramAccepted) return Icons.verified_user;
-    if (isGroupAdded) return Icons.group_add; // ✅ NEW
+    if (isGroupAdded) return Icons.group_add;
     if (isGroupMessage) return Icons.groups;
     if (isChatMessage) return Icons.chat_bubble_outline;
     if (isLike) return Icons.favorite;
     if (isComment || isCommentReply) return Icons.mode_comment_outlined;
     if (isFollow) return Icons.person;
+
+    if (isMarriageInquiryAccepted) return Icons.check_circle_outline;
+    if (isMarriageInquiryDeclined) return Icons.cancel_outlined;
+    if (isMarriageInquiryGroupCreated) return Icons.forum;
+    if (isMarriageInquiryManDecision) return Icons.how_to_reg;
+    if (isMarriageInquiryMahram) return Icons.admin_panel_settings;
+    if (isMarriageInquiryRequest) return Icons.favorite_border;
+
     return Icons.notifications;
   }
 }

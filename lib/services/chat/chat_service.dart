@@ -695,13 +695,13 @@ class ChatService {
     List<String> initialMemberIds = const [],
     String? avatarUrl,
   }) async {
-    // 0) Optional but recommended: enforce creatorId == auth.uid()
+    // 0) Enforce creatorId == auth.uid()
     final currentUid = _supabase.auth.currentUser?.id;
     if (currentUid == null || currentUid != creatorId) {
       throw Exception('creatorId must be the authenticated user (auth.uid()).');
     }
 
-    // 1) Insert row in chat_rooms
+    // 1) Create group room
     final createdRoom = await _supabase
         .from('chat_rooms')
         .insert({
@@ -716,26 +716,22 @@ class ChatService {
         .select('id')
         .maybeSingle();
 
-    if (createdRoom == null) {
+    if (createdRoom == null || createdRoom['id'] == null) {
       throw Exception('Failed to create group room');
     }
 
     final String roomId = createdRoom['id'] as String;
 
-    // -------------------------------
-    // 2) FIRST: insert ONLY the creator as admin
-    // -------------------------------
+    // 2) Add creator as admin
     await _supabase.from('chat_room_members').insert({
       'chat_room_id': roomId,
       'user_id': creatorId,
       'role': 'admin',
     });
 
-    // -------------------------------
-    // 3) THEN: insert the remaining members (if any) as member
-    // -------------------------------
+    // 3) Add remaining members (deduped, excluding creator)
     final otherMembers = initialMemberIds
-        .where((id) => id != creatorId)
+        .where((id) => id.trim().isNotEmpty && id != creatorId)
         .toSet()
         .toList();
 
@@ -752,19 +748,19 @@ class ChatService {
 
       await _supabase.from('chat_room_members').insert(rows);
 
-      // -------------------------------
-      // 🔔 NEW: notify each added member
-      // -------------------------------
+      // 4) Notify each added member (DO NOT break normal group creation if notif fails)
       try {
-        // who added them? (creator)
         final creatorProfile = await _db.getUserFromDatabase(creatorId);
-        final addedByName = (creatorProfile?.username.isNotEmpty ?? false)
-            ? creatorProfile!.username
-            : (creatorProfile?.name.isNotEmpty ?? false)
-            ? creatorProfile!.name
+        final addedByName = ((creatorProfile?.username ?? '').trim().isNotEmpty)
+            ? creatorProfile!.username.trim()
+            : ((creatorProfile?.name ?? '').trim().isNotEmpty)
+            ? creatorProfile!.name.trim()
             : 'Someone';
 
         for (final targetUserId in otherMembers) {
+          // Skip notifying yourself (already excluded, but just in case)
+          if (targetUserId == creatorId) continue;
+
           await _notifications.createGroupAddedNotification(
             targetUserId: targetUserId,
             chatRoomId: roomId,
@@ -774,13 +770,16 @@ class ChatService {
           );
         }
       } catch (e) {
-        debugPrint('⚠️ createGroupRoom: failed to send group-added notifications: $e');
+        debugPrint(
+          '⚠️ createGroupRoomInDatabase: failed to send group-added notifications: $e',
+        );
+        // Intentionally swallow — group creation must still succeed.
       }
     }
 
     return roomId;
-
   }
+
 
   /// Add one or more users to an existing group chat IN DATABASE.
   ///

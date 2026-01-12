@@ -172,6 +172,32 @@
   "yes": "نعم",
   "no": "لا",
 
+  "Something went wrong": "حدث خطأ ما",
+
+  "add_friend": "إضافة صديق",
+  "cancel_request": "إلغاء الطلب",
+  "unfriend": "إزالة الصداقة",
+  "request": "طلب",
+  "blocked": "محظور",
+
+  "cancel_inquiry": "إلغاء طلب الزواج",
+  "end_inquiry": "إنهاء طلب الزواج",
+  "marriage_inquiry_sent": "تم إرسال طلب الزواج",
+
+  "accept": "قبول",
+  "decline": "رفض",
+
+  "marriage_inquiry": "طلب زواج",
+  "neither": "لا هذا ولا ذاك",
+  "cannot_add_opposite_gender": "لا يمكنك إضافة هذا المستخدم كصديق",
+
+  "notif_marriage_inquiry_request": "أرسل {name} طلب زواج",
+  "notif_marriage_inquiry_mahram": "قام {name} باختيارك كمحرم",
+  "notif_marriage_inquiry_man_decision": "مطلوب قرار بشأن طلب الزواج",
+  "notif_marriage_inquiry_group_created": "تم إنشاء مجموعة لطلب الزواج",
+  "notif_marriage_inquiry_accepted": "وافق {name} على طلب الزواج",
+  "notif_marriage_inquiry_declined": "رفض {name} طلب الزواج",
+
 
 
 
