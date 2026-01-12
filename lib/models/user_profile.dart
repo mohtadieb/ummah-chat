@@ -6,7 +6,6 @@ class UserProfile {
   final String bio;
   final String profilePhotoUrl;
   final DateTime createdAt;
-  final String profileSongId;
 
   /// 🆕 Country (set on CompleteProfilePage)
   final String country;
@@ -32,7 +31,6 @@ class UserProfile {
     this.profilePhotoUrl = '',
     required this.createdAt,
     this.lastSeenAt,
-    this.profileSongId = '',
     this.country = '',
     this.city,
     this.gender = '',
@@ -77,7 +75,6 @@ class UserProfile {
       profilePhotoUrl: (map['profile_photo_url'] ?? '') as String,
       createdAt: parseDate(createdAtRaw),
       lastSeenAt: parseNullableDate(lastSeenRaw),
-      profileSongId: map['profile_song_id'] as String? ?? '',
       country: (map['country'] ?? '') as String,
       city: map['city'] as String?,
       gender: (map['gender'] ?? '') as String,
@@ -97,7 +94,6 @@ class UserProfile {
       'profile_photo_url': profilePhotoUrl,
       'created_at': createdAt.toIso8601String(),
       if (lastSeenAt != null) 'last_seen_at': lastSeenAt!.toIso8601String(),
-      'profile_song_id': profileSongId,
       'country': country,
       'city': city,
       'gender': gender,
@@ -116,7 +112,6 @@ class UserProfile {
     String? profilePhotoUrl,
     DateTime? createdAt,
     DateTime? lastSeenAt,
-    String? profileSongId,
     String? country,
     String? city,
     String? gender,
@@ -132,7 +127,6 @@ class UserProfile {
       profilePhotoUrl: profilePhotoUrl ?? this.profilePhotoUrl,
       createdAt: createdAt ?? this.createdAt,
       lastSeenAt: lastSeenAt ?? this.lastSeenAt,
-      profileSongId: profileSongId ?? this.profileSongId,
       country: country ?? this.country,
       city: city ?? this.city,
       gender: gender ?? this.gender,

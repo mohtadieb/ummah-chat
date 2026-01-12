@@ -76,13 +76,5 @@ flutter:
     - assets/onboarding_ummah_chat_1.png
     - assets/onboarding_dua_wall.png
     - assets/onboarding_stories_communities.png
-    - assets/audio/profile_song_1.mp3
-    - assets/audio/profile_song_2.wav
-    - assets/audio/profile_song_3.mp3
-    - assets/audio/profile_song_4.mp3
-    - assets/audio/profile_song_5.mp3
-    - assets/audio/profile_song_6.mp3
-    - assets/audio/profile_song_7.mp3
-    - assets/audio/profile_song_8.mp3
     # 🔑 Add this when you create the translation files:
     - assets/lang/

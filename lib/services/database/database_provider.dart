@@ -54,9 +54,6 @@ class DatabaseProvider extends ChangeNotifier {
   /// Update user bio
   Future<void> updateBio(String bio) => _db.updateUserBioInDatabase(bio);
 
-  /// Update profile song
-  Future<void> updateProfileSong(String songId) =>
-      _db.updateUserProfileSong(songId);
 
   /// Update about me (city + languages + interests)
   Future<void> updateAboutMe({

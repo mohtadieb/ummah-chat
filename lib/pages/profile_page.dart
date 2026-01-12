@@ -2,8 +2,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:just_audio/just_audio.dart';
-import 'package:flutter/services.dart' show rootBundle;
 import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
@@ -26,7 +24,6 @@ import '../services/auth/auth_service.dart';
 import '../services/database/database_provider.dart';
 import 'follow_list_page.dart';
 import 'friends_page.dart';
-import '../models/profile_song.dart';
 
 // Story registry (id -> StoryData with chipLabel/title/icon)
 import '../models/story_registry.dart';
@@ -109,10 +106,6 @@ class _ProfilePageState extends State<ProfilePage> {
     return _completedStoryIds;
   }
 
-  // PROFILE SONG – audio player
-  late final AudioPlayer _audioPlayer;
-  bool _isPlayingProfileSong = false;
-  String? _currentSongId;
 
   @override
   void initState() {
@@ -121,19 +114,6 @@ class _ProfilePageState extends State<ProfilePage> {
     debugPrint(
       '👤 ProfilePage initState | userId=${widget.userId} | stateHash=${identityHashCode(this)}',
     );
-
-    _audioPlayer = AudioPlayer();
-
-    // listen to player state to update the play/pause icon
-    _audioPlayer.playerStateStream.listen((state) {
-      final isPlaying =
-          state.playing &&
-          state.processingState != ProcessingState.completed &&
-          state.processingState != ProcessingState.idle;
-
-      if (!mounted) return;
-      setState(() => _isPlayingProfileSong = isPlaying);
-    });
 
     loadUser();
   }
@@ -145,103 +125,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
     bioTextController.dispose();
     _scrollController.dispose();
-    _audioPlayer.dispose();
     super.dispose();
-  }
-
-  // lookup helper
-  ProfileSong? _getSongById(String? id) {
-    if (id == null || id.isEmpty) return null;
-    try {
-      return kProfileSongs.firstWhere((s) => s.id == id);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  // start playing a given song id (if it exists locally)
-  Future<void> _startProfileSong(String songId) async {
-    final song = _getSongById(songId);
-    if (song == null) {
-      debugPrint('⚠️ No matching song found for id=$songId');
-      return;
-    }
-
-    try {
-      // 1) Check asset is loadable
-      try {
-        final data = await rootBundle.load(song.assetPath);
-        debugPrint(
-          '✅ Asset loaded: ${song.assetPath}, bytes=${data.lengthInBytes}',
-        );
-      } catch (e) {
-        debugPrint('❌ Unable to load asset ${song.assetPath}: $e');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'asset_not_found'.tr(namedArgs: {'path': song.assetPath}),
-              ),
-            ),
-          );
-        }
-        return;
-      }
-
-      // 2) Reset + ensure volume is ok
-      await _audioPlayer.stop();
-      await _audioPlayer.setVolume(1.0);
-      await _audioPlayer.setSpeed(1.0);
-
-      // 3) Load into just_audio
-      debugPrint('🎵 Trying to play asset with just_audio: ${song.assetPath}');
-      final duration = await _audioPlayer.setAsset(song.assetPath);
-      debugPrint('⏱️ Profile song duration: $duration');
-
-      await _audioPlayer.setLoopMode(LoopMode.one);
-      await _audioPlayer.play();
-
-      if (mounted) setState(() => _currentSongId = songId);
-    } on PlayerException catch (e) {
-      debugPrint('❌ PlayerException: code=${e.code}, message=${e.message}');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not play song: ${e.message}')),
-        );
-      }
-    } on PlayerInterruptedException catch (e) {
-      debugPrint('⏸️ PlayerInterruptedException: ${e.message}');
-    } catch (e, st) {
-      debugPrint('❌ Unknown error playing profile song: $e\n$st');
-    }
-  }
-
-  // toggle play/pause
-  Future<void> _toggleProfileSongPlayPause() async {
-    final songId = user?.profileSongId ?? '';
-    if (songId.isEmpty) return;
-
-    if (_audioPlayer.playing) {
-      await _audioPlayer.pause();
-    } else {
-      await _startProfileSong(songId);
-    }
-  }
-
-  // change the song from the picker
-  Future<void> _setProfileSong(String songId) async {
-    if (!_isOwnProfile) return;
-
-    // update local UI immediately
-    if (mounted) {
-      setState(() {
-        _currentSongId = songId;
-        if (user != null) user = user!.copyWith(profileSongId: songId);
-      });
-    }
-
-    await databaseProvider.updateProfileSong(songId);
-    await _startProfileSong(songId);
   }
 
   Future<void> loadUser() async {
@@ -313,21 +197,6 @@ class _ProfilePageState extends State<ProfilePage> {
     await databaseProvider.getCompletedStoriesForUser(widget.userId);
     if (!mounted) return;
 
-    // PROFILE SONG HANDLING
-    final songId = user!.profileSongId ?? '';
-    if (songId.isNotEmpty) {
-      _currentSongId = songId;
-
-      if (!_isOwnProfile) {
-        Future.microtask(() async {
-          if (!mounted) return;
-          await _startProfileSong(songId);
-        });
-      }
-    } else {
-      await _audioPlayer.stop();
-      _currentSongId = null;
-    }
 
     if (!mounted) return;
     setState(() => _isLoading = false);
@@ -1462,132 +1331,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // PROFILE SONG SECTION
-  Widget _buildProfileSongSection(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final songId = user?.profileSongId ?? '';
-    final song = _getSongById(songId);
-    final hasSong = song != null;
-
-    void openSongPicker() {
-      if (!_isOwnProfile) return;
-
-      showModalBottomSheet(
-        context: context,
-        showDragHandle: true,
-        backgroundColor: colorScheme.surface,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-        ),
-        builder: (ctx) {
-          final currentId = user?.profileSongId ?? '';
-          return ListView.separated(
-            shrinkWrap: true,
-            padding: const EdgeInsets.only(top: 8, bottom: 24),
-            itemCount: kProfileSongs.length,
-            separatorBuilder: (_, __) => const Divider(height: 0),
-            itemBuilder: (ctx, index) {
-              final s = kProfileSongs[index];
-              final isSelected = s.id == currentId;
-
-              return ListTile(
-                leading: const Icon(Icons.music_note),
-                title: Text(s.title),
-                subtitle: Text(s.artist),
-                trailing: isSelected
-                    ? Icon(Icons.check_circle, color: colorScheme.primary)
-                    : null,
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _setProfileSong(s.id);
-                },
-              );
-            },
-          );
-        },
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: colorScheme.primary.withValues(alpha: 0.12),
-              ),
-              child: const Icon(Icons.music_note_rounded, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Profile song".tr(),
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: colorScheme.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    hasSong
-                        ? '${song!.title} • ${song.artist}'
-                        : (_isOwnProfile
-                              ? "Choose a song that plays on your profile".tr()
-                              : "No profile song set".tr()),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: colorScheme.primary.withValues(
-                        alpha: hasSong ? 0.75 : 0.6,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            if (hasSong)
-              IconButton(
-                onPressed: _toggleProfileSongPlayPause,
-                icon: Icon(
-                  _isPlayingProfileSong
-                      ? Icons.pause_circle_filled_rounded
-                      : Icons.play_circle_fill_rounded,
-                  size: 26,
-                  color: colorScheme.primary,
-                ),
-              ),
-            if (_isOwnProfile)
-              TextButton(
-                onPressed: openSongPicker,
-                child: Text(
-                  hasSong ? "Change".tr() : "Choose".tr(),
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: colorScheme.primary,
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // ✅ NEW: Saved entry that opens SavedPage (3 tabs)
   Widget _buildSavedEntry(BuildContext context) {
     if (!_isOwnProfile) return const SizedBox.shrink();
@@ -2089,8 +1832,6 @@ class _ProfilePageState extends State<ProfilePage> {
           const SizedBox(height: 7),
           _buildEditAboutMeButton(),
           _buildAboutMeSection(),
-
-          _buildProfileSongSection(context),
           _buildFriendsSection(context),
 
           // Stories progress + medals (UPDATED: hide if 0 completed)
@@ -2120,97 +1861,105 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 10),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: sortedCompletedIds.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 4,
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    childAspectRatio: 0.85,
-                  ),
-                  itemBuilder: (context, index) {
-                    final id = sortedCompletedIds[index];
-                    final story = allStoriesById[id];
-                    if (story == null) return const SizedBox.shrink();
+                child: Builder(
+                  builder: (context) {
 
-                    final bool isMuhammad = muhammadIdSet.contains(id);
+                    final w = MediaQuery.of(context).size.width;
+                    final isSmall = w < 360;
 
-                    final Color startColor = isMuhammad
-                        ? const Color(0xFFF7D98A)
-                        : const Color(0xFF0F8254);
-                    final Color endColor = isMuhammad
-                        ? const Color(0xFFE0B95A)
-                        : const Color(0xFF0B6841);
+                    return GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: sortedCompletedIds.length,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: isSmall ? 3 : 4,
+                        mainAxisSpacing: 10,
+                        crossAxisSpacing: 10,
+                        mainAxisExtent: 92,
+                      ),
+                      itemBuilder: (context, index) {
+                        final id = sortedCompletedIds[index];
+                        final story = allStoriesById[id];
+                        if (story == null) return const SizedBox.shrink();
 
-                    String displayName;
-                    if (isMuhammad) {
-                      final partInfo = muhammadPartInfos.firstWhere(
-                        (m) => m.id == id,
-                        orElse: () => _MuhammadPartInfo(id: id),
-                      );
-                      final int? partNo = partInfo.partNo;
-                      displayName = partNo != null
-                          ? 'muhammad_part'.tr(
-                              namedArgs: {'part': partNo.toString()},
-                            )
-                          : 'muhammad'.tr();
-                    } else {
-                      final rawLabel = story.chipLabel.tr();
-                      final lower = rawLabel.toLowerCase();
-                      displayName = lower.startsWith('prophet ')
-                          ? rawLabel.substring('Prophet '.length)
-                          : rawLabel;
-                    }
+                        final bool isMuhammad = muhammadIdSet.contains(id);
 
-                    return Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              colors: [startColor, endColor],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black26.withValues(alpha: 0.12),
-                                blurRadius: 5,
-                                offset: const Offset(0, 3),
+                        final Color startColor = isMuhammad
+                            ? const Color(0xFFF7D98A)
+                            : const Color(0xFF0F8254);
+                        final Color endColor = isMuhammad
+                            ? const Color(0xFFE0B95A)
+                            : const Color(0xFF0B6841);
+
+                        String displayName;
+                        if (isMuhammad) {
+                          final partInfo = muhammadPartInfos.firstWhere(
+                            (m) => m.id == id,
+                            orElse: () => _MuhammadPartInfo(id: id),
+                          );
+                          final int? partNo = partInfo.partNo;
+                          displayName = partNo != null
+                              ? 'muhammad_part'.tr(
+                                  namedArgs: {'part': partNo.toString()},
+                                )
+                              : 'muhammad'.tr();
+                        } else {
+                          final rawLabel = story.chipLabel.tr();
+                          final lower = rawLabel.toLowerCase();
+                          displayName = lower.startsWith('prophet ')
+                              ? rawLabel.substring('Prophet '.length)
+                              : rawLabel;
+                        }
+
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  colors: [startColor, endColor],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black26.withValues(alpha: 0.12),
+                                    blurRadius: 5,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                          child: Center(
-                            child: Icon(
-                              story.icon,
-                              color: Colors.white,
-                              size: 24,
+                              child: Center(
+                                child: Icon(
+                                  story.icon,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        SizedBox(
-                          width: 72,
-                          child: Text(
-                            displayName,
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: theme.colorScheme.primary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
+                            const SizedBox(height: 4),
+                            SizedBox(
+                              width: 72,
+                              child: Text(
+                                displayName,
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: theme.colorScheme.primary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                      ],
+                          ],
+                        );
+                      },
                     );
-                  },
+                  }
                 ),
               ),
               const SizedBox(height: 8),

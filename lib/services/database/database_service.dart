@@ -182,21 +182,6 @@ class DatabaseService {
     }
   }
 
-  /// Update the selected profile song for the current user
-  Future<void> updateUserProfileSong(String songId) async {
-    final currentUserId = _auth.currentUser?.id;
-    if (currentUserId == null || currentUserId.isEmpty) return;
-
-    try {
-      await _db
-          .from('profiles')
-          .update({'profile_song_id': songId})
-          .eq('id', currentUserId);
-    } catch (e) {
-      print('Error updating profile song: $e');
-    }
-  }
-
   /// Update the About Me section (city + languages + interests)
   Future<void> updateUserAboutMeInDatabase({
     required String? city,
