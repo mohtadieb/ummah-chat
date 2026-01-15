@@ -1,16 +1,14 @@
 // lib/pages/profile_page.dart
+import 'dart:typed_data';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'dart:typed_data';
-import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 
 // ✅ NEW: unified Saved page (Posts / Ayat / Reflections)
 import 'package:ummah_chat/pages/saved_page.dart';
-
-import '../models/post.dart';
-import '../services/navigation/bottom_nav_provider.dart';
 
 import '../components/my_bio_box.dart';
 import '../components/my_follow_button.dart';
@@ -19,14 +17,14 @@ import '../components/my_input_alert_box.dart';
 import '../components/my_post_tile.dart';
 import '../components/my_profile_stats.dart';
 import '../helper/navigate_pages.dart';
+import '../models/post.dart';
+import '../models/story_registry.dart'; // Story registry (id -> StoryData with chipLabel/title/icon)
 import '../models/user_profile.dart';
 import '../services/auth/auth_service.dart';
 import '../services/database/database_provider.dart';
+import '../services/navigation/bottom_nav_provider.dart';
 import 'follow_list_page.dart';
 import 'friends_page.dart';
-
-// Story registry (id -> StoryData with chipLabel/title/icon)
-import '../models/story_registry.dart';
 
 /// Internal helper to keep track of Muhammad (ﷺ) parts and their number.
 class _MuhammadPartInfo {
@@ -106,7 +104,6 @@ class _ProfilePageState extends State<ProfilePage> {
     return _completedStoryIds;
   }
 
-
   @override
   void initState() {
     super.initState();
@@ -158,9 +155,9 @@ class _ProfilePageState extends State<ProfilePage> {
 
     _isFollowing = databaseProvider.isFollowing(widget.userId);
 
-// ✅ IMPORTANT: if we arrived via a notification with inquiryId,
-// use that exact inquiry to compute the UI status.
-// This prevents "latest inquiry" mismatches and fixes mahram seeing "Add friend".
+    // ✅ IMPORTANT: if we arrived via a notification with inquiryId,
+    // use that exact inquiry to compute the UI status.
+    // This prevents "latest inquiry" mismatches and fixes mahram seeing "Add friend".
     final passedInquiryId = (widget.inquiryId ?? '').trim();
 
     if (passedInquiryId.isNotEmpty) {
@@ -177,31 +174,31 @@ class _ProfilePageState extends State<ProfilePage> {
           _friendStatus = ui;
         } else {
           // Inquiry is not actionable for this viewer anymore -> fall back to friendship status
-          _friendStatus =
-          await databaseProvider.getFriendshipStatus(widget.userId);
+          _friendStatus = await databaseProvider.getFriendshipStatus(
+            widget.userId,
+          );
         }
       } else {
         // Fallback if inquiry was deleted/ended
-        _friendStatus =
-        await databaseProvider.getCombinedRelationshipStatus(widget.userId);
+        _friendStatus = await databaseProvider.getCombinedRelationshipStatus(
+          widget.userId,
+        );
       }
     } else {
-      _friendStatus =
-      await databaseProvider.getCombinedRelationshipStatus(widget.userId);
+      _friendStatus = await databaseProvider.getCombinedRelationshipStatus(
+        widget.userId,
+      );
     }
 
     if (!mounted) return;
 
-
-    _completedStoryIds =
-    await databaseProvider.getCompletedStoriesForUser(widget.userId);
+    _completedStoryIds = await databaseProvider.getCompletedStoriesForUser(
+      widget.userId,
+    );
     if (!mounted) return;
 
-
-    if (!mounted) return;
     setState(() => _isLoading = false);
   }
-
 
   void _showEditBioBox() {
     bioTextController.text = user?.bio ?? '';
@@ -235,8 +232,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
     if (country.isNotEmpty) chips.add(_chip(country.tr()));
     if (city != null && city.isNotEmpty) chips.add(_chip(city));
-    if (langs.isNotEmpty) chips.addAll(langs.map((l) => _chip(l)));
-    if (ints.isNotEmpty) chips.addAll(ints.map((i) => _chip(i)));
+    if (langs.isNotEmpty) chips.addAll(langs.map(_chip));
+    if (ints.isNotEmpty) chips.addAll(ints.map(_chip));
 
     if (chips.isEmpty) return const SizedBox();
 
@@ -481,13 +478,15 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _acceptFriendFromProfile() async {
     await databaseProvider.acceptFriendRequest(widget.userId);
-    final updated = await databaseProvider.getCombinedRelationshipStatus(widget.userId);
+    final updated =
+    await databaseProvider.getCombinedRelationshipStatus(widget.userId);
     setState(() => _friendStatus = updated);
   }
 
   Future<void> _declineFriendFromProfile() async {
     await databaseProvider.declineFriendRequest(widget.userId);
-    final updated = await databaseProvider.getCombinedRelationshipStatus(widget.userId);
+    final updated =
+    await databaseProvider.getCombinedRelationshipStatus(widget.userId);
     setState(() => _friendStatus = updated);
   }
 
@@ -513,21 +512,17 @@ class _ProfilePageState extends State<ProfilePage> {
     if (confirm != true) return;
 
     await databaseProvider.unfriendUser(widget.userId);
-    final updated = await databaseProvider.getCombinedRelationshipStatus(widget.userId);
+    final updated =
+    await databaseProvider.getCombinedRelationshipStatus(widget.userId);
     if (!mounted) return;
     setState(() => _friendStatus = updated);
   }
 
   void _goToMyProfileInMainLayout() {
-    // If we're already on the root Profile tab (no pushed routes), do nothing.
-    if (!Navigator.of(context).canPop()) return;
-
-    // 1) Switch bottom nav to Profile tab
     Provider.of<BottomNavProvider>(context, listen: false).setIndex(4);
-
-    // 2) Pop everything above MainLayout (root route)
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
+
 
   Future<void> _cancelMahramFromProfile() async {
     await databaseProvider.cancelMahramRequest(widget.userId);
@@ -598,10 +593,10 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-
   Future<void> _declineMahramFromProfile() async {
     await databaseProvider.declineMahramRequest(widget.userId);
-    final updated = await databaseProvider.getCombinedRelationshipStatus(widget.userId);
+    final updated =
+    await databaseProvider.getCombinedRelationshipStatus(widget.userId);
     if (!mounted) return;
     setState(() => _friendStatus = updated);
   }
@@ -619,7 +614,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<String?> _pickMahramDialog({
-    required List<UserProfile> myFriends,
+    required List<UserProfile> myMahrams,
   }) async {
     if (!mounted) return null;
 
@@ -627,30 +622,86 @@ class _ProfilePageState extends State<ProfilePage> {
       context: context,
       barrierDismissible: true,
       builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+
         return AlertDialog(
-          title: Text('Pick a mahram'.tr()),
+          title: Text('select_mahram'.tr()),
           content: SizedBox(
             width: double.maxFinite,
-            child: myFriends.isEmpty
-                ? Text('No friends found'.tr())
+            child: myMahrams.isEmpty
+                ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'mahram_required_for_marriage_inquiry'.tr(),
+                style: TextStyle(
+                  color: cs.primary.withValues(alpha: 0.75),
+                ),
+              ),
+            )
                 : ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: myFriends.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, i) {
-                      final p = myFriends[i];
-                      final label = (p.name.trim().isNotEmpty)
-                          ? p.name.trim()
-                          : (p.username.trim().isNotEmpty
-                                ? p.username.trim()
-                                : 'User'.tr());
+              shrinkWrap: true,
+              itemCount: myMahrams.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, i) {
+                final p = myMahrams[i];
 
-                      return ListTile(
-                        title: Text(label),
-                        onTap: () => Navigator.pop(context, p.id),
-                      );
-                    },
+                final label = p.name.trim().isNotEmpty
+                    ? p.name.trim()
+                    : (p.username.trim().isNotEmpty
+                    ? p.username.trim()
+                    : 'User'.tr());
+
+                return InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () => Navigator.pop(context, p.id),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      color: cs.primary.withValues(alpha: 0.05),
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 24,
+                          backgroundColor:
+                          cs.primary.withValues(alpha: 0.15),
+                          backgroundImage: p.profilePhotoUrl.isNotEmpty
+                              ? NetworkImage(p.profilePhotoUrl)
+                              : null,
+                          child: p.profilePhotoUrl.isEmpty
+                              ? Icon(
+                            Icons.person,
+                            size: 26,
+                            color: cs.primary,
+                          )
+                              : null,
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Text(
+                            label,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: cs.primary,
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          size: 26,
+                          color: cs.primary.withValues(alpha: 0.7),
+                        ),
+                      ],
+                    ),
                   ),
+                );
+              },
+            ),
           ),
           actions: [
             TextButton(
@@ -687,7 +738,7 @@ class _ProfilePageState extends State<ProfilePage> {
         womanId = myUserId;
 
         final mahrams = await db.getMyMahrams();
-        final picked = await _pickMahramDialog(myFriends: mahrams);
+        final picked = await _pickMahramDialog(myMahrams: mahrams);
         if (picked == null || picked.isEmpty) return;
 
         mahramId = picked;
@@ -712,15 +763,25 @@ class _ProfilePageState extends State<ProfilePage> {
       setState(() => _friendStatus = 'inquiry_pending_sent');
 
       // ✅ Refresh actual combined status from DB (always pass the profile you're viewing)
-      final updated = await databaseProvider.getCombinedRelationshipStatus(targetUserId);
+      final updated = await databaseProvider.getCombinedRelationshipStatus(
+        targetUserId,
+      );
       if (!mounted) return;
       setState(() => _friendStatus = updated);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('marriage_inquiry_sent'.tr())),
+        SnackBar(
+          content: Text(
+            initiatedBy == 'woman'
+                ? 'marriage_inquiry_sent_waiting_mahram'.tr()
+                : 'marriage_inquiry_sent'.tr(),
+          ),
+        ),
       );
 
-      debugPrint('✅ Marriage inquiry created: $inquiryId | initiatedBy=$initiatedBy');
+      debugPrint(
+        '✅ Marriage inquiry created: $inquiryId | initiatedBy=$initiatedBy',
+      );
     } catch (e, st) {
       debugPrint('❌ _startMarriageInquiry failed: $e\n$st');
       if (!mounted) return;
@@ -729,7 +790,6 @@ class _ProfilePageState extends State<ProfilePage> {
       );
     }
   }
-
 
   Future<void> _womanPickMahramForInquiry({
     required String inquiryId,
@@ -740,7 +800,7 @@ class _ProfilePageState extends State<ProfilePage> {
       // Woman picks from HER friends
       final mahrams = await db.getMyMahrams();
 
-      final selectedMahramId = await _pickMahramDialog(myFriends: mahrams);
+      final selectedMahramId = await _pickMahramDialog(myMahrams: mahrams);
       if (selectedMahramId == null || selectedMahramId.isEmpty) return;
 
       // ✅ NEW final method
@@ -754,15 +814,14 @@ class _ProfilePageState extends State<ProfilePage> {
       if (!mounted) return;
 
       // refresh combined status so button becomes pending_mahram etc.
-      final updated = await databaseProvider.getCombinedRelationshipStatus(widget.userId);
+      final updated = await databaseProvider.getCombinedRelationshipStatus(
+        widget.userId,
+      );
       if (!mounted) return;
       setState(() => _friendStatus = updated);
 
-      debugPrint('✅ woman selected mahram; refreshing relationship status...');
-
-
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Mahram selected'.tr())),
+        SnackBar(content: Text('mahram_selected'.tr())),
       );
     } catch (e, st) {
       debugPrint('❌ womanAcceptAndSelectMahramForInquiry failed: $e\n$st');
@@ -777,15 +836,41 @@ class _ProfilePageState extends State<ProfilePage> {
     final id = widget.inquiryId;
     if (id != null && id.isNotEmpty) return id;
 
-    final latest = await databaseProvider.getLatestActiveInquiryBetweenMeAnd(widget.userId);
+    final latest = await databaseProvider.getLatestActiveInquiryBetweenMeAnd(
+      widget.userId,
+    );
     if (latest == null) return null;
 
     final latestId = (latest['id'] ?? '').toString();
     return latestId.isEmpty ? null : latestId;
   }
 
+  Future<bool> _confirmEndMarriageInquiry() async {
+    if (!mounted) return false;
 
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('end_marriage_inquiry_title'.tr()),
+          content: Text('end_marriage_inquiry_confirm'.tr()),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text('Cancel'.tr()),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text('End'.tr()),
+            ),
+          ],
+        );
+      },
+    );
 
+    return result == true;
+  }
 
   void _showOppositeGenderRequestSheet({
     required String targetUserId,
@@ -812,7 +897,6 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
                 const SizedBox(height: 12),
-
                 ListTile(
                   leading: const Icon(Icons.favorite_border),
                   title: Text('Marriage inquiry'.tr()),
@@ -821,7 +905,6 @@ class _ProfilePageState extends State<ProfilePage> {
                     await _startMarriageInquiry();
                   },
                 ),
-
                 ListTile(
                   leading: const Icon(Icons.verified_user_outlined),
                   title: Text('Mahram'.tr()),
@@ -833,7 +916,6 @@ class _ProfilePageState extends State<ProfilePage> {
                     );
                   },
                 ),
-
                 ListTile(
                   leading: const Icon(Icons.block),
                   title: Text('Neither'.tr()),
@@ -846,7 +928,6 @@ class _ProfilePageState extends State<ProfilePage> {
                     );
                   },
                 ),
-
                 const SizedBox(height: 4),
                 ListTile(
                   leading: const Icon(Icons.close),
@@ -885,7 +966,6 @@ class _ProfilePageState extends State<ProfilePage> {
 
     if (ok != true) return;
 
-    // Calls Provider → DatabaseService.sendMahramRequestInDatabase(...)
     if (!mounted) return;
     final dbProvider = Provider.of<DatabaseProvider>(context, listen: false);
 
@@ -900,8 +980,8 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
 
-    // ✅ refresh button state after sending
-    final updated = await databaseProvider.getCombinedRelationshipStatus(widget.userId);
+    final updated =
+    await databaseProvider.getCombinedRelationshipStatus(widget.userId);
     if (!mounted) return;
     setState(() => _friendStatus = updated);
   }
@@ -938,12 +1018,12 @@ class _ProfilePageState extends State<ProfilePage> {
     await dbProvider.deleteMahramRelationship(targetUserId);
 
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('mahram_removed'.tr())));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('mahram_removed'.tr())),
+    );
 
-    // ✅ refresh button state after deleting
-    final updated = await databaseProvider.getCombinedRelationshipStatus(widget.userId);
+    final updated =
+    await databaseProvider.getCombinedRelationshipStatus(widget.userId);
     if (!mounted) return;
     setState(() => _friendStatus = updated);
   }
@@ -955,9 +1035,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
     void openFriendsFullScreen() {
       final displayName = (user?.name ?? '').trim();
-      final firstName = displayName.isEmpty
-          ? ''
-          : displayName.split(RegExp(r'\s+')).first;
+      final firstName =
+      displayName.isEmpty ? '' : displayName.split(RegExp(r'\s+')).first;
 
       Navigator.push(
         context,
@@ -976,9 +1055,7 @@ class _ProfilePageState extends State<ProfilePage> {
               elevation: 0,
               scrolledUnderElevation: 0,
             ),
-            body: isOwn
-                ? const FriendsPage()
-                : FriendsPage(userId: widget.userId),
+            body: isOwn ? const FriendsPage() : FriendsPage(userId: widget.userId),
           ),
         ),
       );
@@ -1131,17 +1208,13 @@ class _ProfilePageState extends State<ProfilePage> {
 
           // Show 11 friends + 1 "+X" tile if needed
           final bool hasMore = allFriends.length > maxTiles;
-          final int friendTilesCount = hasMore
-              ? (maxTiles - 1)
-              : allFriends.length;
+          final int friendTilesCount = hasMore ? (maxTiles - 1) : allFriends.length;
 
           final visibleFriends = allFriends.take(friendTilesCount).toList();
           final int remainingCount = allFriends.length - friendTilesCount;
 
           // Total tiles in the horizontal row
-          final int itemCount = hasMore
-              ? friendTilesCount + 1
-              : friendTilesCount;
+          final int itemCount = hasMore ? friendTilesCount + 1 : friendTilesCount;
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1208,13 +1281,9 @@ class _ProfilePageState extends State<ProfilePage> {
                               height: 52,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: colorScheme.primary.withValues(
-                                  alpha: 0.10,
-                                ),
+                                color: colorScheme.primary.withValues(alpha: 0.10),
                                 border: Border.all(
-                                  color: colorScheme.primary.withValues(
-                                    alpha: 0.35,
-                                  ),
+                                  color: colorScheme.primary.withValues(alpha: 0.35),
                                   width: 1,
                                 ),
                               ),
@@ -1272,16 +1341,15 @@ class _ProfilePageState extends State<ProfilePage> {
                               CircleAvatar(
                                 radius: 26,
                                 backgroundColor: colorScheme.secondary,
-                                backgroundImage:
-                                    friend.profilePhotoUrl.isNotEmpty
+                                backgroundImage: friend.profilePhotoUrl.isNotEmpty
                                     ? NetworkImage(friend.profilePhotoUrl)
                                     : null,
                                 child: friend.profilePhotoUrl.isEmpty
                                     ? Icon(
-                                        Icons.person,
-                                        color: colorScheme.primary,
-                                        size: 26,
-                                      )
+                                  Icons.person,
+                                  color: colorScheme.primary,
+                                  size: 26,
+                                )
                                     : null,
                               ),
                               if (friend.isOnline)
@@ -1445,38 +1513,27 @@ class _ProfilePageState extends State<ProfilePage> {
     }
 
     const nonMuhammadOrder = [
-      // Early prophets
       'adam',
       'idris',
       'nuh',
       'hud',
       'salih',
-
-      // Ibrahim family
       'ibrahim',
       'lut',
       'ismail',
       'ishaq',
       'yaqub',
       'yusuf',
-
-      // Other nations
       'shuayb',
       'ayyub',
       'dhul_kifl',
-
-      // Musa era
       'musa',
       'harun',
-
-      // Kings & prophets
       'dawud',
       'sulayman',
       'ilyas',
       'alyasa',
       'yunus',
-
-      // Later prophets
       'zakariya',
       'yahya',
       'maryam',
@@ -1545,13 +1602,10 @@ class _ProfilePageState extends State<ProfilePage> {
       // ✅ IMPORTANT FIX:
       // If no relationship exists AND it's opposite gender -> force button into "request" mode.
       final bool isInquiryStatus = _friendStatus.startsWith('inquiry_');
-
       final String effectiveFriendStatus =
       (!isInquiryStatus && _friendStatus == 'none' && isOpposite)
           ? 'request'
           : _friendStatus;
-
-
 
       bodyChild = ListView(
         controller: _scrollController,
@@ -1593,22 +1647,22 @@ class _ProfilePageState extends State<ProfilePage> {
                   onTap: _isOwnProfile ? _pickProfilePhoto : null,
                   child: user!.profilePhotoUrl.isNotEmpty
                       ? CircleAvatar(
-                          radius: 56,
-                          backgroundImage: NetworkImage(user!.profilePhotoUrl),
-                        )
+                    radius: 56,
+                    backgroundImage: NetworkImage(user!.profilePhotoUrl),
+                  )
                       : Container(
-                          width: 112,
-                          height: 112,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: theme.colorScheme.secondary,
-                          ),
-                          child: Icon(
-                            Icons.person,
-                            size: 70,
-                            color: theme.colorScheme.primary,
-                          ),
-                        ),
+                    width: 112,
+                    height: 112,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: theme.colorScheme.secondary,
+                    ),
+                    child: Icon(
+                      Icons.person,
+                      size: 70,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
                 ),
                 if (_isOwnProfile)
                   Positioned(
@@ -1666,137 +1720,171 @@ class _ProfilePageState extends State<ProfilePage> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: MyFriendButton(
-                      // ✅ use effective status so opposite gender shows "Request"
                       friendStatus: effectiveFriendStatus,
 
-                      // ✅ normal add friend only when NOT in "request" mode
                       onAddFriend: (effectiveFriendStatus == 'request')
                           ? null
                           : _addFriendFromProfile,
 
                       onCancelRequest: () async {
-                        // inquiry cancel/end has priority
-                        if (_friendStatus == 'inquiry_pending_sent' || _friendStatus == 'inquiry_cancel_inquiry') {
+                        if (_friendStatus == 'inquiry_pending_sent' ||
+                            _friendStatus == 'inquiry_cancel_inquiry') {
                           final id = await _resolveInquiryId();
                           if (id == null) {
                             if (!mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('something_went_wrong'.tr())),
+                              SnackBar(
+                                content: Text('something_went_wrong'.tr()),
+                              ),
                             );
                             return;
                           }
 
-                          await databaseProvider.cancelOrEndMarriageInquiry(inquiryId: id);
+                          final confirm = await _confirmEndMarriageInquiry();
+                          if (!confirm) return;
 
-                          final updated = await databaseProvider.getCombinedRelationshipStatus(widget.userId);
-                          if (!mounted) return;
-                          setState(() => _friendStatus = updated);
+                          try {
+                            await databaseProvider.cancelOrEndMarriageInquiry(
+                              inquiryId: id,
+                            );
+
+                            final updated = await databaseProvider
+                                .getCombinedRelationshipStatus(widget.userId);
+                            if (!mounted) return;
+                            setState(() => _friendStatus = updated);
+                          } catch (e) {
+                            debugPrint(
+                              '❌ cancelOrEndMarriageInquiry failed: $e',
+                            );
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('something_went_wrong'.tr()),
+                              ),
+                            );
+                          }
                           return;
                         }
 
-                        // mahram/friend cancel
                         if (_friendStatus == 'pending_mahram_sent') {
                           await _cancelMahramFromProfile();
                         } else {
                           await _cancelFriendFromProfile();
                         }
 
-                        final updated = await databaseProvider.getCombinedRelationshipStatus(widget.userId);
+                        final updated = await databaseProvider
+                            .getCombinedRelationshipStatus(widget.userId);
                         if (!mounted) return;
                         setState(() => _friendStatus = updated);
                       },
 
                       onAcceptRequest: () async {
-                        // ✅ Inquiry accept (role-specific)
                         if (_friendStatus.startsWith('inquiry_')) {
                           final id = await _resolveInquiryId();
                           if (id == null) {
                             if (!mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('something_went_wrong'.tr())),
+                              SnackBar(
+                                content: Text('something_went_wrong'.tr()),
+                              ),
                             );
                             return;
                           }
 
                           if (_friendStatus == 'inquiry_pending_received_woman') {
-                            // woman picks mahram (and accepts)
                             await _womanPickMahramForInquiry(inquiryId: id);
-                          } else if (_friendStatus == 'inquiry_pending_received_mahram') {
-                            // mahram approves
-                            await databaseProvider.mahramRespondToInquiry(inquiryId: id, approve: true);
-                          } else if (_friendStatus == 'inquiry_pending_received_man') {
-                            // man accepts (Flow 2)
-                            await databaseProvider.manRespondToInquiry(inquiryId: id, accept: true);
+                          } else if (_friendStatus ==
+                              'inquiry_pending_received_mahram') {
+                            await databaseProvider.mahramRespondToInquiry(
+                              inquiryId: id,
+                              approve: true,
+                            );
+                          } else if (_friendStatus ==
+                              'inquiry_pending_received_man') {
+                            await databaseProvider.manRespondToInquiry(
+                              inquiryId: id,
+                              accept: true,
+                            );
                           }
 
-                          final updated = await databaseProvider.getCombinedRelationshipStatus(widget.userId);
+                          final updated = await databaseProvider
+                              .getCombinedRelationshipStatus(widget.userId);
                           if (!mounted) return;
                           setState(() => _friendStatus = updated);
                           return;
                         }
 
-                        // ✅ Mahram / friend accept
                         if (_friendStatus == 'pending_mahram_received') {
                           await _acceptMahramFromProfile();
                         } else {
                           await _acceptFriendFromProfile();
                         }
 
-                        final updated = await databaseProvider.getCombinedRelationshipStatus(widget.userId);
+                        final updated = await databaseProvider
+                            .getCombinedRelationshipStatus(widget.userId);
                         if (!mounted) return;
                         setState(() => _friendStatus = updated);
                       },
 
                       onDeclineRequest: () async {
-                        // ✅ Inquiry decline (role-specific)
                         if (_friendStatus.startsWith('inquiry_')) {
                           final id = await _resolveInquiryId();
                           if (id == null) {
                             if (!mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('something_went_wrong'.tr())),
+                              SnackBar(
+                                content: Text('something_went_wrong'.tr()),
+                              ),
                             );
                             return;
                           }
 
                           if (_friendStatus == 'inquiry_pending_received_woman') {
-                            await databaseProvider.womanDeclineInquiry(inquiryId: id);
-                          } else if (_friendStatus == 'inquiry_pending_received_mahram') {
-                            await databaseProvider.mahramRespondToInquiry(inquiryId: id, approve: false);
-                          } else if (_friendStatus == 'inquiry_pending_received_man') {
-                            await databaseProvider.manRespondToInquiry(inquiryId: id, accept: false);
+                            await databaseProvider.womanDeclineInquiry(
+                              inquiryId: id,
+                            );
+                          } else if (_friendStatus ==
+                              'inquiry_pending_received_mahram') {
+                            await databaseProvider.mahramRespondToInquiry(
+                              inquiryId: id,
+                              approve: false,
+                            );
+                          } else if (_friendStatus ==
+                              'inquiry_pending_received_man') {
+                            await databaseProvider.manRespondToInquiry(
+                              inquiryId: id,
+                              accept: false,
+                            );
                           }
 
-                          final updated = await databaseProvider.getCombinedRelationshipStatus(widget.userId);
+                          final updated = await databaseProvider
+                              .getCombinedRelationshipStatus(widget.userId);
                           if (!mounted) return;
                           setState(() => _friendStatus = updated);
                           return;
                         }
 
-                        // mahram/friend decline
                         if (_friendStatus == 'pending_mahram_received') {
                           await _declineMahramFromProfile();
                         } else {
                           await _declineFriendFromProfile();
                         }
 
-                        final updated = await databaseProvider.getCombinedRelationshipStatus(widget.userId);
+                        final updated = await databaseProvider
+                            .getCombinedRelationshipStatus(widget.userId);
                         if (!mounted) return;
                         setState(() => _friendStatus = updated);
                       },
 
-                      // ✅ normal unfriend
                       onUnfriend: _unfriendFromProfile,
 
-                      // ✅ NEW: opposite-gender “Request” sheet
                       onOpenRequestSheet: (effectiveFriendStatus == 'request')
                           ? () => _showOppositeGenderRequestSheet(
-                              targetUserId: widget.userId,
-                              targetName: user!.name,
-                            )
+                        targetUserId: widget.userId,
+                        targetName: user!.name,
+                      )
                           : null,
 
-                      // ✅ delete mahram relationship when status == 'mahram'
                       onDeleteMahram: () => _confirmAndDeleteMahram(
                         targetUserId: widget.userId,
                         targetName: user!.name,
@@ -1838,7 +1926,6 @@ class _ProfilePageState extends State<ProfilePage> {
           if (totalStories > 0) ...[
             const SizedBox(height: 24),
 
-            // ✅ hide "stories completed" text when 0
             if (sortedCompletedIds.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 28.0),
@@ -1863,9 +1950,18 @@ class _ProfilePageState extends State<ProfilePage> {
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: Builder(
                   builder: (context) {
-
                     final w = MediaQuery.of(context).size.width;
                     final isSmall = w < 360;
+
+                    // ✅ Overflow fix: give small screens more height + account for text scaling
+                    final textScale = MediaQuery.textScaleFactorOf(context);
+                    final safeScale = textScale.clamp(1.0, 1.15);
+                    final baseExtent = isSmall ? 104.0 : 92.0;
+
+                    final double badgeSize = isSmall ? 52 : 56;
+                    final double iconSize = isSmall ? 22 : 24;
+                    final double labelFontSize = isSmall ? 10 : 11;
+                    final double labelWidth = isSmall ? 68 : 72;
 
                     return GridView.builder(
                       shrinkWrap: true,
@@ -1875,7 +1971,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         crossAxisCount: isSmall ? 3 : 4,
                         mainAxisSpacing: 10,
                         crossAxisSpacing: 10,
-                        mainAxisExtent: 92,
+                        mainAxisExtent: baseExtent * safeScale,
                       ),
                       itemBuilder: (context, index) {
                         final id = sortedCompletedIds[index];
@@ -1894,14 +1990,14 @@ class _ProfilePageState extends State<ProfilePage> {
                         String displayName;
                         if (isMuhammad) {
                           final partInfo = muhammadPartInfos.firstWhere(
-                            (m) => m.id == id,
+                                (m) => m.id == id,
                             orElse: () => _MuhammadPartInfo(id: id),
                           );
                           final int? partNo = partInfo.partNo;
                           displayName = partNo != null
                               ? 'muhammad_part'.tr(
-                                  namedArgs: {'part': partNo.toString()},
-                                )
+                            namedArgs: {'part': partNo.toString()},
+                          )
                               : 'muhammad'.tr();
                         } else {
                           final rawLabel = story.chipLabel.tr();
@@ -1915,8 +2011,8 @@ class _ProfilePageState extends State<ProfilePage> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Container(
-                              width: 56,
-                              height: 56,
+                              width: badgeSize,
+                              height: badgeSize,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 gradient: LinearGradient(
@@ -1936,13 +2032,13 @@ class _ProfilePageState extends State<ProfilePage> {
                                 child: Icon(
                                   story.icon,
                                   color: Colors.white,
-                                  size: 24,
+                                  size: iconSize,
                                 ),
                               ),
                             ),
                             const SizedBox(height: 4),
                             SizedBox(
-                              width: 72,
+                              width: labelWidth,
                               child: Text(
                                 displayName,
                                 textAlign: TextAlign.center,
@@ -1950,8 +2046,9 @@ class _ProfilePageState extends State<ProfilePage> {
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   color: theme.colorScheme.primary,
-                                  fontSize: 11,
+                                  fontSize: labelFontSize,
                                   fontWeight: FontWeight.w600,
+                                  height: 1.1,
                                 ),
                               ),
                             ),
@@ -1959,7 +2056,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         );
                       },
                     );
-                  }
+                  },
                 ),
               ),
               const SizedBox(height: 8),
@@ -1987,12 +2084,16 @@ class _ProfilePageState extends State<ProfilePage> {
                           color: Color(0xFFE0B95A),
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          "Muhammad (ﷺ) series completed".tr(),
-                          style: const TextStyle(
-                            color: Color(0xFF8C6B24),
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
+                        Flexible(
+                          child: Text(
+                            "Muhammad (ﷺ) series completed".tr(),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF8C6B24),
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ],
@@ -2025,14 +2126,18 @@ class _ProfilePageState extends State<ProfilePage> {
                           color: Color(0xFF0F8254),
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          'prophets_stories_level'.tr(
-                            namedArgs: {'level': levelsCompleted.toString()},
-                          ),
-                          style: const TextStyle(
-                            color: Color(0xFF0F8254),
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
+                        Flexible(
+                          child: Text(
+                            'prophets_stories_level'.tr(
+                              namedArgs: {'level': levelsCompleted.toString()},
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF0F8254),
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
@@ -2087,9 +2192,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: theme.colorScheme.primary.withValues(
-                          alpha: 0.12,
-                        ),
+                        color: theme.colorScheme.primary.withValues(alpha: 0.12),
                       ),
                       child: Icon(
                         Icons.article_outlined,
@@ -2114,9 +2217,9 @@ class _ProfilePageState extends State<ProfilePage> {
                             postCount == 0
                                 ? 'tap_to_view_posts'.tr()
                                 : 'posts_tap_to_view'.plural(
-                                    postCount,
-                                    namedArgs: {'count': postCount.toString()},
-                                  ),
+                              postCount,
+                              namedArgs: {'count': postCount.toString()},
+                            ),
                             style: TextStyle(
                               fontSize: 12,
                               color: theme.colorScheme.primary.withValues(
@@ -2135,9 +2238,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(999),
-                        color: theme.colorScheme.primary.withValues(
-                          alpha: 0.08,
-                        ),
+                        color: theme.colorScheme.primary.withValues(alpha: 0.08),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -2171,27 +2272,27 @@ class _ProfilePageState extends State<ProfilePage> {
             const SizedBox(height: 8),
             (allUserPosts.isEmpty
                 ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(14.0),
-                      child: Text(
-                        "No posts yet..".tr(),
-                        style: TextStyle(color: theme.colorScheme.primary),
-                      ),
-                    ),
-                  )
+              child: Padding(
+                padding: const EdgeInsets.all(14.0),
+                child: Text(
+                  "No posts yet..".tr(),
+                  style: TextStyle(color: theme.colorScheme.primary),
+                ),
+              ),
+            )
                 : ListView.builder(
-                    itemCount: allUserPosts.length,
-                    physics: const NeverScrollableScrollPhysics(),
-                    shrinkWrap: true,
-                    itemBuilder: (context, index) {
-                      final post = allUserPosts[index];
-                      return MyPostTile(
-                        post: post,
-                        onPostTap: () => goPostPage(context, post),
-                        scaffoldContext: context,
-                      );
-                    },
-                  )),
+              itemCount: allUserPosts.length,
+              physics: const NeverScrollableScrollPhysics(),
+              shrinkWrap: true,
+              itemBuilder: (context, index) {
+                final Post post = allUserPosts[index];
+                return MyPostTile(
+                  post: post,
+                  onPostTap: () => goPostPage(context, post),
+                  scaffoldContext: context,
+                );
+              },
+            )),
           ],
 
           const SizedBox(height: 18),
@@ -2199,17 +2300,17 @@ class _ProfilePageState extends State<ProfilePage> {
       );
     }
 
-    final canPop = Navigator.of(context).canPop();
+    final bool showLocalAppBar = !_isOwnProfile; // only for other users
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: canPop
+      appBar: showLocalAppBar
           ? AppBar(
-              foregroundColor: Theme.of(context).colorScheme.primary,
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              elevation: 0,
-              scrolledUnderElevation: 0,
-            )
+        foregroundColor: Theme.of(context).colorScheme.primary,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+      )
           : null,
       body: bodyChild,
     );

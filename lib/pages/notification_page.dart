@@ -9,6 +9,7 @@ import 'package:ummah_chat/pages/group_chat_page.dart'; // 👈 NEW
 
 import '../helper/navigate_pages.dart';
 import '../helper/time_ago_text.dart';
+import '../services/chat/chat_service.dart';
 import '../services/database/database_service.dart';
 import '../services/notifications/notification_service.dart';
 import 'package:intl/intl.dart';
@@ -113,7 +114,7 @@ class _NotificationPageState extends State<NotificationPage> {
           if (body.startsWith('MARRIAGE_INQUIRY_MAHRAM:')) {
             final rest = body.substring('MARRIAGE_INQUIRY_MAHRAM:'.length);
             final parts = rest.split('::');
-            if (parts.length > 1) _cacheName(parts[1].trim());
+            if (parts.length > 2) _cacheName(parts[2].trim());
           }
 
           // MARRIAGE_INQUIRY_MAN_DECISION:<inquiryId>::<womanId>::<mahramId>
@@ -123,12 +124,11 @@ class _NotificationPageState extends State<NotificationPage> {
             if (parts.length > 1) _cacheName(parts[1].trim()); // ✅ womanId
           }
 
-
-          // MARRIAGE_INQUIRY_ACCEPTED:<inquiryId>::<manId>::...
+          // ✅ UPDATED: MARRIAGE_INQUIRY_ACCEPTED:<inquiryId>::<otherUserId>
           if (body.startsWith('MARRIAGE_INQUIRY_ACCEPTED:')) {
             final rest = body.substring('MARRIAGE_INQUIRY_ACCEPTED:'.length);
             final parts = rest.split('::');
-            if (parts.length > 1) _cacheName(parts[1].trim());
+            if (parts.length > 1) _cacheName(parts[1].trim()); // ✅ otherUserId
           }
 
           // MARRIAGE_INQUIRY_DECLINED:<inquiryId>::<manId>::...
@@ -136,6 +136,20 @@ class _NotificationPageState extends State<NotificationPage> {
             final rest = body.substring('MARRIAGE_INQUIRY_DECLINED:'.length);
             final parts = rest.split('::');
             if (parts.length > 1) _cacheName(parts[1].trim());
+          }
+
+          // MARRIAGE_INQUIRY_MAHRAM_ACCEPTED:<inquiryId>::<manId>
+          if (body.startsWith('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED:')) {
+            final rest = body.substring('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED:'.length);
+            final parts = rest.split('::');
+            if (parts.length > 1) _cacheName(parts[1].trim()); // manId
+          }
+
+          // ✅ NEW: MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:<inquiryId>::<manId>
+          if (body.startsWith('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:')) {
+            final rest = body.substring('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:'.length);
+            final parts = rest.split('::');
+            if (parts.length > 1) _cacheName(parts[1].trim()); // manId
           }
         }
       },
@@ -341,9 +355,26 @@ class _NotificationPageState extends State<NotificationPage> {
     if (body.startsWith('MARRIAGE_INQUIRY_MAHRAM:')) {
       final rest = body.substring('MARRIAGE_INQUIRY_MAHRAM:'.length);
       final parts = rest.split('::');
+
+      // body = inquiryId :: manId :: womanId
+      final womanId = parts.length > 2 ? parts[2].trim() : '';
+      final name = _nameFromIdOrFallback(womanId, legacyName);
+
+      return 'notif_mahram_chosen_for_marriage'.tr(namedArgs: {'name': name});
+    }
+
+    // ✅ UPDATE: when man initiates and woman selects mahram, show the simple title key
+    if (body.startsWith('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED:')) {
+      return 'notif_marriage_inquiry_mahram_accepted_title'.tr();
+    }
+
+    // ✅ NEW: when woman initiates, show "sent to {man}"
+    if (body.startsWith('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:')) {
+      final rest = body.substring('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:'.length);
+      final parts = rest.split('::');
       final manId = parts.length > 1 ? parts[1].trim() : '';
       final name = _nameFromIdOrFallback(manId, legacyName);
-      return 'notif_marriage_inquiry_mahram'.tr(namedArgs: {'name': name});
+      return 'notif_marriage_inquiry_mahram_accepted_sent_to'.tr(namedArgs: {'name': name});
     }
 
     if (body.startsWith('MARRIAGE_INQUIRY_MAN_DECISION:')) {
@@ -357,16 +388,16 @@ class _NotificationPageState extends State<NotificationPage> {
       return 'notif_marriage_inquiry_man_decision'.tr(namedArgs: {'name': name});
     }
 
-
     if (body.startsWith('MARRIAGE_INQUIRY_GROUP_CREATED:')) {
       return 'notif_marriage_inquiry_group_created'.tr();
     }
 
+    // ✅ UPDATED: accepted uses <otherUserId> (not "manId")
     if (body.startsWith('MARRIAGE_INQUIRY_ACCEPTED:')) {
       final rest = body.substring('MARRIAGE_INQUIRY_ACCEPTED:'.length);
       final parts = rest.split('::');
-      final manId = parts.length > 1 ? parts[1].trim() : '';
-      final name = _nameFromIdOrFallback(manId, legacyName);
+      final otherUserId = parts.length > 1 ? parts[1].trim() : '';
+      final name = _nameFromIdOrFallback(otherUserId, legacyName);
       return 'notif_marriage_inquiry_accepted'.tr(namedArgs: {'name': name});
     }
 
@@ -516,6 +547,13 @@ class _NotificationPageState extends State<NotificationPage> {
         final isMarriageInquiryAccepted = body.startsWith('MARRIAGE_INQUIRY_ACCEPTED:');
         final isMarriageInquiryDeclined = body.startsWith('MARRIAGE_INQUIRY_DECLINED:');
 
+        final isMarriageInquiryMahramAccepted =
+        body.startsWith('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED:');
+
+        // ✅ NEW
+        final isMarriageInquiryMahramAcceptedSentTo =
+        body.startsWith('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:');
+
         String? friendRequesterId;
         String? friendAcceptedUserId;
         String? followUserId;
@@ -544,6 +582,11 @@ class _NotificationPageState extends State<NotificationPage> {
         String? inquiryWomanId;
         String? inquiryChatRoomId;
         String? inquiryGroupName;
+
+        String? inquiryMahramAcceptedManId;
+
+        // ✅ NEW: accepted otherUserId holder
+        String? inquiryAcceptedOtherUserId;
 
         // Parse IDs (and cache names when possible)
         if (isFriendRequest) {
@@ -652,6 +695,27 @@ class _NotificationPageState extends State<NotificationPage> {
           if (parts.length > 2) inquiryWomanId = parts[2].trim();
         }
 
+        if (isMarriageInquiryMahramAccepted) {
+          final rest = body.substring('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED:'.length);
+          final parts = rest.split('::');
+          if (parts.isNotEmpty) inquiryId = parts[0].trim();
+          if (parts.length > 1) {
+            inquiryMahramAcceptedManId = parts[1].trim();
+            _cacheName(inquiryMahramAcceptedManId!);
+          }
+        }
+
+        // ✅ NEW: same parsing, different body prefix
+        if (isMarriageInquiryMahramAcceptedSentTo) {
+          final rest = body.substring('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:'.length);
+          final parts = rest.split('::');
+          if (parts.isNotEmpty) inquiryId = parts[0].trim();
+          if (parts.length > 1) {
+            inquiryMahramAcceptedManId = parts[1].trim();
+            _cacheName(inquiryMahramAcceptedManId!);
+          }
+        }
+
         if (isMarriageInquiryManDecision) {
           final rest = body.substring('MARRIAGE_INQUIRY_MAN_DECISION:'.length);
           final parts = rest.split('::');
@@ -663,11 +727,7 @@ class _NotificationPageState extends State<NotificationPage> {
             inquiryWomanId = parts[1].trim();
             _cacheName(inquiryWomanId!);
           }
-
-          // optional: mahram id if you ever need it later
-          // if (parts.length > 2) inquiryMahramId = parts[2].trim();
         }
-
 
         if (isMarriageInquiryGroupCreated) {
           final rest = body.substring('MARRIAGE_INQUIRY_GROUP_CREATED:'.length);
@@ -677,13 +737,14 @@ class _NotificationPageState extends State<NotificationPage> {
           if (parts.length > 2) inquiryGroupName = parts[2].trim();
         }
 
+        // ✅ UPDATED: accepted uses otherUserId
         if (isMarriageInquiryAccepted) {
           final rest = body.substring('MARRIAGE_INQUIRY_ACCEPTED:'.length);
           final parts = rest.split('::');
           if (parts.isNotEmpty) inquiryId = parts[0].trim();
           if (parts.length > 1) {
-            inquiryManId = parts[1].trim();
-            _cacheName(inquiryManId!);
+            inquiryAcceptedOtherUserId = parts[1].trim();
+            _cacheName(inquiryAcceptedOtherUserId!);
           }
         }
 
@@ -719,6 +780,8 @@ class _NotificationPageState extends State<NotificationPage> {
             !isMarriageInquiryGroupCreated &&
             !isMarriageInquiryAccepted &&
             !isMarriageInquiryDeclined &&
+            !isMarriageInquiryMahramAccepted &&
+            !isMarriageInquiryMahramAcceptedSentTo &&
             rawBody.isNotEmpty &&
             !rawBody.contains(':')) {
           subtitleText = rawBody;
@@ -743,6 +806,8 @@ class _NotificationPageState extends State<NotificationPage> {
           isMarriageInquiryGroupCreated: isMarriageInquiryGroupCreated,
           isMarriageInquiryAccepted: isMarriageInquiryAccepted,
           isMarriageInquiryDeclined: isMarriageInquiryDeclined,
+          isMarriageInquiryMahramAccepted: isMarriageInquiryMahramAccepted,
+          isMarriageInquiryMahramAcceptedSentTo: isMarriageInquiryMahramAcceptedSentTo,
         );
 
         final leading = Container(
@@ -1001,6 +1066,25 @@ class _NotificationPageState extends State<NotificationPage> {
                 return;
               }
 
+              // ✅ MAHRAM_ACCEPTED (both variants) → open MAN profile (same behavior)
+              if ((isMarriageInquiryMahramAccepted || isMarriageInquiryMahramAcceptedSentTo) &&
+                  inquiryMahramAcceptedManId != null &&
+                  inquiryMahramAcceptedManId!.isNotEmpty) {
+                if (!mounted) return;
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProfilePage(
+                      userId: inquiryMahramAcceptedManId!,
+                      inquiryId: inquiryId ?? '',
+                    ),
+                  ),
+                );
+                if (!mounted) return;
+                setState(() {});
+                return;
+              }
+
               // 💍 Marriage inquiry mahram notif → go to MAN profile
               if (isMarriageInquiryMahram &&
                   inquiryId != null &&
@@ -1024,8 +1108,31 @@ class _NotificationPageState extends State<NotificationPage> {
                 return;
               }
 
-              // 💍 Man accepted/declined → open man's profile
-              if ((isMarriageInquiryAccepted || isMarriageInquiryDeclined) &&
+              // ✅ UPDATED: accepted → open the OTHER user's profile
+              if (isMarriageInquiryAccepted &&
+                  inquiryAcceptedOtherUserId != null &&
+                  inquiryAcceptedOtherUserId!.isNotEmpty &&
+                  inquiryId != null &&
+                  inquiryId!.isNotEmpty) {
+                if (!mounted) return;
+
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProfilePage(
+                      userId: inquiryAcceptedOtherUserId!,
+                      inquiryId: inquiryId!,
+                    ),
+                  ),
+                );
+
+                if (!mounted) return;
+                setState(() {});
+                return;
+              }
+
+              // 💍 Man declined → open man's profile (kept as-is)
+              if (isMarriageInquiryDeclined &&
                   inquiryManId != null &&
                   inquiryManId!.isNotEmpty &&
                   inquiryId != null &&
@@ -1075,6 +1182,16 @@ class _NotificationPageState extends State<NotificationPage> {
                   inquiryChatRoomId != null &&
                   inquiryChatRoomId!.isNotEmpty) {
                 if (!mounted) return;
+
+                final exists = await ChatService().groupRoomExistsInDatabase(inquiryChatRoomId!);
+
+                if (!exists) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('This group is no longer available.'.tr())),
+                  );
+                  return;
+                }
 
                 await Navigator.push(
                   context,
@@ -1182,6 +1299,8 @@ class _NotificationPageState extends State<NotificationPage> {
     required bool isMarriageInquiryGroupCreated,
     required bool isMarriageInquiryAccepted,
     required bool isMarriageInquiryDeclined,
+    required bool isMarriageInquiryMahramAccepted,
+    required bool isMarriageInquiryMahramAcceptedSentTo,
   }) {
     if (isFriendRequest) return Icons.person_add_alt_1;
     if (isFriendAccepted) return Icons.handshake;
@@ -1193,6 +1312,11 @@ class _NotificationPageState extends State<NotificationPage> {
     if (isLike) return Icons.favorite;
     if (isComment || isCommentReply) return Icons.mode_comment_outlined;
     if (isFollow) return Icons.person;
+
+    // ✅ icon for MARRIAGE_INQUIRY_MAHRAM_ACCEPTED (both types)
+    if (isMarriageInquiryMahramAccepted || isMarriageInquiryMahramAcceptedSentTo) {
+      return Icons.verified_user;
+    }
 
     if (isMarriageInquiryAccepted) return Icons.check_circle_outline;
     if (isMarriageInquiryDeclined) return Icons.cancel_outlined;

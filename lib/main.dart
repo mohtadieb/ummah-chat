@@ -19,6 +19,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'services/notifications/push_notification_service.dart';
 
 // 🔔 Background handler (top-level)
+@pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   debugPrint(

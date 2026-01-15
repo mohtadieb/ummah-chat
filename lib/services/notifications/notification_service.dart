@@ -51,48 +51,49 @@ class NotificationService {
 
   /// 🔔 Unread count stream for bell badge
   Stream<int> unreadCountStream() {
-    final userId = _currentUserId;
-    if (userId.isEmpty) return Stream.value(0);
+    // React to auth changes, so cold-start from push works
+    return _auth.onAuthStateChange.asyncExpand((_) {
+      final userId = _currentUserId;
+      if (userId.isEmpty) return Stream.value(0);
 
-    return _db
-        .from('notifications')
-        .stream(primaryKey: ['id'])
-        .eq('user_id', userId)
-        .map((rows) {
-      final unread = rows.where((r) {
-        final isUnread = r['is_read'] == false || r['is_read'] == 0;
-        return isUnread;
-      }).length;
+      return _db
+          .from('notifications')
+          .stream(primaryKey: ['id'])
+          .eq('user_id', userId)
+          .map((rows) {
+        final unread = rows.where((r) {
+          final isUnread = r['is_read'] == false || r['is_read'] == 0;
+          return isUnread;
+        }).length;
 
-      debugPrint('🔔 unreadCountStream rows=${rows.length}, unread=$unread');
-      return unread;
-    });
+        debugPrint('🔔 unreadCountStream rows=${rows.length}, unread=$unread');
+        return unread;
+      });
+    }).distinct();
   }
+
 
 
   /// 📄 Full notifications list
   Stream<List<models.Notification>> notificationsStream() {
-    final userId = _currentUserId;
-    if (userId.isEmpty) return Stream.value([]);
+    return _auth.onAuthStateChange.asyncExpand((_) {
+      final userId = _currentUserId;
+      if (userId.isEmpty) return Stream.value([]);
 
-    return _db
-        .from('notifications')
-        .stream(primaryKey: ['id'])
-        .eq('user_id', userId)
-        .map((rows) {
-      final sorted = [...rows];
+      return _db
+          .from('notifications')
+          .stream(primaryKey: ['id'])
+          .eq('user_id', userId)
+          .map((rows) {
+        final sorted = [...rows];
+        sorted.sort((a, b) => DateTime.parse(b['created_at'])
+            .compareTo(DateTime.parse(a['created_at'])));
 
-      sorted.sort(
-            (a, b) => DateTime.parse(b['created_at']).compareTo(
-          DateTime.parse(a['created_at']),
-        ),
-      );
-
-      return sorted
-          .map((data) => models.Notification.fromMap(data))
-          .toList();
+        return sorted.map((data) => models.Notification.fromMap(data)).toList();
+      });
     });
   }
+
 
 
   // -------------------------
@@ -454,6 +455,10 @@ class NotificationService {
     if (b.startsWith('MARRIAGE_INQUIRY_MAHRAM:')) return 'MARRIAGE_INQUIRY_MAHRAM';
     if (b.startsWith('MARRIAGE_INQUIRY_MAN_DECISION:')) return 'MARRIAGE_INQUIRY_MAN_DECISION';
     if (b.startsWith('MARRIAGE_INQUIRY_GROUP_CREATED:')) return 'MARRIAGE_INQUIRY_GROUP_CREATED';
+    if (b.startsWith('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED:')) {
+      return 'MARRIAGE_INQUIRY_MAHRAM_ACCEPTED';
+    }
+
 
 
     // safe fallback

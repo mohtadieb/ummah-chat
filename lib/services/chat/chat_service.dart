@@ -1022,6 +1022,19 @@ class ChatService {
     ).asyncMap((_) => fetchGroupRoomsForUserFromDatabase(userId));
   }
 
+  Future<bool> groupRoomExistsInDatabase(String chatRoomId) async {
+    if (chatRoomId.trim().isEmpty) return false;
+
+    final row = await _supabase
+        .from('chat_rooms')
+        .select('id')
+        .eq('id', chatRoomId)
+        .maybeSingle();
+
+    return row != null;
+  }
+
+
   // ---------------------------------------------------------------------------
   // 👥 GROUP MEMBERS
   // ---------------------------------------------------------------------------

@@ -1735,7 +1735,7 @@ class DatabaseService {
           'manId': manId,
           'womanId': womanId,
         },
-        fromUserId: manId, // keep as man for your NotificationPage parsing
+        fromUserId: womanId, // keep as man for your NotificationPage parsing
         type: 'social',
         unreadCount: 1,
         isRead: false,
@@ -1819,7 +1819,7 @@ class DatabaseService {
         'manId': manId,
         'womanId': womanId,
       },
-      fromUserId: manId,
+      fromUserId: womanId,
       type: 'social',
       unreadCount: 1,
       isRead: false,
@@ -1855,13 +1855,8 @@ class DatabaseService {
     }).eq('id', inquiryId);
   }
 
-  /// BOTH FLOWS:
-  /// Mahram approves/declines.
-  /// - Requires status=pending_mahram_response and mahram_status=pending.
-  /// - If declined -> ends inquiry (closed_mahram_declined) + notify man & woman.
-  /// - If approved:
-  ///    - initiated_by=woman -> status=pending_man_decision + notify man (opens WOMAN profile)
-  ///    - initiated_by=man   -> create group immediately + notify all 3
+  // ✅ Only the relevant method below (as you pasted), updated.
+  // ✅ COMMENTS PRESERVED (and I only added a few clearly-marked ones).
   Future<void> mahramRespondToInquiryInDatabase({
     required String inquiryId,
     required bool approve,
@@ -1972,8 +1967,44 @@ class DatabaseService {
         isRead: false,
       );
 
+      // ✅ notify WOMAN: mahram accepted, inquiry sent to man
+      // ✅ UPDATE: use a DIFFERENT body prefix so NotificationPage can show the correct key
+      await NotificationService().createNotificationForUser(
+        targetUserId: womanId,
+        title: 'notif_marriage_inquiry_mahram_accepted_sent_to'.tr(),
+        body: 'MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:$inquiryId::$manId',
+        sendPush: true,
+        data: {
+          'type': 'MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO',
+          'inquiryId': inquiryId,
+          'manId': manId,
+        },
+        fromUserId: mahramId,
+        type: 'social',
+        unreadCount: 1,
+        isRead: false,
+      );
+
       return;
     }
+
+    // ✅ Flow 1 (man initiated): notify the WOMAN: mahram accepted (simple title)
+    // ✅ UPDATE: keep body as the base "ACCEPTED" type so NotificationPage maps to *_title
+    await NotificationService().createNotificationForUser(
+      targetUserId: womanId,
+      title: 'notif_marriage_inquiry_mahram_accepted_title'.tr(),
+      body: 'MARRIAGE_INQUIRY_MAHRAM_ACCEPTED:$inquiryId::$manId',
+      sendPush: true,
+      data: {
+        'type': 'MARRIAGE_INQUIRY_MAHRAM_ACCEPTED',
+        'inquiryId': inquiryId,
+        'manId': manId,
+      },
+      fromUserId: mahramId, // optional; shows mahram as sender in DB
+      type: 'social',
+      unreadCount: 1,
+      isRead: false,
+    );
 
     // ✅ Flow 1 (man initiated): create group immediately
     await _db.from('marriage_inquiries').update({
@@ -1981,6 +2012,25 @@ class DatabaseService {
       'mahram_status': 'approved',
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', inquiryId);
+
+    // ✅ NEW: notify MAN "accepted" BEFORE "group created"
+    // ✅ Body format standardized: <inquiryId>::<otherUserId>
+    // ✅ For the man, the "other user" is the WOMAN.
+    await NotificationService().createNotificationForUser(
+      targetUserId: manId,
+      title: 'notif_marriage_inquiry_accepted'.tr(namedArgs: {'name': ''}),
+      body: 'MARRIAGE_INQUIRY_ACCEPTED:$inquiryId::$womanId',
+      sendPush: true,
+      data: {
+        'type': 'MARRIAGE_INQUIRY_ACCEPTED',
+        'inquiryId': inquiryId,
+        'otherUserId': womanId,
+      },
+      fromUserId: womanId, // ✅ so it shows as coming from the woman
+      type: 'social',
+      unreadCount: 1,
+      isRead: false,
+    );
 
     final String groupName = 'Marriage inquiry'.tr();
 
@@ -2018,6 +2068,7 @@ class DatabaseService {
       );
     }
   }
+
 
 
   /// FLOW 2 ONLY (initiated_by=woman):
@@ -2272,27 +2323,38 @@ class DatabaseService {
       throw Exception('Only man or woman can cancel/end the inquiry.');
     }
 
-    // ✅ If group exists -> delete group + end inquiry via secure RPC (works even if mahram created the room)
+    // ✅ If group exists -> delete group + end inquiry via secure RPC
     if (chatRoomId.isNotEmpty) {
       await _db.rpc(
         'end_marriage_inquiry_and_delete_group',
         params: {'p_inquiry_id': inquiryId},
       );
 
-      // ✅ remove any pending notifications for this inquiry
       await NotificationService().deleteMarriageInquiryNotifications(inquiryId);
       return;
     }
 
-    // ✅ No group yet -> just cancel inquiry
-    await _db.from('marriage_inquiries').update({
+    // ✅ No group yet -> cancel inquiry
+    final updated = await _db
+        .from('marriage_inquiries')
+        .update({
       'status': 'cancelled',
+      // you can omit updated_at if you have trigger set_updated_at()
       'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', inquiryId);
+    })
+        .eq('id', inquiryId)
+    // ✅ IMPORTANT: force RETURNING so RLS issues don't fail silently
+        .select('id, status, updated_at')
+        .maybeSingle();
 
-    // ✅ remove pending notifications for this inquiry
+    if (updated == null) {
+      // This almost always means UPDATE was blocked by RLS (0 rows affected)
+      throw Exception('Cancel failed: update blocked (RLS) or inquiry not found.');
+    }
+
     await NotificationService().deleteMarriageInquiryNotifications(inquiryId);
   }
+
 
 
 

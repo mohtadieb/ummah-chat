@@ -222,6 +222,27 @@
   "cancel_inquiry": "Aanvraag annuleren",
   "end_inquiry": "Aanvraag beëindigen",
   "marriage_inquiry_sent": "Huwelijksaanvraag verzonden",
+  "marriage_inquiry_sent_waiting_mahram": "Huwelijksaanvraag verzonden, wachtend op goedkeuring van de mahram.",
+  "notif_mahram_chosen_for_marriage":
+  "{name} heeft jou gekozen als haar mahram voor een huwelijksaanvraag. Tik om het profiel van de man te bekijken.",
+  "notif_marriage_inquiry_man_decision": "{name} heeft een huwelijksaanvraag gedaan. Klik hier om naar haar profiel te gaan om te accepteren of te weigeren.",
+  "notif_marriage_inquiry_mahram_accepted_title": "Mahram geaccepteerd",
+  "notif_marriage_inquiry_mahram_accepted_sent_to": "Mahram geaccepteerd, aanvraag doorgestuurd naar {name}.",
+
+  "mahram_required_for_marriage_inquiry": "Om een huwelijksverzoek te starten, moet er een mahram aanwezig zijn. Voeg een mahram toe om verder te gaan.",
+  "marriage_group_intro_message": "Welkom in deze huwelijksaanvraag-groep.\nDeze ruimte is aangemaakt voor respectvolle en transparante communicatie, met aanwezigheid van de mahram.\nGa het gesprek aan met oprechtheid, goede intenties en wederzijds respect. 🤍",
+
+  "select_mahram": "Selecteer een mahram",
+  "no_mahrams_found": "Geen mahrams gevonden",
+  "tap_to_select": "Tik om te selecteren",
+  "notif_marriage_inquiry_mahram_chosen": "{name} heeft jou gekozen als haar mahram.",
+  "group_no_longer_available": "Deze groep is niet meer beschikbaar.",
+
+
+  "end_marriage_inquiry_title": "Huwelijksaanvraag beëindigen",
+  "end_marriage_inquiry_confirm": "Weet je zeker dat je deze huwelijksaanvraag wilt beëindigen?",
+  "End": "Beëindigen",
+
 
   "accept": "Accepteren",
   "decline": "Afwijzen",
@@ -233,10 +254,10 @@
 
   "notif_marriage_inquiry_request": "{name} heeft je een huwelijksaanvraag gestuurd",
   "notif_marriage_inquiry_mahram": "{name} heeft jou als mahram gekozen",
-  "notif_marriage_inquiry_man_decision": "Beslissing vereist voor huwelijksaanvraag",
   "notif_marriage_inquiry_group_created": "Groep voor huwelijksaanvraag aangemaakt",
   "notif_marriage_inquiry_accepted": "{name} heeft de huwelijksaanvraag geaccepteerd",
   "notif_marriage_inquiry_declined": "{name} heeft de huwelijksaanvraag afgewezen",
+  "mahram_selected": "Mahram geselecteerd",
 
 
 
