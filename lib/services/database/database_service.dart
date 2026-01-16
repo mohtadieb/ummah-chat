@@ -1946,10 +1946,7 @@ class DatabaseService {
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       }).eq('id', inquiryId);
 
-      // ✅ IMPORTANT:
-      // - the notification must open the WOMAN profile for the man
-      // - so set fromUserId = womanId
-      // - keep body format consistent with NotificationPage parser
+      // ✅ notify MAN: open WOMAN profile
       await NotificationService().createNotificationForUser(
         targetUserId: manId,
         title: 'notif_marriage_inquiry_man_decision_title'.tr(),
@@ -1961,14 +1958,13 @@ class DatabaseService {
           'womanId': womanId,
           'mahramId': mahramId,
         },
-        fromUserId: womanId, // ✅ CHANGED (was mahramId)
+        fromUserId: womanId, // ✅ CHANGED
         type: 'social',
         unreadCount: 1,
         isRead: false,
       );
 
       // ✅ notify WOMAN: mahram accepted, inquiry sent to man
-      // ✅ UPDATE: use a DIFFERENT body prefix so NotificationPage can show the correct key
       await NotificationService().createNotificationForUser(
         targetUserId: womanId,
         title: 'notif_marriage_inquiry_mahram_accepted_sent_to'.tr(),
@@ -1988,8 +1984,7 @@ class DatabaseService {
       return;
     }
 
-    // ✅ Flow 1 (man initiated): notify the WOMAN: mahram accepted (simple title)
-    // ✅ UPDATE: keep body as the base "ACCEPTED" type so NotificationPage maps to *_title
+    // ✅ Flow 1 (man initiated): notify WOMAN: mahram accepted (simple title)
     await NotificationService().createNotificationForUser(
       targetUserId: womanId,
       title: 'notif_marriage_inquiry_mahram_accepted_title'.tr(),
@@ -2000,7 +1995,7 @@ class DatabaseService {
         'inquiryId': inquiryId,
         'manId': manId,
       },
-      fromUserId: mahramId, // optional; shows mahram as sender in DB
+      fromUserId: mahramId,
       type: 'social',
       unreadCount: 1,
       isRead: false,
@@ -2014,8 +2009,6 @@ class DatabaseService {
     }).eq('id', inquiryId);
 
     // ✅ NEW: notify MAN "accepted" BEFORE "group created"
-    // ✅ Body format standardized: <inquiryId>::<otherUserId>
-    // ✅ For the man, the "other user" is the WOMAN.
     await NotificationService().createNotificationForUser(
       targetUserId: manId,
       title: 'notif_marriage_inquiry_accepted'.tr(namedArgs: {'name': ''}),
@@ -2026,7 +2019,7 @@ class DatabaseService {
         'inquiryId': inquiryId,
         'otherUserId': womanId,
       },
-      fromUserId: womanId, // ✅ so it shows as coming from the woman
+      fromUserId: womanId,
       type: 'social',
       unreadCount: 1,
       isRead: false,
@@ -2040,14 +2033,21 @@ class DatabaseService {
       initialMemberIds: [manId, womanId],
     );
 
+    // ✅ NEW: insert INTRO system message into the group
+    await _db.from('messages').insert({
+      'chat_room_id': chatRoomId,
+      'sender_id': mahramId, // must be a valid user id
+      'message': 'SYSTEM:marriage_group_intro_message',
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+    });
+
     await _db.from('marriage_inquiries').update({
       'status': 'group_created',
       'chat_room_id': chatRoomId,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', inquiryId);
 
-    final bodyCode =
-        'MARRIAGE_INQUIRY_GROUP_CREATED:$inquiryId::$chatRoomId::$groupName';
+    final bodyCode = 'MARRIAGE_INQUIRY_GROUP_CREATED:$inquiryId::$chatRoomId::$groupName';
 
     for (final target in [manId, womanId, mahramId]) {
       await NotificationService().createNotificationForUser(
@@ -2068,6 +2068,7 @@ class DatabaseService {
       );
     }
   }
+
 
 
 
@@ -2163,14 +2164,21 @@ class DatabaseService {
       initialMemberIds: [womanId, mahramId],
     );
 
+    // ✅ NEW: insert INTRO system message into the group
+    await _db.from('messages').insert({
+      'chat_room_id': chatRoomId,
+      'sender_id': manId, // must be a valid user id
+      'message': 'SYSTEM:marriage_group_intro_message',
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+    });
+
     await _db.from('marriage_inquiries').update({
       'status': 'group_created',
       'chat_room_id': chatRoomId,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', inquiryId);
 
-    final bodyCode =
-        'MARRIAGE_INQUIRY_GROUP_CREATED:$inquiryId::$chatRoomId::$groupName';
+    final bodyCode = 'MARRIAGE_INQUIRY_GROUP_CREATED:$inquiryId::$chatRoomId::$groupName';
 
     for (final target in [manId, womanId, mahramId]) {
       await NotificationService().createNotificationForUser(
@@ -2191,6 +2199,7 @@ class DatabaseService {
       );
     }
   }
+
 
   Future<Map<String, dynamic>?> getLatestActiveInquiryBetweenMeAnd(String otherUserId) async {
     final currentUserId = _auth.currentUser?.id;
