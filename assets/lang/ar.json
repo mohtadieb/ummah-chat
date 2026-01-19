@@ -204,6 +204,7 @@
   "marriage_inquiry": "طلب زواج",
   "neither": "لا هذا ولا ذاك",
   "cannot_add_opposite_gender": "لا يمكنك إضافة هذا المستخدم كصديق",
+  "marriage_inquiry_for": "طلب زواج لـ {name}",
 
   "notif_marriage_inquiry_request": "أرسل {name} طلب زواج",
   "notif_marriage_inquiry_mahram": "قام {name} باختيارك كمحرم",

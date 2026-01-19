@@ -1050,6 +1050,18 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
     final typingLabel = _buildTypingLabel();
 
+    String localizeGroupName(String raw) {
+      final s = raw.trim();
+      if (s.startsWith('L10N:')) {
+        final key = s.substring('L10N:'.length).trim();
+        return key.isEmpty ? raw : key.tr();
+      }
+      return raw;
+    }
+
+    final appBarTitle = localizeGroupName(widget.groupName);
+
+
     return PopScope(
       canPop: !_isSelectionMode,
       onPopInvoked: (didPop) {
@@ -1078,7 +1090,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                widget.groupName,
+                appBarTitle,
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               Text(

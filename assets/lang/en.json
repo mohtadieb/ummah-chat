@@ -295,6 +295,7 @@
   "mahram_selected": "Mahram selected",
   "mahram_required_for_marriage_inquiry": "To continue a marriage inquiry, a mahram must be present. Please add a mahram first.",
   "marriage_group_intro_message": "Welcome to this marriage inquiry group.\nThis space has been created to allow respectful and transparent communication, with the presence of the mahram.\nPlease proceed with sincerity, good intentions, and mutual respect. 🤍",
+  "marriage_inquiry_for": "Marriage inquiry for {name}",
 
 
 

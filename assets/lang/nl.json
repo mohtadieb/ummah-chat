@@ -237,6 +237,7 @@
   "tap_to_select": "Tik om te selecteren",
   "notif_marriage_inquiry_mahram_chosen": "{name} heeft jou gekozen als haar mahram.",
   "group_no_longer_available": "Deze groep is niet meer beschikbaar.",
+  "marriage_inquiry_for": "Huwelijksaanvraag voor {name}",
 
 
   "end_marriage_inquiry_title": "Huwelijksaanvraag beëindigen",

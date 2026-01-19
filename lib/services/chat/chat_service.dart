@@ -977,13 +977,16 @@ class ChatService {
   ///     'avatar_url': <nullable>,
   ///     'created_at': <DateTime or String>,
   ///   }
-  Future<List<Map<String, dynamic>>> fetchGroupRoomsForUserFromDatabase(
-      String userId,
-      ) async {
+  Future<List<Map<String, dynamic>>> fetchGroupRoomsForUserFromDatabase(String userId) async {
     final data = await _supabase
         .from('chat_room_members')
         .select(
-      'chat_room_id, chat_rooms!inner (id, name, avatar_url, created_at, is_group)',
+      'chat_room_id, chat_rooms!inner ('
+          'id, name, avatar_url, created_at, is_group, '
+          'context_type, context_id, '
+          'man_id, woman_id, mahram_id, '
+          'man_name, woman_name'
+          ')',
     )
         .eq('user_id', userId)
         .eq('chat_rooms.is_group', true)
@@ -1000,6 +1003,15 @@ class ChatService {
         'name': room['name'] ?? 'Group',
         'avatar_url': room['avatar_url'],
         'created_at': room['created_at'],
+
+        // ✅ NEW: keep extra fields so UI can localize + detect marriage inquiry
+        'context_type': room['context_type'],
+        'context_id': room['context_id'],
+        'man_id': room['man_id'],
+        'woman_id': room['woman_id'],
+        'mahram_id': room['mahram_id'],
+        'man_name': room['man_name'],
+        'woman_name': room['woman_name'],
       };
 
       groups.add(map);
@@ -1007,6 +1019,7 @@ class ChatService {
 
     return groups;
   }
+
 
   /// Polling stream of group rooms for the current user FROM DATABASE.
   Stream<List<Map<String, dynamic>>> groupRoomsForUserPollingStreamFromDatabase(

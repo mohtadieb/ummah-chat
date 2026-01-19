@@ -11,14 +11,23 @@ type NotifType =
   | "FOLLOW_USER"
   | "FRIEND_REQUEST"
   | "FRIEND_ACCEPTED"
-  | "MAHRAM_REQUEST"     // ✅ NEW
-  | "MAHRAM_ACCEPTED"    // ✅ NEW
+  | "MAHRAM_REQUEST"
+  | "MAHRAM_ACCEPTED"
   | "LIKE_POST"
   | "COMMENT_POST"
   | "COMMENT_REPLY"
   | "CHAT_MESSAGE"
   | "GROUP_MESSAGE"
-  | "GROUP_ADDED";
+  | "GROUP_ADDED"
+  // ✅ NEW: Marriage inquiry notifications
+  | "MARRIAGE_INQUIRY_REQUEST"
+  | "MARRIAGE_INQUIRY_MAHRAM"
+  | "MARRIAGE_INQUIRY_MAN_DECISION"
+  | "MARRIAGE_INQUIRY_MAHRAM_ACCEPTED"
+  | "MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO"
+  | "MARRIAGE_INQUIRY_ACCEPTED"
+  | "MARRIAGE_INQUIRY_DECLINED"
+  | "MARRIAGE_INQUIRY_GROUP_CREATED";
 
 type LocaleCode = "en" | "nl" | "ar";
 
@@ -59,6 +68,9 @@ function template(
   const groupName = safeStr(args.groupName);
   const preview = safeStr(args.preview);
 
+  // ✅ optional "name" arg for templates like: "sent to {name}"
+  const nameArg = safeStr(args.name);
+
   if (locale === "nl") {
     switch (type) {
       case "FOLLOW_USER":
@@ -83,7 +95,7 @@ function template(
             : "Je vriendschapsverzoek is geaccepteerd.",
         };
 
-      case "MAHRAM_REQUEST": // ✅ NEW
+      case "MAHRAM_REQUEST":
         return {
           title: "Mahram-verzoek",
           body: senderFirst
@@ -91,7 +103,7 @@ function template(
             : "Je hebt een mahram-verzoek ontvangen.",
         };
 
-      case "MAHRAM_ACCEPTED": // ✅ NEW
+      case "MAHRAM_ACCEPTED":
         return {
           title: "Mahram geaccepteerd",
           body: senderFirst
@@ -138,7 +150,9 @@ function template(
       case "GROUP_MESSAGE":
         return {
           title: groupName || "Groepsbericht",
-          body: preview || (groupName ? `Nieuw bericht in ${groupName}.` : "Nieuw groepsbericht."),
+          body:
+            preview ||
+            (groupName ? `Nieuw bericht in ${groupName}.` : "Nieuw groepsbericht."),
         };
 
       case "GROUP_ADDED":
@@ -147,6 +161,69 @@ function template(
           body: senderFirst
             ? `${senderFirst} heeft je toegevoegd aan de groep.`
             : "Je bent toegevoegd aan een groep.",
+        };
+
+      // -------------------------
+      // 💍 Marriage inquiry (NL)
+      // -------------------------
+      case "MARRIAGE_INQUIRY_REQUEST":
+        return {
+          title: "Huwelijksaanvraag",
+          body: senderFirst
+            ? `${senderFirst} heeft een huwelijksaanvraag gestuurd. Tik om te bekijken.`
+            : "Je hebt een huwelijksaanvraag ontvangen.",
+        };
+
+      case "MARRIAGE_INQUIRY_MAHRAM":
+        return {
+          title: "Mahram gekozen",
+          body: senderFirst
+            ? `${senderFirst} heeft jou gekozen als mahram voor een huwelijksaanvraag. Tik om het profiel te bekijken.`
+            : "Je bent gekozen als mahram voor een huwelijksaanvraag.",
+        };
+
+      case "MARRIAGE_INQUIRY_MAN_DECISION":
+        return {
+          title: "Beslissing nodig",
+          body: senderFirst
+            ? `${senderFirst} heeft een huwelijksaanvraag gedaan. Tik om te accepteren of te weigeren.`
+            : "Er is een huwelijksaanvraag. Tik om te accepteren of te weigeren.",
+        };
+
+      case "MARRIAGE_INQUIRY_MAHRAM_ACCEPTED":
+        return {
+          title: "Mahram geaccepteerd",
+          body: "De mahram heeft geaccepteerd. Tik om verder te gaan.",
+        };
+
+      case "MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO":
+        return {
+          title: "Mahram geaccepteerd",
+          body: nameArg
+            ? `Mahram geaccepteerd, aanvraag verzonden naar ${nameArg}.`
+            : "Mahram geaccepteerd, aanvraag is verzonden.",
+        };
+
+      case "MARRIAGE_INQUIRY_ACCEPTED":
+        return {
+          title: "Huwelijksaanvraag geaccepteerd",
+          body: senderFirst
+            ? `${senderFirst} heeft de huwelijksaanvraag geaccepteerd.`
+            : "De huwelijksaanvraag is geaccepteerd.",
+        };
+
+      case "MARRIAGE_INQUIRY_DECLINED":
+        return {
+          title: "Huwelijksaanvraag geweigerd",
+          body: senderFirst
+            ? `${senderFirst} heeft de huwelijksaanvraag geweigerd.`
+            : "De huwelijksaanvraag is geweigerd.",
+        };
+
+      case "MARRIAGE_INQUIRY_GROUP_CREATED":
+        return {
+          title: "Groep aangemaakt",
+          body: "De groepschat voor de huwelijksaanvraag is aangemaakt. Tik om te openen.",
         };
     }
   }
@@ -171,13 +248,13 @@ function template(
           body: senderFirst ? `${senderFirst} قبل طلب صداقتك.` : "تم قبول طلب صداقتك.",
         };
 
-      case "MAHRAM_REQUEST": // ✅ NEW
+      case "MAHRAM_REQUEST":
         return {
           title: "طلب محرم",
           body: senderFirst ? `${senderFirst} أرسل لك طلب محرم.` : "لديك طلب محرم جديد.",
         };
 
-      case "MAHRAM_ACCEPTED": // ✅ NEW
+      case "MAHRAM_ACCEPTED":
         return {
           title: "تم قبول طلب المحرم",
           body: senderFirst ? `${senderFirst} قبل طلب المحرم.` : "تم قبول طلب المحرم.",
@@ -222,13 +299,74 @@ function template(
       case "GROUP_MESSAGE":
         return {
           title: groupName || "رسالة جماعية",
-          body: preview || (groupName ? `رسالة جديدة في ${groupName}.` : "رسالة جماعية جديدة."),
+          body:
+            preview ||
+            (groupName ? `رسالة جديدة في ${groupName}.` : "رسالة جماعية جديدة."),
         };
 
       case "GROUP_ADDED":
         return {
           title: groupName || "مجموعة",
           body: senderFirst ? `${senderFirst} أضافك إلى المجموعة.` : "تمت إضافتك إلى مجموعة.",
+        };
+
+      // -------------------------
+      // 💍 Marriage inquiry (AR)
+      // -------------------------
+      case "MARRIAGE_INQUIRY_REQUEST":
+        return {
+          title: "طلب زواج",
+          body: senderFirst
+            ? `${senderFirst} أرسل طلب زواج. اضغط للعرض.`
+            : "لديك طلب زواج جديد.",
+        };
+
+      case "MARRIAGE_INQUIRY_MAHRAM":
+        return {
+          title: "تم اختيارك كمحرم",
+          body: senderFirst
+            ? `${senderFirst} اختارك كمحرم لطلب زواج. اضغط لعرض الملف الشخصي.`
+            : "تم اختيارك كمحرم لطلب زواج.",
+        };
+
+      case "MARRIAGE_INQUIRY_MAN_DECISION":
+        return {
+          title: "مطلوب قرار",
+          body: senderFirst
+            ? `${senderFirst} طلب/طلبت زواج. اضغط للقبول أو الرفض.`
+            : "هناك طلب زواج. اضغط للقبول أو الرفض.",
+        };
+
+      case "MARRIAGE_INQUIRY_MAHRAM_ACCEPTED":
+        return {
+          title: "تم قبول المحرم",
+          body: "تم قبول المحرم. اضغط للمتابعة.",
+        };
+
+      case "MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO":
+        return {
+          title: "تم قبول المحرم",
+          body: nameArg
+            ? `تم قبول المحرم، وتم إرسال الطلب إلى ${nameArg}.`
+            : "تم قبول المحرم، وتم إرسال الطلب.",
+        };
+
+      case "MARRIAGE_INQUIRY_ACCEPTED":
+        return {
+          title: "تم قبول طلب الزواج",
+          body: senderFirst ? `${senderFirst} قبل طلب الزواج.` : "تم قبول طلب الزواج.",
+        };
+
+      case "MARRIAGE_INQUIRY_DECLINED":
+        return {
+          title: "تم رفض طلب الزواج",
+          body: senderFirst ? `${senderFirst} رفض طلب الزواج.` : "تم رفض طلب الزواج.",
+        };
+
+      case "MARRIAGE_INQUIRY_GROUP_CREATED":
+        return {
+          title: "تم إنشاء المجموعة",
+          body: "تم إنشاء مجموعة الدردشة لطلب الزواج. اضغط لفتحها.",
         };
     }
   }
@@ -253,13 +391,13 @@ function template(
         body: senderFirst ? `${senderFirst} accepted your friend request.` : "Your friend request was accepted.",
       };
 
-    case "MAHRAM_REQUEST": // ✅ NEW
+    case "MAHRAM_REQUEST":
       return {
         title: "Mahram request",
         body: senderFirst ? `${senderFirst} sent you a mahram request.` : "You received a new mahram request.",
       };
 
-    case "MAHRAM_ACCEPTED": // ✅ NEW
+    case "MAHRAM_ACCEPTED":
       return {
         title: "Mahram request accepted",
         body: senderFirst ? `${senderFirst} accepted your mahram request.` : "Your mahram request was accepted.",
@@ -312,6 +450,69 @@ function template(
         title: groupName || "Group",
         body: senderFirst ? `${senderFirst} added you to the group.` : "You were added to a group.",
       };
+
+    // -------------------------
+    // 💍 Marriage inquiry (EN)
+    // -------------------------
+    case "MARRIAGE_INQUIRY_REQUEST":
+      return {
+        title: "Marriage inquiry",
+        body: senderFirst
+          ? `${senderFirst} requested a marriage inquiry. Tap to view.`
+          : "You received a marriage inquiry request.",
+      };
+
+    case "MARRIAGE_INQUIRY_MAHRAM":
+      return {
+        title: "You were chosen as a mahram",
+        body: senderFirst
+          ? `${senderFirst} chose you as her mahram for a marriage inquiry. Tap to view the profile.`
+          : "You were chosen as a mahram for a marriage inquiry.",
+      };
+
+    case "MARRIAGE_INQUIRY_MAN_DECISION":
+      return {
+        title: "Decision needed",
+        body: senderFirst
+          ? `${senderFirst} requested a marriage inquiry. Tap to accept or decline.`
+          : "A marriage inquiry needs your decision. Tap to accept or decline.",
+      };
+
+    case "MARRIAGE_INQUIRY_MAHRAM_ACCEPTED":
+      return {
+        title: "Mahram accepted",
+        body: "The mahram accepted. Tap to continue.",
+      };
+
+    case "MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO":
+      return {
+        title: "Mahram accepted",
+        body: nameArg
+          ? `Mahram accepted, inquiry sent to ${nameArg}.`
+          : "Mahram accepted, inquiry was sent.",
+      };
+
+    case "MARRIAGE_INQUIRY_ACCEPTED":
+      return {
+        title: "Marriage inquiry accepted",
+        body: senderFirst
+          ? `${senderFirst} accepted the marriage inquiry.`
+          : "The marriage inquiry was accepted.",
+      };
+
+    case "MARRIAGE_INQUIRY_DECLINED":
+      return {
+        title: "Marriage inquiry declined",
+        body: senderFirst
+          ? `${senderFirst} declined the marriage inquiry.`
+          : "The marriage inquiry was declined.",
+      };
+
+    case "MARRIAGE_INQUIRY_GROUP_CREATED":
+      return {
+        title: "Group created",
+        body: "A group chat for the marriage inquiry was created. Tap to open.",
+      };
   }
 }
 
@@ -330,18 +531,20 @@ function safeTemplate(
 
 serve(async (req: Request) => {
   try {
-const body = await req.json().catch(() => ({}));
+    const body = await req.json().catch(() => ({}));
 
     // ✅ NEW payload
     const targetUserId = body?.target_user_id as string | undefined;
     const notifType = body?.notif_type as string | undefined; // accept string, we validate via safeTemplate
-    const args = (body?.args && typeof body.args === "object") ? (body.args as Record<string, unknown>) : {};
-    const dataIncoming = (body?.data && typeof body.data === "object") ? body.data : {};
+    const args =
+      (body?.args && typeof body.args === "object")
+        ? (body.args as Record<string, unknown>)
+        : {};
+    const dataIncoming =
+      (body?.data && typeof body.data === "object") ? body.data : {};
 
     console.log("send_push incoming keys:", Object.keys(body ?? {}));
     console.log("send_push new payload:", { targetUserId, notifType });
-
-
 
     // ✅ OLD payload
     const oldFcmToken = body?.fcm_token as string | undefined;
@@ -360,7 +563,9 @@ const body = await req.json().catch(() => ({}));
 
       if (!supabaseUrl || !serviceRoleKey) {
         return new Response(
-          JSON.stringify({ error: "Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY in secrets" }),
+          JSON.stringify({
+            error: "Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY in secrets",
+          }),
           { status: 500 },
         );
       }
@@ -410,7 +615,6 @@ const body = await req.json().catch(() => ({}));
       finalTitle = safeStr(res?.title) || finalTitle || "New notification";
       finalBody = safeStr(res?.body) || finalBody || "";
     }
-
 
     // -------------------------
     // Send to FCM

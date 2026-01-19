@@ -1888,8 +1888,8 @@ class DatabaseService {
     }
 
     // -----------------------------
-    // DECLINE
-    // -----------------------------
+// DECLINE
+// -----------------------------
     if (!approve) {
       await _db.from('marriage_inquiries').update({
         'status': 'closed_mahram_declined',
@@ -1897,7 +1897,7 @@ class DatabaseService {
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       }).eq('id', inquiryId);
 
-      // ✅ notify woman
+      // ✅ Always notify woman (opens MAN profile)
       await NotificationService().createNotificationForUser(
         targetUserId: womanId,
         title: 'notif_marriage_inquiry_declined'.tr(),
@@ -1914,25 +1914,29 @@ class DatabaseService {
         isRead: false,
       );
 
-      // ✅ notify man
-      await NotificationService().createNotificationForUser(
-        targetUserId: manId,
-        title: 'notif_marriage_inquiry_declined'.tr(),
-        body: 'MARRIAGE_INQUIRY_DECLINED:$inquiryId::$manId',
-        sendPush: true,
-        data: {
-          'type': 'MARRIAGE_INQUIRY_DECLINED',
-          'inquiryId': inquiryId,
-          'manId': manId,
-        },
-        fromUserId: mahramId,
-        type: 'social',
-        unreadCount: 1,
-        isRead: false,
-      );
+      // ✅ Notify MAN ONLY if he initiated
+      // 🔥 Body uses WOMAN ID so tapping opens her profile
+      if (initiatedBy == 'man') {
+        await NotificationService().createNotificationForUser(
+          targetUserId: manId,
+          title: 'notif_marriage_inquiry_declined'.tr(),
+          body: 'MARRIAGE_INQUIRY_DECLINED:$inquiryId::$womanId',
+          sendPush: true,
+          data: {
+            'type': 'MARRIAGE_INQUIRY_DECLINED',
+            'inquiryId': inquiryId,
+            'womanId': womanId,
+          },
+          fromUserId: mahramId,
+          type: 'social',
+          unreadCount: 1,
+          isRead: false,
+        );
+      }
 
       return;
     }
+
 
     // -----------------------------
     // APPROVE
@@ -2025,13 +2029,37 @@ class DatabaseService {
       isRead: false,
     );
 
-    final String groupName = 'Marriage inquiry'.tr();
+    final String groupName = 'L10N:marriage_inquiry';
 
     final chatRoomId = await ChatService().createGroupRoomInDatabase(
       name: groupName,
       creatorId: mahramId,
       initialMemberIds: [manId, womanId],
     );
+
+    final manProfile = await getUserFromDatabase(manId);
+    final womanProfile = await getUserFromDatabase(womanId);
+
+    final manName = (manProfile?.name ?? manProfile?.username ?? '').trim();
+    final womanName = (womanProfile?.name ?? womanProfile?.username ?? '').trim();
+
+
+    final updated = await _db.from('chat_rooms').update({
+      'context_type': 'marriage_inquiry',
+      'context_id': inquiryId,
+      'man_id': manId,
+      'woman_id': womanId,
+      'mahram_id': mahramId,
+      'man_name': manName,
+      'woman_name': womanName,
+    }).eq('id', chatRoomId)
+        .select('id, context_type, context_id, man_name, woman_name')
+        .maybeSingle();
+
+    if (updated == null) {
+      throw Exception('chat_rooms update blocked by RLS (0 rows updated).');
+    }
+
 
     // ✅ NEW: insert INTRO system message into the group
     await _db.from('messages').insert({
@@ -2108,6 +2136,9 @@ class DatabaseService {
       throw Exception('No mahram set for this inquiry.');
     }
 
+    // -----------------------------
+    // DECLINE
+    // -----------------------------
     if (!accept) {
       await _db.from('marriage_inquiries').update({
         'status': 'closed_man_declined',
@@ -2150,13 +2181,51 @@ class DatabaseService {
       return;
     }
 
+    // -----------------------------
+    // ACCEPT
+    // -----------------------------
     await _db.from('marriage_inquiries').update({
       'status': 'accepted_by_man',
       'man_status': 'accepted',
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', inquiryId);
 
-    final String groupName = 'Marriage inquiry'.tr();
+    // ✅ NEW: notify WOMAN + MAHRAM that the man accepted
+    // (send BEFORE group created notif, so ordering is correct)
+    await NotificationService().createNotificationForUser(
+      targetUserId: womanId,
+      title: 'notif_marriage_inquiry_accepted'.tr(namedArgs: {'name': ''}),
+      body: 'MARRIAGE_INQUIRY_ACCEPTED:$inquiryId::$manId',
+      sendPush: true,
+      data: {
+        'type': 'MARRIAGE_INQUIRY_ACCEPTED',
+        'inquiryId': inquiryId,
+        'manId': manId,
+      },
+      fromUserId: manId,
+      type: 'social',
+      unreadCount: 1,
+      isRead: false,
+    );
+
+    await NotificationService().createNotificationForUser(
+      targetUserId: mahramId,
+      title: 'notif_marriage_inquiry_accepted'.tr(namedArgs: {'name': ''}),
+      body: 'MARRIAGE_INQUIRY_ACCEPTED:$inquiryId::$manId',
+      sendPush: true,
+      data: {
+        'type': 'MARRIAGE_INQUIRY_ACCEPTED',
+        'inquiryId': inquiryId,
+        'manId': manId,
+      },
+      fromUserId: manId,
+      type: 'social',
+      unreadCount: 1,
+      isRead: false,
+    );
+
+    // ✅ then create the group
+    final String groupName = 'L10N:marriage_inquiry';
 
     final chatRoomId = await ChatService().createGroupRoomInDatabase(
       name: groupName,
@@ -2164,7 +2233,31 @@ class DatabaseService {
       initialMemberIds: [womanId, mahramId],
     );
 
-    // ✅ NEW: insert INTRO system message into the group
+    final manProfile = await getUserFromDatabase(manId);
+    final womanProfile = await getUserFromDatabase(womanId);
+
+    final manName = (manProfile?.name ?? manProfile?.username ?? '').trim();
+    final womanName = (womanProfile?.name ?? womanProfile?.username ?? '').trim();
+
+    final updated = await _db.from('chat_rooms').update({
+      'context_type': 'marriage_inquiry',
+      'context_id': inquiryId,
+      'man_id': manId,
+      'woman_id': womanId,
+      'mahram_id': mahramId,
+      'man_name': manName,
+      'woman_name': womanName,
+    }).eq('id', chatRoomId)
+        .select('id, context_type, context_id, man_name, woman_name')
+        .maybeSingle();
+
+    if (updated == null) {
+      throw Exception('chat_rooms update blocked by RLS (0 rows updated).');
+    }
+
+
+
+    // ✅ insert INTRO system message into the group
     await _db.from('messages').insert({
       'chat_room_id': chatRoomId,
       'sender_id': manId, // must be a valid user id
@@ -2178,7 +2271,8 @@ class DatabaseService {
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', inquiryId);
 
-    final bodyCode = 'MARRIAGE_INQUIRY_GROUP_CREATED:$inquiryId::$chatRoomId::$groupName';
+    final bodyCode =
+        'MARRIAGE_INQUIRY_GROUP_CREATED:$inquiryId::$chatRoomId::$groupName';
 
     for (final target in [manId, womanId, mahramId]) {
       await NotificationService().createNotificationForUser(
@@ -2199,6 +2293,7 @@ class DatabaseService {
       );
     }
   }
+
 
 
   Future<Map<String, dynamic>?> getLatestActiveInquiryBetweenMeAnd(String otherUserId) async {

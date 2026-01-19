@@ -132,6 +132,8 @@ class NotificationService {
     String? chatRoomId,
     int? unreadCount,
     bool? isRead,
+
+    Map<String, String>? pushArgs,
   }) async {
     // 1️⃣ Store notification in DB (for in-app list)
     final insertMap = <String, dynamic>{
@@ -166,8 +168,13 @@ class NotificationService {
           'senderName': (data?['senderName'] ?? '').trim(),
           'groupName': (data?['groupName'] ?? '').trim(),
           'preview': preview,
+
+          // ✅ NEW: allow custom args like { "name": "..." }
+          ...?pushArgs,
         },
-        data: data,
+        // ✅ your _sendLocalizedPushToUserId likely expects Map<String,String>,
+        // so make sure it's never null
+        data: data ?? const {},
       );
     }
   }
@@ -541,14 +548,11 @@ class NotificationService {
     final id = inquiryId.trim();
     if (id.isEmpty) return;
 
-    await _db.from('notifications').delete().or(
-      'body.like.MARRIAGE_INQUIRY_REQUEST:$id%,'
-          'body.like.MARRIAGE_INQUIRY_MAHRAM:$id%,'
-          'body.like.MARRIAGE_INQUIRY_MAN_DECISION:$id%,'
-          'body.like.MARRIAGE_INQUIRY_GROUP_CREATED:$id%,'
-          'body.like.MARRIAGE_INQUIRY_ACCEPTED:$id%,'
-          'body.like.MARRIAGE_INQUIRY_DECLINED:$id%',
-    );
+    // ✅ Delete directly; let DELETE RLS filter what’s allowed.
+    await _db
+        .from('notifications')
+        .delete()
+        .ilike('body', 'MARRIAGE_INQUIRY_%:$id%');
   }
 
 

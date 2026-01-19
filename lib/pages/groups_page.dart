@@ -44,8 +44,7 @@ class _GroupsPageState extends State<GroupsPage> {
     final currentUserId = _authService.getCurrentUserId();
 
     if (currentUserId != null && currentUserId.isNotEmpty) {
-      final chatProvider =
-      Provider.of<ChatProvider>(context, listen: false);
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
       // (nothing else needed here for now)
     }
   }
@@ -64,27 +63,24 @@ class _GroupsPageState extends State<GroupsPage> {
     final currentUserId = _authService.getCurrentUserId();
     if (currentUserId == null || currentUserId.isEmpty) return;
 
-    final chatProvider =
-    Provider.of<ChatProvider>(context, listen: false);
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
-    _lastMsgSub =
-        chatProvider.lastGroupMessagesPollingStream().listen((map) {
+    _lastMsgSub = chatProvider.lastGroupMessagesPollingStream().listen((map) {
+      if (!mounted) return;
+      setState(() {
+        _lastGroupMessages = map;
+      });
+    });
+
+    _unreadSub = chatProvider
+        .groupUnreadCountsPollingStream(currentUserId)
+        .listen((map) {
           if (!mounted) return;
+          debugPrint('📥 GroupsPage: unread map from provider: $map');
           setState(() {
-            _lastGroupMessages = map;
+            _groupUnreadCounts = map;
           });
         });
-
-    _unreadSub =
-        chatProvider.groupUnreadCountsPollingStream(currentUserId).listen(
-              (map) {
-            if (!mounted) return;
-            debugPrint('📥 GroupsPage: unread map from provider: $map');
-            setState(() {
-              _groupUnreadCounts = map;
-            });
-          },
-        );
   }
 
   @override
@@ -109,8 +105,7 @@ class _GroupsPageState extends State<GroupsPage> {
       );
     }
 
-    final chatProvider =
-    Provider.of<ChatProvider>(context, listen: false);
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
     // 🆕 Access NotificationService singleton
     final notificationService = NotificationService();
@@ -157,7 +152,8 @@ class _GroupsPageState extends State<GroupsPage> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Create a group to start chatting with multiple friends at once.'.tr(),
+                    'Create a group to start chatting with multiple friends at once.'
+                        .tr(),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 13,
@@ -186,8 +182,7 @@ class _GroupsPageState extends State<GroupsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding:
-              const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 4.0),
+              padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 4.0),
               child: MySearchBar(
                 controller: _searchController,
                 hintText: 'Search groups'.tr(),
@@ -211,7 +206,8 @@ class _GroupsPageState extends State<GroupsPage> {
               ),
               child: Row(
                 children: [
-                  Text("Your groups".tr(),
+                  Text(
+                    "Your groups".tr(),
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
@@ -244,86 +240,127 @@ class _GroupsPageState extends State<GroupsPage> {
             Expanded(
               child: noMatches
                   ? Center(
-                child: Text(
-                  'No groups match your search'.tr(),
-                  style: TextStyle(
-                    color: colorScheme.primary
-                        .withValues(alpha: 0.8),
-                  ),
-                ),
-              )
-                  : ScrollConfiguration(
-                behavior: ScrollConfiguration.of(context)
-                    .copyWith(overscroll: false),
-                child: ListView.builder(
-                  physics: const ClampingScrollPhysics(),
-                  padding: EdgeInsets.only(
-                    bottom: MediaQuery.of(context)
-                        .padding
-                        .bottom +
-                        96,
-                  ),
-                  itemCount: filteredGroups.length,
-                  itemBuilder: (context, index) {
-                    final group = filteredGroups[index];
-                    final groupId =
-                        group['id']?.toString() ?? '';
-                    final groupName =
-                    (group['name'] as String?)?.trim().isNotEmpty ==
-                        true
-                        ? group['name'] as String
-                        : 'Group'.tr();
-                    final avatarUrl =
-                    group['avatar_url'] as String?;
-
-                    final MessageModel? lastMsg =
-                    _lastGroupMessages[groupId];
-
-                    // Raw unread from DB
-                    final int rawUnread =
-                        _groupUnreadCounts[groupId] ?? 0;
-
-                    // 🆕 If this group chat is currently active, hide unread count
-                    final int unread =
-                    (activeChatRoomId != null &&
-                        activeChatRoomId == groupId)
-                        ? 0
-                        : rawUnread;
-
-                    final String subtitle = lastMsg != null
-                        ? _buildLastMessagePreview(
-                      msg: lastMsg,
-                      currentUserId: currentUserId,
+                      child: Text(
+                        'No groups match your search'.tr(),
+                        style: TextStyle(
+                          color: colorScheme.primary.withValues(alpha: 0.8),
+                        ),
+                      ),
                     )
-                        : 'No messages yet'.tr();
+                  : ScrollConfiguration(
+                      behavior: ScrollConfiguration.of(
+                        context,
+                      ).copyWith(overscroll: false),
+                      child: ListView.builder(
+                        physics: const ClampingScrollPhysics(),
+                        padding: EdgeInsets.only(
+                          bottom: MediaQuery.of(context).padding.bottom + 96,
+                        ),
+                        itemCount: filteredGroups.length,
+                        itemBuilder: (context, index) {
+                          final group = filteredGroups[index];
+                          final groupId = group['id']?.toString() ?? '';
+                          final rawGroupName =
+                              (group['name'] as String?)?.trim().isNotEmpty ==
+                                  true
+                              ? (group['name'] as String)
+                              : 'Group'.tr();
 
-                    final String? lastTimeLabel = lastMsg != null
-                        ? formatLastMessageTime(lastMsg.createdAt)
-                        : null;
+                          // base localized name (works for normal groups + L10N: keys)
+                          final baseGroupName = localizeGroupName(rawGroupName);
 
-                    return MyGroupTile(
-                      groupName: groupName,
-                      avatarUrl: avatarUrl,
-                      lastMessagePreview: subtitle,
-                      lastMessageTimeLabel: lastTimeLabel,
-                      unreadCount: unread,
-                      onTap: groupId.isEmpty
-                          ? null
-                          : () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => GroupChatPage(
-                              chatRoomId: groupId,
-                              groupName: groupName,
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
+                          // ✅ Detect marriage inquiry groups using chat_rooms.context_type
+                          final contextType = (group['context_type'] ?? '')
+                              .toString()
+                              .trim();
+                          final isMarriageInquiryRoom =
+                              contextType == 'marriage_inquiry';
+
+                          // Default title = normal behavior
+                          String displayGroupName = baseGroupName;
+
+                          if (isMarriageInquiryRoom) {
+                            final manId = (group['man_id'] ?? '')
+                                .toString()
+                                .trim();
+                            final womanId = (group['woman_id'] ?? '')
+                                .toString()
+                                .trim();
+
+                            final manName = (group['man_name'] ?? '')
+                                .toString()
+                                .trim();
+                            final womanName = (group['woman_name'] ?? '')
+                                .toString()
+                                .trim();
+
+                            // ✅ Your rule:
+                            // - man sees: for (woman)
+                            // - woman + mahram see: for (man)
+                            final targetName = (currentUserId == manId)
+                                ? womanName
+                                : manName;
+
+                            if (targetName.isNotEmpty) {
+                              displayGroupName = 'marriage_inquiry_for'.tr(
+                                namedArgs: {'name': targetName},
+                              );
+                            } else {
+                              // fallback if names are missing
+                              displayGroupName = baseGroupName;
+                            }
+                          }
+
+                          final avatarUrl = group['avatar_url'] as String?;
+
+                          final MessageModel? lastMsg =
+                              _lastGroupMessages[groupId];
+
+                          // Raw unread from DB
+                          final int rawUnread =
+                              _groupUnreadCounts[groupId] ?? 0;
+
+                          // 🆕 If this group chat is currently active, hide unread count
+                          final int unread =
+                              (activeChatRoomId != null &&
+                                  activeChatRoomId == groupId)
+                              ? 0
+                              : rawUnread;
+
+                          final String subtitle = lastMsg != null
+                              ? _buildLastMessagePreview(
+                                  msg: lastMsg,
+                                  currentUserId: currentUserId,
+                                )
+                              : 'No messages yet'.tr();
+
+                          final String? lastTimeLabel = lastMsg != null
+                              ? formatLastMessageTime(lastMsg.createdAt)
+                              : null;
+
+                          return MyGroupTile(
+                            groupName: displayGroupName,
+                            avatarUrl: avatarUrl,
+                            lastMessagePreview: subtitle,
+                            lastMessageTimeLabel: lastTimeLabel,
+                            unreadCount: unread,
+                            onTap: groupId.isEmpty
+                                ? null
+                                : () async {
+                                    await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => GroupChatPage(
+                                          chatRoomId: groupId,
+                                          groupName: displayGroupName,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                          );
+                        },
+                      ),
+                    ),
             ),
           ],
         );
@@ -331,22 +368,44 @@ class _GroupsPageState extends State<GroupsPage> {
     );
   }
 
+  String localizeGroupName(String raw) {
+    final s = raw.trim();
+    if (s.startsWith('L10N:')) {
+      final key = s.substring('L10N:'.length).trim();
+      return key.isEmpty ? raw : key.tr();
+    }
+    return raw;
+  }
+
+  String localizeLastMessagePreview(String raw) {
+    final s = raw.trim();
+    if (s.startsWith('SYSTEM:')) {
+      final key = s.substring('SYSTEM:'.length).trim();
+      return key.isEmpty ? '' : key.tr();
+    }
+    return raw;
+  }
+
   String _buildLastMessagePreview({
     required MessageModel msg,
     required String currentUserId,
   }) {
-    final raw = msg.message;
-    final trimmed = raw.trim();
-    if (trimmed.isEmpty) return '';
+    final raw = msg.message.trim();
+    if (raw.isEmpty) return '';
+
+    // ✅ System message preview translation
+    if (raw.startsWith('SYSTEM:')) {
+      final key = raw.substring('SYSTEM:'.length).trim();
+      return key.isNotEmpty ? key.tr() : raw;
+    }
 
     final bool isMine = msg.senderId == currentUserId;
 
-    // 👇 Localized "You"
-    final String base = isMine ? '${"You".tr()}: $trimmed' : trimmed;
+    // keep your existing "You:" prefix behavior
+    final String base = isMine ? '${"You".tr()}: $raw' : raw;
 
     const maxLen = 40;
     if (base.length <= maxLen) return base;
     return '${base.substring(0, maxLen)}…';
   }
-
 }
