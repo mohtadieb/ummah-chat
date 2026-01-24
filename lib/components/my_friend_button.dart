@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 class MyFriendButton extends StatelessWidget {
   final String friendStatus;
+
   final VoidCallback? onAddFriend;
   final VoidCallback? onCancelRequest;
   final VoidCallback? onAcceptRequest;
@@ -11,6 +12,9 @@ class MyFriendButton extends StatelessWidget {
   final VoidCallback? onUnfriend;
   final VoidCallback? onOpenRequestSheet;
   final VoidCallback? onDeleteMahram;
+
+  /// ✅ NEW: disables all taps + shows a small spinner
+  final bool isBusy;
 
   const MyFriendButton({
     super.key,
@@ -22,6 +26,7 @@ class MyFriendButton extends StatelessWidget {
     this.onUnfriend,
     this.onOpenRequestSheet,
     this.onDeleteMahram,
+    this.isBusy = false,
   });
 
   bool get _isInquiryReceived =>
@@ -38,11 +43,11 @@ class MyFriendButton extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     // ✅ Treat inquiry "received" role-specific statuses same as pending_received UI (Accept + Decline)
-    final isTwoButtonReceived =
-        friendStatus == 'pending_received' ||
-            friendStatus == 'pending_mahram_received' ||
-            _isInquiryReceived;
+    final isTwoButtonReceived = friendStatus == 'pending_received' ||
+        friendStatus == 'pending_mahram_received' ||
+        _isInquiryReceived;
 
+    // ---- TWO BUTTON ROW (Accept / Decline) ----
     if (isTwoButtonReceived) {
       return SizedBox(
         height: 36,
@@ -50,7 +55,7 @@ class MyFriendButton extends StatelessWidget {
           children: [
             Expanded(
               child: TextButton(
-                onPressed: onAcceptRequest,
+                onPressed: isBusy ? null : onAcceptRequest,
                 style: TextButton.styleFrom(
                   backgroundColor: colorScheme.primary,
                   foregroundColor: colorScheme.onPrimary,
@@ -58,15 +63,12 @@ class MyFriendButton extends StatelessWidget {
                     borderRadius: BorderRadius.circular(18),
                   ),
                 ),
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.center,
-                  child: Text(
-                    'Accept'.tr(),
-                    maxLines: 1,
-                    softWrap: false,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                child: _ButtonChild(
+                  isBusy: isBusy,
+                  label: 'Accept'.tr(),
+                  textStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -74,7 +76,7 @@ class MyFriendButton extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: TextButton(
-                onPressed: onDeclineRequest,
+                onPressed: isBusy ? null : onDeclineRequest,
                 style: TextButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   foregroundColor: colorScheme.primary,
@@ -83,15 +85,12 @@ class MyFriendButton extends StatelessWidget {
                     borderRadius: BorderRadius.circular(18),
                   ),
                 ),
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.center,
-                  child: Text(
-                    'Decline'.tr(),
-                    maxLines: 1,
-                    softWrap: false,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                child: _ButtonChild(
+                  isBusy: isBusy,
+                  label: 'Decline'.tr(),
+                  textStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -101,7 +100,7 @@ class MyFriendButton extends StatelessWidget {
       );
     }
 
-    // Everything else → single button
+    // ---- SINGLE BUTTON ----
     Color bg;
     Color fg;
     BorderSide? side;
@@ -202,7 +201,7 @@ class MyFriendButton extends StatelessWidget {
     return SizedBox(
       height: 36,
       child: TextButton(
-        onPressed: onTap,
+        onPressed: isBusy ? null : onTap,
         style: TextButton.styleFrom(
           backgroundColor: bg,
           foregroundColor: fg,
@@ -211,16 +210,51 @@ class MyFriendButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(18),
           ),
         ),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.center,
-          child: Text(
-            label.tr(),
-            maxLines: 1,
-            softWrap: false,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-          ),
+        child: _ButtonChild(
+          isBusy: isBusy,
+          label: label.tr(),
+          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        ),
+      ),
+    );
+  }
+}
+
+/// Small helper so we keep your FittedBox behavior, but can show a spinner when busy.
+class _ButtonChild extends StatelessWidget {
+  final bool isBusy;
+  final String label;
+  final TextStyle textStyle;
+
+  const _ButtonChild({
+    required this.isBusy,
+    required this.label,
+    required this.textStyle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.center,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 160),
+        switchInCurve: Curves.easeOut,
+        switchOutCurve: Curves.easeIn,
+        child: isBusy
+            ? const SizedBox(
+          key: ValueKey('busy'),
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        )
+            : Text(
+          key: const ValueKey('label'),
+          label,
+          maxLines: 1,
+          softWrap: false,
+          textAlign: TextAlign.center,
+          style: textStyle,
         ),
       ),
     );

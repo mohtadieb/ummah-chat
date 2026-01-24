@@ -72,9 +72,15 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/login_page_image_green.png
-    - assets/onboarding_ummah_chat_1.png
-    - assets/onboarding_dua_wall.png
-    - assets/onboarding_stories_communities.png
+    - assets/images/login_page_image_green.png
+    - assets/images/onboarding_ummah_chat_1.png
+    - assets/images/onboarding_dua_wall.png
+    - assets/images/onboarding_stories_communities.png
+    - assets/images/man_normal_hair.png
+    - assets/images/man_hair_beard.png
+    - assets/images/man_beard_headwear.png
+    - assets/images/woman_loose_hair.png
+    - assets/images/woman_hijab.png
+    - assets/images/woman_niqab.png
     # 🔑 Add this when you create the translation files:
     - assets/lang/

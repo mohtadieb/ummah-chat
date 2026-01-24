@@ -145,7 +145,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
 
                       // Logo
                       Image.asset(
-                        'assets/login_page_image_green.png',
+                        'assets/images/login_page_image_green.png',
                         width: 220,
                         height: 220,
                         fit: BoxFit.contain,

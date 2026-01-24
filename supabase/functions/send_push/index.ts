@@ -19,7 +19,7 @@ type NotifType =
   | "CHAT_MESSAGE"
   | "GROUP_MESSAGE"
   | "GROUP_ADDED"
-  // ✅ NEW: Marriage inquiry notifications
+  | "COMMUNITY_INVITE"
   | "MARRIAGE_INQUIRY_REQUEST"
   | "MARRIAGE_INQUIRY_MAHRAM"
   | "MARRIAGE_INQUIRY_MAN_DECISION"
@@ -162,7 +162,13 @@ function template(
             ? `${senderFirst} heeft je toegevoegd aan de groep.`
             : "Je bent toegevoegd aan een groep.",
         };
-
+      case "COMMUNITY_INVITE":
+        return {
+          title: "Community-uitnodiging",
+          body: nameArg
+            ? `Je bent uitgenodigd voor ${nameArg}.`
+            : "Je hebt een community-uitnodiging ontvangen.",
+        };
       // -------------------------
       // 💍 Marriage inquiry (NL)
       // -------------------------
@@ -193,16 +199,17 @@ function template(
       case "MARRIAGE_INQUIRY_MAHRAM_ACCEPTED":
         return {
           title: "Mahram geaccepteerd",
-          body: "De mahram heeft geaccepteerd. Tik om verder te gaan.",
+          body: "De mahram heeft de huwelijksaanvraag geaccepteerd.",
         };
 
       case "MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO":
         return {
           title: "Mahram geaccepteerd",
           body: nameArg
-            ? `Mahram geaccepteerd, aanvraag verzonden naar ${nameArg}.`
-            : "Mahram geaccepteerd, aanvraag is verzonden.",
+            ? `De mahram heeft de huwelijksaanvraag geaccepteerd, aanvraag verzonden naar ${nameArg}.`
+            : "De mahram heeft de huwelijksaanvraag geaccepteerd, aanvraag is verzonden.",
         };
+
 
       case "MARRIAGE_INQUIRY_ACCEPTED":
         return {
@@ -309,6 +316,14 @@ function template(
           title: groupName || "مجموعة",
           body: senderFirst ? `${senderFirst} أضافك إلى المجموعة.` : "تمت إضافتك إلى مجموعة.",
         };
+      case "COMMUNITY_INVITE":
+        return {
+          title: "دعوة إلى مجتمع",
+          body: nameArg
+            ? `تمت دعوتك إلى ${nameArg}.`
+            : "لديك دعوة إلى مجتمع.",
+        };
+
 
       // -------------------------
       // 💍 Marriage inquiry (AR)
@@ -340,16 +355,17 @@ function template(
       case "MARRIAGE_INQUIRY_MAHRAM_ACCEPTED":
         return {
           title: "تم قبول المحرم",
-          body: "تم قبول المحرم. اضغط للمتابعة.",
+          body: "وافق المحرم على طلب الزواج.",
         };
 
       case "MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO":
         return {
           title: "تم قبول المحرم",
           body: nameArg
-            ? `تم قبول المحرم، وتم إرسال الطلب إلى ${nameArg}.`
-            : "تم قبول المحرم، وتم إرسال الطلب.",
+            ? `وافق المحرم على طلب الزواج، وتم إرسال الطلب إلى ${nameArg}.`
+            : "وافق المحرم على طلب الزواج، وتم إرسال الطلب.",
         };
+
 
       case "MARRIAGE_INQUIRY_ACCEPTED":
         return {
@@ -451,6 +467,15 @@ function template(
         body: senderFirst ? `${senderFirst} added you to the group.` : "You were added to a group.",
       };
 
+  case "COMMUNITY_INVITE":
+    return {
+      title: "Community invite",
+      body: nameArg
+        ? `You were invited to ${nameArg}.`
+        : "You received a community invite.",
+    };
+
+
     // -------------------------
     // 💍 Marriage inquiry (EN)
     // -------------------------
@@ -481,16 +506,17 @@ function template(
     case "MARRIAGE_INQUIRY_MAHRAM_ACCEPTED":
       return {
         title: "Mahram accepted",
-        body: "The mahram accepted. Tap to continue.",
+        body: "The mahram accepted the marriage inquiry.",
       };
 
     case "MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO":
       return {
         title: "Mahram accepted",
         body: nameArg
-          ? `Mahram accepted, inquiry sent to ${nameArg}.`
-          : "Mahram accepted, inquiry was sent.",
+          ? `The mahram accepted the marriage inquiry, and the inquiry was sent to ${nameArg}.`
+          : "The mahram accepted the marriage inquiry, and the inquiry was sent.",
       };
+
 
     case "MARRIAGE_INQUIRY_ACCEPTED":
       return {

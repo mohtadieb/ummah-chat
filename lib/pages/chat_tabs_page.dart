@@ -46,7 +46,8 @@ class _ChatTabsPageState extends State<ChatTabsPage>
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         centerTitle: true,
-        title: Text("Chats".tr(),
+        title: Text(
+          "Chats".tr(),
           style: TextStyle(
             color: colorScheme.primary,
             fontWeight: FontWeight.w600,
@@ -79,12 +80,11 @@ class _ChatTabsPageState extends State<ChatTabsPage>
 
                   // no splash / overlay highlight
                   splashFactory: NoSplash.splashFactory,
-                  overlayColor:
-                  WidgetStateProperty.all(Colors.transparent),
+                  overlayColor: WidgetStateProperty.all(Colors.transparent),
 
                   labelColor: colorScheme.onPrimary,
                   unselectedLabelColor: colorScheme.primary,
-                  labelStyle: TextStyle(
+                  labelStyle: const TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
                   ),
@@ -199,81 +199,113 @@ class _ChatTabsPageState extends State<ChatTabsPage>
 
     return showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-        ),
-        title: Text(
-          'Create community'.tr(),
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: colorScheme.primary,
-          ),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: InputDecoration(
-                  labelText: 'Name'.tr(),
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: descController,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  labelText: 'Description'.tr(),
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: countryController,
-                decoration: InputDecoration(
-                  labelText: 'Country'.tr(),
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'.tr()),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final name = nameController.text.trim();
-              final desc = descController.text.trim();
-              final country = countryController.text.trim();
+      builder: (dialogCtx) {
+        bool isPrivate = false;
 
-              if (name.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Please enter a name for your community.'.tr(),
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              title: Text(
+                'Create community'.tr(),
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.primary,
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      decoration: InputDecoration(
+                        labelText: 'Name'.tr(),
+                        border: const OutlineInputBorder(),
+                      ),
                     ),
-                  ),
-                );
-                return;
-              }
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: descController,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        labelText: 'Description'.tr(),
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: countryController,
+                      decoration: InputDecoration(
+                        labelText: 'Country'.tr(),
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
 
-              // Create on backend
-              await db.createCommunity(name, desc, country);
+                    // ✅ NEW: Private toggle
+                    const SizedBox(height: 12),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('Private community'.tr()),
+                      value: isPrivate,
+                      onChanged: (v) => setState(() => isPrivate = v),
+                    ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'private_community_hint'.tr(),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.primary.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  child: Text('Cancel'.tr()),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final name = nameController.text.trim();
+                    final desc = descController.text.trim();
+                    final country = countryController.text.trim();
 
-              if (context.mounted) {
-                Navigator.pop(context);
-              }
-            },
-            child: Text('Create'.tr()),
-          ),
-        ],
-      ),
+                    if (name.isEmpty) {
+                      ScaffoldMessenger.of(dialogCtx).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Please enter a name for your community.'.tr(),
+                          ),
+                        ),
+                      );
+                      return;
+                    }
+
+                    // ✅ UPDATED: pass isPrivate
+                    await db.createCommunity(
+                      name,
+                      desc,
+                      country,
+                      isPrivate: isPrivate,
+                    );
+
+                    if (dialogCtx.mounted) {
+                      Navigator.pop(dialogCtx);
+                    }
+                  },
+                  child: Text('Create'.tr()),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }

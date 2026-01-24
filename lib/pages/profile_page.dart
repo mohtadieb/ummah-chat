@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/services.dart' show rootBundle;
+
 
 // ✅ NEW: unified Saved page (Posts / Ayat / Reflections)
 import 'package:ummah_chat/pages/saved_page.dart';
@@ -78,6 +80,8 @@ class _ProfilePageState extends State<ProfilePage> {
   // isFollowing state
   bool _isFollowing = false;
 
+  bool _isFriendActionBusy = false;
+
   // FRIENDS state
   // "none", "pending_sent", "pending_received", "accepted", "blocked"
   String _friendStatus = 'none';
@@ -124,6 +128,184 @@ class _ProfilePageState extends State<ProfilePage> {
     _scrollController.dispose();
     super.dispose();
   }
+
+  static const List<String> _maleAvatars = [
+    'assets/images/man_normal_hair.png',
+    'assets/images/man_hair_beard.png',
+    'assets/images/man_beard_headwear.png',
+  ];
+
+  static const List<String> _femaleAvatars = [
+    'assets/images/woman_loose_hair.png',
+    'assets/images/woman_hijab.png',
+    'assets/images/woman_niqab.png',
+  ];
+
+  List<String> _avatarsForGender(String? genderRaw) {
+    final g = (genderRaw ?? '').trim().toLowerCase();
+    if (g == 'male') return _maleAvatars;
+    if (g == 'female') return _femaleAvatars;
+    // fallback if gender missing/other:
+    return [..._maleAvatars, ..._femaleAvatars];
+  }
+
+  Future<void> _showProfilePhotoChooser() async {
+    if (!mounted) return;
+
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      isScrollControlled: true,
+      builder: (ctx) {
+        final avatars = _avatarsForGender(user?.gender);
+
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade400,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                ListTile(
+                  leading: const Icon(Icons.photo_library_outlined),
+                  title: Text('Gallery'.tr()),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    await _pickProfilePhotoFromGallery();
+                  },
+                ),
+
+                const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Choose an avatar'.tr(),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: cs.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: avatars.length,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                  ),
+                  itemBuilder: (_, i) {
+                    final path = avatars[i];
+                    return InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () async {
+                        Navigator.pop(ctx);
+                        await _setProfilePhotoFromAsset(path);
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          color: cs.surfaceContainerHighest.withValues(alpha: 0.55),
+                        ),
+                        child: Center(
+                          child: CircleAvatar(
+                            radius: 34,
+                            backgroundColor: cs.secondary,
+                            backgroundImage: AssetImage(path),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickProfilePhotoFromGallery() async {
+    try {
+      final picker = ImagePicker();
+      final XFile? picked = await picker.pickImage(source: ImageSource.gallery);
+      if (picked == null) return;
+
+      final CroppedFile? cropped = await ImageCropper().cropImage(
+        sourcePath: picked.path,
+        maxWidth: 800,
+        maxHeight: 800,
+        compressFormat: ImageCompressFormat.jpg,
+        compressQuality: 85,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: "crop_profile_photo".tr(),
+            toolbarColor: Theme.of(context).colorScheme.primary,
+            toolbarWidgetColor: Colors.white,
+            initAspectRatio: CropAspectRatioPreset.square,
+            lockAspectRatio: true,
+            hideBottomControls: true,
+            cropStyle: CropStyle.circle,
+          ),
+          IOSUiSettings(
+            title: 'Crop profile photo'.tr(),
+            aspectRatioLockEnabled: true,
+            cropStyle: CropStyle.circle,
+          ),
+        ],
+      );
+
+      if (cropped == null) return;
+
+      final bytes = await cropped.readAsBytes();
+      await databaseProvider.updateProfilePhoto(bytes);
+      await loadUser();
+    } catch (e, st) {
+      debugPrint('❌ _pickProfilePhotoFromGallery: $e\n$st');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update profile picture'.tr())),
+      );
+    }
+  }
+
+
+  Future<void> _setProfilePhotoFromAsset(String assetPath) async {
+    try {
+      final data = await rootBundle.load(assetPath);
+      final bytes = data.buffer.asUint8List();
+
+      await databaseProvider.updateProfilePhoto(bytes);
+      await loadUser();
+    } catch (e, st) {
+      debugPrint('❌ _setProfilePhotoFromAsset: $e\n$st');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update profile picture'.tr())),
+      );
+    }
+  }
+
+
 
   Future<void> loadUser() async {
     if (mounted) setState(() => _isLoading = true);
@@ -390,6 +572,47 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  Future<void> _runOptimisticFriendAction({
+    required String optimisticStatus,
+    required Future<void> Function() action,
+    String? successRefreshOtherUserId,
+  }) async {
+    if (_isFriendActionBusy) return;
+
+    final previous = _friendStatus;
+
+    setState(() {
+      _isFriendActionBusy = true;
+      _friendStatus = optimisticStatus;
+    });
+
+    try {
+      await action();
+
+      // Refresh from DB so UI becomes the real final state
+      final updated = await databaseProvider.getCombinedRelationshipStatus(
+        successRefreshOtherUserId ?? widget.userId,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _friendStatus = updated;
+        _isFriendActionBusy = false;
+      });
+    } catch (e, st) {
+      debugPrint('❌ optimistic friend action failed: $e\n$st');
+      if (!mounted) return;
+      setState(() {
+        _friendStatus = previous; // rollback
+        _isFriendActionBusy = false;
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('something_went_wrong'.tr())));
+    }
+  }
+
   Future<void> _toggleFollow() async {
     if (_isFollowing) {
       final confirm = await showDialog<bool>(
@@ -422,74 +645,6 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  Future<void> _pickProfilePhoto() async {
-    try {
-      final ImagePicker picker = ImagePicker();
-      final XFile? picked = await picker.pickImage(source: ImageSource.gallery);
-      if (picked == null) return;
-
-      final CroppedFile? cropped = await ImageCropper().cropImage(
-        sourcePath: picked.path,
-        maxWidth: 800,
-        maxHeight: 800,
-        compressFormat: ImageCompressFormat.jpg,
-        compressQuality: 85,
-        uiSettings: [
-          AndroidUiSettings(
-            toolbarTitle: 'Crop profile photo'.tr(),
-            toolbarColor: Theme.of(context).colorScheme.primary,
-            toolbarWidgetColor: Colors.white,
-            initAspectRatio: CropAspectRatioPreset.square,
-            lockAspectRatio: true,
-            hideBottomControls: true,
-            cropStyle: CropStyle.circle,
-          ),
-          IOSUiSettings(
-            title: 'Crop profile photo'.tr(),
-            aspectRatioLockEnabled: true,
-            cropStyle: CropStyle.circle,
-          ),
-        ],
-      );
-
-      if (cropped == null) return;
-
-      final Uint8List bytes = await cropped.readAsBytes();
-      await databaseProvider.updateProfilePhoto(bytes);
-      await loadUser();
-    } catch (e, st) {
-      debugPrint('❌ Error in _pickProfilePhoto: $e\n$st');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not update profile picture'.tr())),
-      );
-    }
-  }
-
-  Future<void> _addFriendFromProfile() async {
-    await databaseProvider.sendFriendRequest(widget.userId);
-    setState(() => _friendStatus = 'pending_sent');
-  }
-
-  Future<void> _cancelFriendFromProfile() async {
-    await databaseProvider.cancelFriendRequest(widget.userId);
-    setState(() => _friendStatus = 'none');
-  }
-
-  Future<void> _acceptFriendFromProfile() async {
-    await databaseProvider.acceptFriendRequest(widget.userId);
-    final updated =
-    await databaseProvider.getCombinedRelationshipStatus(widget.userId);
-    setState(() => _friendStatus = updated);
-  }
-
-  Future<void> _declineFriendFromProfile() async {
-    await databaseProvider.declineFriendRequest(widget.userId);
-    final updated =
-    await databaseProvider.getCombinedRelationshipStatus(widget.userId);
-    setState(() => _friendStatus = updated);
-  }
-
   Future<void> _unfriendFromProfile() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -512,8 +667,9 @@ class _ProfilePageState extends State<ProfilePage> {
     if (confirm != true) return;
 
     await databaseProvider.unfriendUser(widget.userId);
-    final updated =
-    await databaseProvider.getCombinedRelationshipStatus(widget.userId);
+    final updated = await databaseProvider.getCombinedRelationshipStatus(
+      widget.userId,
+    );
     if (!mounted) return;
     setState(() => _friendStatus = updated);
   }
@@ -522,7 +678,6 @@ class _ProfilePageState extends State<ProfilePage> {
     Provider.of<BottomNavProvider>(context, listen: false).setIndex(4);
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
-
 
   Future<void> _cancelMahramFromProfile() async {
     await databaseProvider.cancelMahramRequest(widget.userId);
@@ -563,40 +718,43 @@ class _ProfilePageState extends State<ProfilePage> {
 
         await db.acceptMahramRequest(otherUserId);
 
-        final updated =
-        await databaseProvider.getCombinedRelationshipStatus(widget.userId);
+        final updated = await databaseProvider.getCombinedRelationshipStatus(
+          widget.userId,
+        );
         if (!mounted) return;
         setState(() => _friendStatus = updated);
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('mahram_accepted'.tr())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('mahram_accepted'.tr())));
       } else {
         if (mounted) setState(() => _friendStatus = 'none');
 
         await db.declineMahramRequest(otherUserId);
 
-        final updated =
-        await databaseProvider.getCombinedRelationshipStatus(widget.userId);
+        final updated = await databaseProvider.getCombinedRelationshipStatus(
+          widget.userId,
+        );
         if (!mounted) return;
         setState(() => _friendStatus = updated);
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('mahram_declined'.tr())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('mahram_declined'.tr())));
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('something_went_wrong'.tr())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('something_went_wrong'.tr())));
     }
   }
 
   Future<void> _declineMahramFromProfile() async {
     await databaseProvider.declineMahramRequest(widget.userId);
-    final updated =
-    await databaseProvider.getCombinedRelationshipStatus(widget.userId);
+    final updated = await databaseProvider.getCombinedRelationshipStatus(
+      widget.userId,
+    );
     if (!mounted) return;
     setState(() => _friendStatus = updated);
   }
@@ -630,78 +788,79 @@ class _ProfilePageState extends State<ProfilePage> {
             width: double.maxFinite,
             child: myMahrams.isEmpty
                 ? Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Text(
-                'mahram_required_for_marriage_inquiry'.tr(),
-                style: TextStyle(
-                  color: cs.primary.withValues(alpha: 0.75),
-                ),
-              ),
-            )
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      'mahram_required_for_marriage_inquiry'.tr(),
+                      style: TextStyle(
+                        color: cs.primary.withValues(alpha: 0.75),
+                      ),
+                    ),
+                  )
                 : ListView.separated(
-              shrinkWrap: true,
-              itemCount: myMahrams.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (context, i) {
-                final p = myMahrams[i];
+                    shrinkWrap: true,
+                    itemCount: myMahrams.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (context, i) {
+                      final p = myMahrams[i];
 
-                final label = p.name.trim().isNotEmpty
-                    ? p.name.trim()
-                    : (p.username.trim().isNotEmpty
-                    ? p.username.trim()
-                    : 'User'.tr());
+                      final label = p.name.trim().isNotEmpty
+                          ? p.name.trim()
+                          : (p.username.trim().isNotEmpty
+                                ? p.username.trim()
+                                : 'User'.tr());
 
-                return InkWell(
-                  borderRadius: BorderRadius.circular(14),
-                  onTap: () => Navigator.pop(context, p.id),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
-                      color: cs.primary.withValues(alpha: 0.05),
-                    ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 24,
-                          backgroundColor:
-                          cs.primary.withValues(alpha: 0.15),
-                          backgroundImage: p.profilePhotoUrl.isNotEmpty
-                              ? NetworkImage(p.profilePhotoUrl)
-                              : null,
-                          child: p.profilePhotoUrl.isEmpty
-                              ? Icon(
-                            Icons.person,
-                            size: 26,
-                            color: cs.primary,
-                          )
-                              : null,
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Text(
-                            label,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: cs.primary,
-                            ),
+                      return InkWell(
+                        borderRadius: BorderRadius.circular(14),
+                        onTap: () => Navigator.pop(context, p.id),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            color: cs.primary.withValues(alpha: 0.05),
+                          ),
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 24,
+                                backgroundColor: cs.primary.withValues(
+                                  alpha: 0.15,
+                                ),
+                                backgroundImage: p.profilePhotoUrl.isNotEmpty
+                                    ? NetworkImage(p.profilePhotoUrl)
+                                    : null,
+                                child: p.profilePhotoUrl.isEmpty
+                                    ? Icon(
+                                        Icons.person,
+                                        size: 26,
+                                        color: cs.primary,
+                                      )
+                                    : null,
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Text(
+                                  label,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: cs.primary,
+                                  ),
+                                ),
+                              ),
+                              Icon(
+                                Icons.chevron_right_rounded,
+                                size: 26,
+                                color: cs.primary.withValues(alpha: 0.7),
+                              ),
+                            ],
                           ),
                         ),
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          size: 26,
-                          color: cs.primary.withValues(alpha: 0.7),
-                        ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
           actions: [
             TextButton(
@@ -785,15 +944,13 @@ class _ProfilePageState extends State<ProfilePage> {
     } catch (e, st) {
       debugPrint('❌ _startMarriageInquiry failed: $e\n$st');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('something_went_wrong'.tr())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('something_went_wrong'.tr())));
     }
   }
 
-  Future<void> _womanPickMahramForInquiry({
-    required String inquiryId,
-  }) async {
+  Future<void> _womanPickMahramForInquiry({required String inquiryId}) async {
     final db = context.read<DatabaseProvider>();
 
     try {
@@ -820,15 +977,15 @@ class _ProfilePageState extends State<ProfilePage> {
       if (!mounted) return;
       setState(() => _friendStatus = updated);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('mahram_selected'.tr())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('mahram_selected'.tr())));
     } catch (e, st) {
       debugPrint('❌ womanAcceptAndSelectMahramForInquiry failed: $e\n$st');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('something_went_wrong'.tr())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('something_went_wrong'.tr())));
     }
   }
 
@@ -980,8 +1137,9 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
 
-    final updated =
-    await databaseProvider.getCombinedRelationshipStatus(widget.userId);
+    final updated = await databaseProvider.getCombinedRelationshipStatus(
+      widget.userId,
+    );
     if (!mounted) return;
     setState(() => _friendStatus = updated);
   }
@@ -1018,12 +1176,13 @@ class _ProfilePageState extends State<ProfilePage> {
     await dbProvider.deleteMahramRelationship(targetUserId);
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('mahram_removed'.tr())),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('mahram_removed'.tr())));
 
-    final updated =
-    await databaseProvider.getCombinedRelationshipStatus(widget.userId);
+    final updated = await databaseProvider.getCombinedRelationshipStatus(
+      widget.userId,
+    );
     if (!mounted) return;
     setState(() => _friendStatus = updated);
   }
@@ -1035,8 +1194,9 @@ class _ProfilePageState extends State<ProfilePage> {
 
     void openFriendsFullScreen() {
       final displayName = (user?.name ?? '').trim();
-      final firstName =
-      displayName.isEmpty ? '' : displayName.split(RegExp(r'\s+')).first;
+      final firstName = displayName.isEmpty
+          ? ''
+          : displayName.split(RegExp(r'\s+')).first;
 
       Navigator.push(
         context,
@@ -1055,7 +1215,9 @@ class _ProfilePageState extends State<ProfilePage> {
               elevation: 0,
               scrolledUnderElevation: 0,
             ),
-            body: isOwn ? const FriendsPage() : FriendsPage(userId: widget.userId),
+            body: isOwn
+                ? const FriendsPage()
+                : FriendsPage(userId: widget.userId),
           ),
         ),
       );
@@ -1208,13 +1370,17 @@ class _ProfilePageState extends State<ProfilePage> {
 
           // Show 11 friends + 1 "+X" tile if needed
           final bool hasMore = allFriends.length > maxTiles;
-          final int friendTilesCount = hasMore ? (maxTiles - 1) : allFriends.length;
+          final int friendTilesCount = hasMore
+              ? (maxTiles - 1)
+              : allFriends.length;
 
           final visibleFriends = allFriends.take(friendTilesCount).toList();
           final int remainingCount = allFriends.length - friendTilesCount;
 
           // Total tiles in the horizontal row
-          final int itemCount = hasMore ? friendTilesCount + 1 : friendTilesCount;
+          final int itemCount = hasMore
+              ? friendTilesCount + 1
+              : friendTilesCount;
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1281,9 +1447,13 @@ class _ProfilePageState extends State<ProfilePage> {
                               height: 52,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: colorScheme.primary.withValues(alpha: 0.10),
+                                color: colorScheme.primary.withValues(
+                                  alpha: 0.10,
+                                ),
                                 border: Border.all(
-                                  color: colorScheme.primary.withValues(alpha: 0.35),
+                                  color: colorScheme.primary.withValues(
+                                    alpha: 0.35,
+                                  ),
                                   width: 1,
                                 ),
                               ),
@@ -1341,15 +1511,16 @@ class _ProfilePageState extends State<ProfilePage> {
                               CircleAvatar(
                                 radius: 26,
                                 backgroundColor: colorScheme.secondary,
-                                backgroundImage: friend.profilePhotoUrl.isNotEmpty
+                                backgroundImage:
+                                    friend.profilePhotoUrl.isNotEmpty
                                     ? NetworkImage(friend.profilePhotoUrl)
                                     : null,
                                 child: friend.profilePhotoUrl.isEmpty
                                     ? Icon(
-                                  Icons.person,
-                                  color: colorScheme.primary,
-                                  size: 26,
-                                )
+                                        Icons.person,
+                                        color: colorScheme.primary,
+                                        size: 26,
+                                      )
                                     : null,
                               ),
                               if (friend.isOnline)
@@ -1603,7 +1774,7 @@ class _ProfilePageState extends State<ProfilePage> {
       // If no relationship exists AND it's opposite gender -> force button into "request" mode.
       final bool isInquiryStatus = _friendStatus.startsWith('inquiry_');
       final String effectiveFriendStatus =
-      (!isInquiryStatus && _friendStatus == 'none' && isOpposite)
+          (!isInquiryStatus && _friendStatus == 'none' && isOpposite)
           ? 'request'
           : _friendStatus;
 
@@ -1644,32 +1815,32 @@ class _ProfilePageState extends State<ProfilePage> {
               alignment: Alignment.center,
               children: [
                 GestureDetector(
-                  onTap: _isOwnProfile ? _pickProfilePhoto : null,
+                  onTap: _isOwnProfile ? _showProfilePhotoChooser : null,
                   child: user!.profilePhotoUrl.isNotEmpty
                       ? CircleAvatar(
-                    radius: 56,
-                    backgroundImage: NetworkImage(user!.profilePhotoUrl),
-                  )
+                          radius: 56,
+                          backgroundImage: NetworkImage(user!.profilePhotoUrl),
+                        )
                       : Container(
-                    width: 112,
-                    height: 112,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: theme.colorScheme.secondary,
-                    ),
-                    child: Icon(
-                      Icons.person,
-                      size: 70,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ),
+                          width: 112,
+                          height: 112,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: theme.colorScheme.secondary,
+                          ),
+                          child: Icon(
+                            Icons.person,
+                            size: 70,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
                 ),
                 if (_isOwnProfile)
                   Positioned(
                     bottom: 4,
                     right: 4,
                     child: GestureDetector(
-                      onTap: _pickProfilePhoto,
+                      onTap: _isOwnProfile ? _showProfilePhotoChooser : null,
                       child: Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
@@ -1721,12 +1892,23 @@ class _ProfilePageState extends State<ProfilePage> {
                   Expanded(
                     child: MyFriendButton(
                       friendStatus: effectiveFriendStatus,
+                      isBusy: _isFriendActionBusy,
 
-                      onAddFriend: (effectiveFriendStatus == 'request')
+                      onAddFriend:
+                          (effectiveFriendStatus == 'request' ||
+                              _isFriendActionBusy)
                           ? null
-                          : _addFriendFromProfile,
+                          : () => _runOptimisticFriendAction(
+                              optimisticStatus: 'pending_sent',
+                              action: () => databaseProvider.sendFriendRequest(
+                                widget.userId,
+                              ),
+                            ),
 
                       onCancelRequest: () async {
+                        if (_isFriendActionBusy) return;
+
+                        // ✅ Marriage inquiry cancel/end
                         if (_friendStatus == 'inquiry_pending_sent' ||
                             _friendStatus == 'inquiry_cancel_inquiry') {
                           final id = await _resolveInquiryId();
@@ -1743,42 +1925,41 @@ class _ProfilePageState extends State<ProfilePage> {
                           final confirm = await _confirmEndMarriageInquiry();
                           if (!confirm) return;
 
-                          try {
-                            await databaseProvider.cancelOrEndMarriageInquiry(
-                              inquiryId: id,
-                            );
-
-                            final updated = await databaseProvider
-                                .getCombinedRelationshipStatus(widget.userId);
-                            if (!mounted) return;
-                            setState(() => _friendStatus = updated);
-                          } catch (e) {
-                            debugPrint(
-                              '❌ cancelOrEndMarriageInquiry failed: $e',
-                            );
-                            if (!mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('something_went_wrong'.tr()),
-                              ),
-                            );
-                          }
+                          await _runOptimisticFriendAction(
+                            optimisticStatus: 'none',
+                            action: () => databaseProvider
+                                .cancelOrEndMarriageInquiry(inquiryId: id),
+                          );
                           return;
                         }
 
+                        // ✅ Mahram cancel
                         if (_friendStatus == 'pending_mahram_sent') {
-                          await _cancelMahramFromProfile();
-                        } else {
-                          await _cancelFriendFromProfile();
+                          await _runOptimisticFriendAction(
+                            optimisticStatus: 'none',
+                            action: () => databaseProvider.cancelMahramRequest(
+                              widget.userId,
+                            ),
+                          );
+                          return;
                         }
 
-                        final updated = await databaseProvider
-                            .getCombinedRelationshipStatus(widget.userId);
-                        if (!mounted) return;
-                        setState(() => _friendStatus = updated);
+                        // ✅ Normal friend cancel
+                        if (_friendStatus == 'pending_sent') {
+                          await _runOptimisticFriendAction(
+                            optimisticStatus: 'none',
+                            action: () => databaseProvider.cancelFriendRequest(
+                              widget.userId,
+                            ),
+                          );
+                          return;
+                        }
                       },
 
                       onAcceptRequest: () async {
+                        if (_isFriendActionBusy) return;
+
+                        // ✅ Inquiry accept flows
                         if (_friendStatus.startsWith('inquiry_')) {
                           final id = await _resolveInquiryId();
                           if (id == null) {
@@ -1791,42 +1972,81 @@ class _ProfilePageState extends State<ProfilePage> {
                             return;
                           }
 
-                          if (_friendStatus == 'inquiry_pending_received_woman') {
-                            await _womanPickMahramForInquiry(inquiryId: id);
-                          } else if (_friendStatus ==
-                              'inquiry_pending_received_mahram') {
-                            await databaseProvider.mahramRespondToInquiry(
-                              inquiryId: id,
-                              approve: true,
-                            );
-                          } else if (_friendStatus ==
-                              'inquiry_pending_received_man') {
-                            await databaseProvider.manRespondToInquiry(
-                              inquiryId: id,
-                              accept: true,
+                          final prevStatus =
+                              _friendStatus; // ✅ IMPORTANT: store BEFORE setState
+
+                          setState(() {
+                            _isFriendActionBusy = true;
+                            _friendStatus =
+                                'inquiry_pending_sent'; // instant feedback
+                          });
+
+                          try {
+                            if (prevStatus ==
+                                'inquiry_pending_received_woman') {
+                              await _womanPickMahramForInquiry(inquiryId: id);
+                            } else if (prevStatus ==
+                                'inquiry_pending_received_mahram') {
+                              await databaseProvider.mahramRespondToInquiry(
+                                inquiryId: id,
+                                approve: true,
+                              );
+                            } else if (prevStatus ==
+                                'inquiry_pending_received_man') {
+                              await databaseProvider.manRespondToInquiry(
+                                inquiryId: id,
+                                accept: true,
+                              );
+                            }
+
+                            final updated = await databaseProvider
+                                .getCombinedRelationshipStatus(widget.userId);
+
+                            if (!mounted) return;
+                            setState(() {
+                              _friendStatus = updated;
+                              _isFriendActionBusy = false;
+                            });
+                          } catch (e, st) {
+                            debugPrint('❌ inquiry accept failed: $e\n$st');
+                            if (!mounted) return;
+                            setState(() {
+                              _isFriendActionBusy = false;
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('something_went_wrong'.tr()),
+                              ),
                             );
                           }
-
-                          final updated = await databaseProvider
-                              .getCombinedRelationshipStatus(widget.userId);
-                          if (!mounted) return;
-                          setState(() => _friendStatus = updated);
                           return;
                         }
 
+                        // ✅ Mahram accept (kept your dialog, but make it feel instant)
                         if (_friendStatus == 'pending_mahram_received') {
+                          setState(() => _isFriendActionBusy = true);
                           await _acceptMahramFromProfile();
-                        } else {
-                          await _acceptFriendFromProfile();
+                          if (!mounted) return;
+                          setState(() => _isFriendActionBusy = false);
+                          return;
                         }
 
-                        final updated = await databaseProvider
-                            .getCombinedRelationshipStatus(widget.userId);
-                        if (!mounted) return;
-                        setState(() => _friendStatus = updated);
+                        // ✅ Normal friend accept
+                        if (_friendStatus == 'pending_received') {
+                          await _runOptimisticFriendAction(
+                            optimisticStatus: 'accepted',
+                            action: () => databaseProvider.acceptFriendRequest(
+                              widget.userId,
+                            ),
+                          );
+                          return;
+                        }
                       },
 
                       onDeclineRequest: () async {
+                        if (_isFriendActionBusy) return;
+
+                        // ✅ Inquiry decline flows
                         if (_friendStatus.startsWith('inquiry_')) {
                           final id = await _resolveInquiryId();
                           if (id == null) {
@@ -1839,56 +2059,75 @@ class _ProfilePageState extends State<ProfilePage> {
                             return;
                           }
 
-                          if (_friendStatus == 'inquiry_pending_received_woman') {
-                            await databaseProvider.womanDeclineInquiry(
-                              inquiryId: id,
-                            );
-                          } else if (_friendStatus ==
-                              'inquiry_pending_received_mahram') {
-                            await databaseProvider.mahramRespondToInquiry(
-                              inquiryId: id,
-                              approve: false,
-                            );
-                          } else if (_friendStatus ==
-                              'inquiry_pending_received_man') {
-                            await databaseProvider.manRespondToInquiry(
-                              inquiryId: id,
-                              accept: false,
-                            );
-                          }
+                          final prevStatus =
+                              _friendStatus; // ✅ store BEFORE optimistic changes
 
-                          final updated = await databaseProvider
-                              .getCombinedRelationshipStatus(widget.userId);
-                          if (!mounted) return;
-                          setState(() => _friendStatus = updated);
+                          await _runOptimisticFriendAction(
+                            optimisticStatus: 'none',
+                            action: () async {
+                              if (prevStatus ==
+                                  'inquiry_pending_received_woman') {
+                                await databaseProvider.womanDeclineInquiry(
+                                  inquiryId: id,
+                                );
+                              } else if (prevStatus ==
+                                  'inquiry_pending_received_mahram') {
+                                await databaseProvider.mahramRespondToInquiry(
+                                  inquiryId: id,
+                                  approve: false,
+                                );
+                              } else if (prevStatus ==
+                                  'inquiry_pending_received_man') {
+                                await databaseProvider.manRespondToInquiry(
+                                  inquiryId: id,
+                                  accept: false,
+                                );
+                              }
+                            },
+                          );
                           return;
                         }
 
+                        // ✅ Mahram decline
                         if (_friendStatus == 'pending_mahram_received') {
-                          await _declineMahramFromProfile();
-                        } else {
-                          await _declineFriendFromProfile();
+                          await _runOptimisticFriendAction(
+                            optimisticStatus: 'none',
+                            action: () => databaseProvider.declineMahramRequest(
+                              widget.userId,
+                            ),
+                          );
+                          return;
                         }
 
-                        final updated = await databaseProvider
-                            .getCombinedRelationshipStatus(widget.userId);
-                        if (!mounted) return;
-                        setState(() => _friendStatus = updated);
+                        // ✅ Normal friend decline
+                        if (_friendStatus == 'pending_received') {
+                          await _runOptimisticFriendAction(
+                            optimisticStatus: 'none',
+                            action: () => databaseProvider.declineFriendRequest(
+                              widget.userId,
+                            ),
+                          );
+                          return;
+                        }
                       },
 
-                      onUnfriend: _unfriendFromProfile,
+                      onUnfriend: _isFriendActionBusy
+                          ? null
+                          : _unfriendFromProfile,
 
                       onOpenRequestSheet: (effectiveFriendStatus == 'request')
                           ? () => _showOppositeGenderRequestSheet(
-                        targetUserId: widget.userId,
-                        targetName: user!.name,
-                      )
+                              targetUserId: widget.userId,
+                              targetName: user!.name,
+                            )
                           : null,
 
-                      onDeleteMahram: () => _confirmAndDeleteMahram(
-                        targetUserId: widget.userId,
-                        targetName: user!.name,
-                      ),
+                      onDeleteMahram: _isFriendActionBusy
+                          ? null
+                          : () => _confirmAndDeleteMahram(
+                              targetUserId: widget.userId,
+                              targetName: user!.name,
+                            ),
                     ),
                   ),
                 ],
@@ -1990,14 +2229,14 @@ class _ProfilePageState extends State<ProfilePage> {
                         String displayName;
                         if (isMuhammad) {
                           final partInfo = muhammadPartInfos.firstWhere(
-                                (m) => m.id == id,
+                            (m) => m.id == id,
                             orElse: () => _MuhammadPartInfo(id: id),
                           );
                           final int? partNo = partInfo.partNo;
                           displayName = partNo != null
                               ? 'muhammad_part'.tr(
-                            namedArgs: {'part': partNo.toString()},
-                          )
+                                  namedArgs: {'part': partNo.toString()},
+                                )
                               : 'muhammad'.tr();
                         } else {
                           final rawLabel = story.chipLabel.tr();
@@ -2022,7 +2261,9 @@ class _ProfilePageState extends State<ProfilePage> {
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black26.withValues(alpha: 0.12),
+                                    color: Colors.black26.withValues(
+                                      alpha: 0.12,
+                                    ),
                                     blurRadius: 5,
                                     offset: const Offset(0, 3),
                                   ),
@@ -2192,7 +2433,9 @@ class _ProfilePageState extends State<ProfilePage> {
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                        color: theme.colorScheme.primary.withValues(
+                          alpha: 0.12,
+                        ),
                       ),
                       child: Icon(
                         Icons.article_outlined,
@@ -2217,9 +2460,9 @@ class _ProfilePageState extends State<ProfilePage> {
                             postCount == 0
                                 ? 'tap_to_view_posts'.tr()
                                 : 'posts_tap_to_view'.plural(
-                              postCount,
-                              namedArgs: {'count': postCount.toString()},
-                            ),
+                                    postCount,
+                                    namedArgs: {'count': postCount.toString()},
+                                  ),
                             style: TextStyle(
                               fontSize: 12,
                               color: theme.colorScheme.primary.withValues(
@@ -2238,7 +2481,9 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(999),
-                        color: theme.colorScheme.primary.withValues(alpha: 0.08),
+                        color: theme.colorScheme.primary.withValues(
+                          alpha: 0.08,
+                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -2272,27 +2517,27 @@ class _ProfilePageState extends State<ProfilePage> {
             const SizedBox(height: 8),
             (allUserPosts.isEmpty
                 ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(14.0),
-                child: Text(
-                  "No posts yet..".tr(),
-                  style: TextStyle(color: theme.colorScheme.primary),
-                ),
-              ),
-            )
+                    child: Padding(
+                      padding: const EdgeInsets.all(14.0),
+                      child: Text(
+                        "No posts yet..".tr(),
+                        style: TextStyle(color: theme.colorScheme.primary),
+                      ),
+                    ),
+                  )
                 : ListView.builder(
-              itemCount: allUserPosts.length,
-              physics: const NeverScrollableScrollPhysics(),
-              shrinkWrap: true,
-              itemBuilder: (context, index) {
-                final Post post = allUserPosts[index];
-                return MyPostTile(
-                  post: post,
-                  onPostTap: () => goPostPage(context, post),
-                  scaffoldContext: context,
-                );
-              },
-            )),
+                    itemCount: allUserPosts.length,
+                    physics: const NeverScrollableScrollPhysics(),
+                    shrinkWrap: true,
+                    itemBuilder: (context, index) {
+                      final Post post = allUserPosts[index];
+                      return MyPostTile(
+                        post: post,
+                        onPostTap: () => goPostPage(context, post),
+                        scaffoldContext: context,
+                      );
+                    },
+                  )),
           ],
 
           const SizedBox(height: 18),
@@ -2306,11 +2551,11 @@ class _ProfilePageState extends State<ProfilePage> {
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: showLocalAppBar
           ? AppBar(
-        foregroundColor: Theme.of(context).colorScheme.primary,
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-      )
+              foregroundColor: Theme.of(context).colorScheme.primary,
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+            )
           : null,
       body: bodyChild,
     );

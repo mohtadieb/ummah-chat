@@ -364,6 +364,15 @@ class ChatProvider with ChangeNotifier {
     return _chatService.fetchGroupMemberLinksFromDatabase(chatRoomId);
   }
 
+  // ---------------------------------------------------------------------------
+// 🆕 CHAT ROOM CONTEXT (exposed to UI)
+// ---------------------------------------------------------------------------
+
+  Future<Map<String, dynamic>?> fetchChatRoomContext(String chatRoomId) {
+    return _chatService.fetchChatRoomContextByIdFromDatabase(chatRoomId);
+  }
+
+
   Future<String> createGroupRoom({
     required String name,
     required String creatorId,

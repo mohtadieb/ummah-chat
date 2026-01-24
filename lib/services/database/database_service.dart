@@ -32,7 +32,6 @@ import '../notifications/notification_service.dart';
 import 'dart:typed_data';
 import '../chat/chat_service.dart';
 
-
 // 🆕 Notifications
 
 class DatabaseService {
@@ -1621,7 +1620,9 @@ class DatabaseService {
 
     final profiles = await _db
         .from('profiles')
-        .select('id, name, username, profile_photo_url, last_seen_at, gender, country, city')
+        .select(
+          'id, name, username, profile_photo_url, last_seen_at, gender, country, city',
+        )
         .inFilter('id', ids.toList());
 
     return (profiles as List)
@@ -1629,44 +1630,41 @@ class DatabaseService {
         .toList();
   }
 
-
-
-
-// =========================================================
-// MARRIAGE INQUIRIES (DatabaseService)
-// =========================================================
-//
-// ✅ FINAL, CONSISTENT VERSION (copy/paste over your whole marriage section)
-//
-// Statuses used (consistent everywhere):
-// - pending_woman_response        (Flow 1: man initiated, waiting for woman to accept + pick mahram)
-// - pending_mahram_response       (Waiting for mahram approval/decline)
-// - pending_man_decision          (Flow 2: woman initiated, waiting for man accept/decline AFTER mahram approved)
-// - approved_by_mahram            (optional milestone before group creation in flow 1)
-// - accepted_by_man               (optional milestone before group creation in flow 2)
-// - group_created
-// - cancelled
-// - ended
-// - closed_woman_declined
-// - closed_mahram_declined
-// - closed_man_declined
-//
-// mahram_status values used:
-// - pending
-// - approved
-// - declined
-//
-// man_status values used:
-// - pending
-// - accepted
-// - declined
-//
-// Notifications bodies used (keep stable for NotificationPage parsing):
-// - MARRIAGE_INQUIRY_REQUEST:$inquiryId::$manId
-// - MARRIAGE_INQUIRY_MAHRAM:$inquiryId::$manId::$womanId
-// - MARRIAGE_INQUIRY_MAN_DECISION:$inquiryId::$womanId::$mahramId
-// - MARRIAGE_INQUIRY_GROUP_CREATED:$inquiryId::$chatRoomId::$groupName
-// - MARRIAGE_INQUIRY_DECLINED:$inquiryId::$manId
+  // =========================================================
+  // MARRIAGE INQUIRIES (DatabaseService)
+  // =========================================================
+  //
+  // ✅ FINAL, CONSISTENT VERSION (copy/paste over your whole marriage section)
+  //
+  // Statuses used (consistent everywhere):
+  // - pending_woman_response        (Flow 1: man initiated, waiting for woman to accept + pick mahram)
+  // - pending_mahram_response       (Waiting for mahram approval/decline)
+  // - pending_man_decision          (Flow 2: woman initiated, waiting for man accept/decline AFTER mahram approved)
+  // - approved_by_mahram            (optional milestone before group creation in flow 1)
+  // - accepted_by_man               (optional milestone before group creation in flow 2)
+  // - group_created
+  // - cancelled
+  // - ended
+  // - closed_woman_declined
+  // - closed_mahram_declined
+  // - closed_man_declined
+  //
+  // mahram_status values used:
+  // - pending
+  // - approved
+  // - declined
+  //
+  // man_status values used:
+  // - pending
+  // - accepted
+  // - declined
+  //
+  // Notifications bodies used (keep stable for NotificationPage parsing):
+  // - MARRIAGE_INQUIRY_REQUEST:$inquiryId::$manId
+  // - MARRIAGE_INQUIRY_MAHRAM:$inquiryId::$manId::$womanId
+  // - MARRIAGE_INQUIRY_MAN_DECISION:$inquiryId::$womanId::$mahramId
+  // - MARRIAGE_INQUIRY_GROUP_CREATED:$inquiryId::$chatRoomId::$groupName
+  // - MARRIAGE_INQUIRY_DECLINED:$inquiryId::$manId
 
   Future<String> createMarriageInquiryInDatabase({
     required String manId,
@@ -1678,10 +1676,14 @@ class DatabaseService {
 
     // ✅ Enforce caller matches initiatedBy
     if (initiatedBy == 'man' && currentUserId != manId) {
-      throw Exception('Only the man can create this inquiry (initiated_by=man).');
+      throw Exception(
+        'Only the man can create this inquiry (initiated_by=man).',
+      );
     }
     if (initiatedBy == 'woman' && currentUserId != womanId) {
-      throw Exception('Only the woman can create this inquiry (initiated_by=woman).');
+      throw Exception(
+        'Only the woman can create this inquiry (initiated_by=woman).',
+      );
     }
 
     // ✅ woman-initiated must include mahram upfront
@@ -1692,26 +1694,28 @@ class DatabaseService {
     final bool hasMahram = mahramId != null && mahramId!.isNotEmpty;
 
     // ✅ Consistent statuses
-    final String initialStatus =
-    hasMahram ? 'pending_mahram_response' : 'pending_woman_response';
+    final String initialStatus = hasMahram
+        ? 'pending_mahram_response'
+        : 'pending_woman_response';
 
     final String initialMahramStatus = hasMahram ? 'pending' : 'not_assigned';
 
     // ✅ In Flow 2 (woman initiated), man will later decide, so set man_status=pending
-    final String initialManStatus =
-    (initiatedBy == 'woman') ? 'pending' : 'not_required';
+    final String initialManStatus = (initiatedBy == 'woman')
+        ? 'pending'
+        : 'not_required';
 
     final created = await _db
         .from('marriage_inquiries')
         .insert({
-      'man_id': manId,
-      'woman_id': womanId,
-      'mahram_id': hasMahram ? mahramId : null,
-      'status': initialStatus,
-      'initiated_by': initiatedBy,
-      'mahram_status': initialMahramStatus,
-      'man_status': initialManStatus,
-    })
+          'man_id': manId,
+          'woman_id': womanId,
+          'mahram_id': hasMahram ? mahramId : null,
+          'status': initialStatus,
+          'initiated_by': initiatedBy,
+          'mahram_status': initialMahramStatus,
+          'man_status': initialManStatus,
+        })
         .select('id')
         .maybeSingle();
 
@@ -1735,7 +1739,8 @@ class DatabaseService {
           'manId': manId,
           'womanId': womanId,
         },
-        fromUserId: womanId, // keep as man for your NotificationPage parsing
+        fromUserId: womanId,
+        // keep as man for your NotificationPage parsing
         type: 'social',
         unreadCount: 1,
         isRead: false,
@@ -1801,12 +1806,15 @@ class DatabaseService {
       throw Exception('Mahram is required.');
     }
 
-    await _db.from('marriage_inquiries').update({
-      'mahram_id': mahramId,
-      'mahram_status': 'pending',
-      'status': 'pending_mahram_response',
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', inquiryId);
+    await _db
+        .from('marriage_inquiries')
+        .update({
+          'mahram_id': mahramId,
+          'mahram_status': 'pending',
+          'status': 'pending_mahram_response',
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', inquiryId);
 
     await NotificationService().createNotificationForUser(
       targetUserId: mahramId,
@@ -1849,10 +1857,13 @@ class DatabaseService {
       throw Exception('Inquiry is not awaiting the woman’s response.');
     }
 
-    await _db.from('marriage_inquiries').update({
-      'status': 'closed_woman_declined',
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', inquiryId);
+    await _db
+        .from('marriage_inquiries')
+        .update({
+          'status': 'closed_woman_declined',
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', inquiryId);
   }
 
   // ✅ Only the relevant method below (as you pasted), updated.
@@ -1865,7 +1876,9 @@ class DatabaseService {
 
     final inquiry = await _db
         .from('marriage_inquiries')
-        .select('id, man_id, woman_id, mahram_id, status, initiated_by, mahram_status')
+        .select(
+          'id, man_id, woman_id, mahram_id, status, initiated_by, mahram_status',
+        )
         .eq('id', inquiryId)
         .maybeSingle();
 
@@ -1879,7 +1892,8 @@ class DatabaseService {
     final mahramStatus = (inquiry['mahram_status'] ?? '').toString();
 
     if (mahramId.isEmpty) throw Exception('No mahram set yet.');
-    if (currentUserId != mahramId) throw Exception('Only the mahram can respond.');
+    if (currentUserId != mahramId)
+      throw Exception('Only the mahram can respond.');
     if (status != 'pending_mahram_response') {
       throw Exception('Inquiry is not awaiting mahram response.');
     }
@@ -1888,14 +1902,17 @@ class DatabaseService {
     }
 
     // -----------------------------
-// DECLINE
-// -----------------------------
+    // DECLINE
+    // -----------------------------
     if (!approve) {
-      await _db.from('marriage_inquiries').update({
-        'status': 'closed_mahram_declined',
-        'mahram_status': 'declined',
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', inquiryId);
+      await _db
+          .from('marriage_inquiries')
+          .update({
+            'status': 'closed_mahram_declined',
+            'mahram_status': 'declined',
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', inquiryId);
 
       // ✅ Always notify woman (opens MAN profile)
       await NotificationService().createNotificationForUser(
@@ -1937,18 +1954,20 @@ class DatabaseService {
       return;
     }
 
-
     // -----------------------------
     // APPROVE
     // -----------------------------
 
     // ✅ Flow 2 (woman initiated): move to man decision
     if (initiatedBy == 'woman') {
-      await _db.from('marriage_inquiries').update({
-        'status': 'pending_man_decision',
-        'mahram_status': 'approved',
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', inquiryId);
+      await _db
+          .from('marriage_inquiries')
+          .update({
+            'status': 'pending_man_decision',
+            'mahram_status': 'approved',
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', inquiryId);
 
       // ✅ notify MAN: open WOMAN profile
       await NotificationService().createNotificationForUser(
@@ -1962,7 +1981,8 @@ class DatabaseService {
           'womanId': womanId,
           'mahramId': mahramId,
         },
-        fromUserId: womanId, // ✅ CHANGED
+        fromUserId: womanId,
+        // ✅ CHANGED
         type: 'social',
         unreadCount: 1,
         isRead: false,
@@ -2006,11 +2026,14 @@ class DatabaseService {
     );
 
     // ✅ Flow 1 (man initiated): create group immediately
-    await _db.from('marriage_inquiries').update({
-      'status': 'approved_by_mahram',
-      'mahram_status': 'approved',
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', inquiryId);
+    await _db
+        .from('marriage_inquiries')
+        .update({
+          'status': 'approved_by_mahram',
+          'mahram_status': 'approved',
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', inquiryId);
 
     // ✅ NEW: notify MAN "accepted" BEFORE "group created"
     await NotificationService().createNotificationForUser(
@@ -2041,25 +2064,27 @@ class DatabaseService {
     final womanProfile = await getUserFromDatabase(womanId);
 
     final manName = (manProfile?.name ?? manProfile?.username ?? '').trim();
-    final womanName = (womanProfile?.name ?? womanProfile?.username ?? '').trim();
+    final womanName = (womanProfile?.name ?? womanProfile?.username ?? '')
+        .trim();
 
-
-    final updated = await _db.from('chat_rooms').update({
-      'context_type': 'marriage_inquiry',
-      'context_id': inquiryId,
-      'man_id': manId,
-      'woman_id': womanId,
-      'mahram_id': mahramId,
-      'man_name': manName,
-      'woman_name': womanName,
-    }).eq('id', chatRoomId)
+    final updated = await _db
+        .from('chat_rooms')
+        .update({
+          'context_type': 'marriage_inquiry',
+          'context_id': inquiryId,
+          'man_id': manId,
+          'woman_id': womanId,
+          'mahram_id': mahramId,
+          'man_name': manName,
+          'woman_name': womanName,
+        })
+        .eq('id', chatRoomId)
         .select('id, context_type, context_id, man_name, woman_name')
         .maybeSingle();
 
     if (updated == null) {
       throw Exception('chat_rooms update blocked by RLS (0 rows updated).');
     }
-
 
     // ✅ NEW: insert INTRO system message into the group
     await _db.from('messages').insert({
@@ -2069,13 +2094,17 @@ class DatabaseService {
       'created_at': DateTime.now().toUtc().toIso8601String(),
     });
 
-    await _db.from('marriage_inquiries').update({
-      'status': 'group_created',
-      'chat_room_id': chatRoomId,
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', inquiryId);
+    await _db
+        .from('marriage_inquiries')
+        .update({
+          'status': 'group_created',
+          'chat_room_id': chatRoomId,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', inquiryId);
 
-    final bodyCode = 'MARRIAGE_INQUIRY_GROUP_CREATED:$inquiryId::$chatRoomId::$groupName';
+    final bodyCode =
+        'MARRIAGE_INQUIRY_GROUP_CREATED:$inquiryId::$chatRoomId::$groupName';
 
     for (final target in [manId, womanId, mahramId]) {
       await NotificationService().createNotificationForUser(
@@ -2097,9 +2126,6 @@ class DatabaseService {
     }
   }
 
-
-
-
   /// FLOW 2 ONLY (initiated_by=woman):
   Future<void> manRespondToInquiryInDatabase({
     required String inquiryId,
@@ -2109,7 +2135,9 @@ class DatabaseService {
 
     final inquiry = await _db
         .from('marriage_inquiries')
-        .select('id, man_id, woman_id, mahram_id, status, mahram_status, initiated_by')
+        .select(
+          'id, man_id, woman_id, mahram_id, status, mahram_status, initiated_by',
+        )
         .eq('id', inquiryId)
         .maybeSingle();
 
@@ -2140,11 +2168,14 @@ class DatabaseService {
     // DECLINE
     // -----------------------------
     if (!accept) {
-      await _db.from('marriage_inquiries').update({
-        'status': 'closed_man_declined',
-        'man_status': 'declined',
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', inquiryId);
+      await _db
+          .from('marriage_inquiries')
+          .update({
+            'status': 'closed_man_declined',
+            'man_status': 'declined',
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', inquiryId);
 
       await NotificationService().createNotificationForUser(
         targetUserId: womanId,
@@ -2184,11 +2215,14 @@ class DatabaseService {
     // -----------------------------
     // ACCEPT
     // -----------------------------
-    await _db.from('marriage_inquiries').update({
-      'status': 'accepted_by_man',
-      'man_status': 'accepted',
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', inquiryId);
+    await _db
+        .from('marriage_inquiries')
+        .update({
+          'status': 'accepted_by_man',
+          'man_status': 'accepted',
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', inquiryId);
 
     // ✅ NEW: notify WOMAN + MAHRAM that the man accepted
     // (send BEFORE group created notif, so ordering is correct)
@@ -2237,25 +2271,27 @@ class DatabaseService {
     final womanProfile = await getUserFromDatabase(womanId);
 
     final manName = (manProfile?.name ?? manProfile?.username ?? '').trim();
-    final womanName = (womanProfile?.name ?? womanProfile?.username ?? '').trim();
+    final womanName = (womanProfile?.name ?? womanProfile?.username ?? '')
+        .trim();
 
-    final updated = await _db.from('chat_rooms').update({
-      'context_type': 'marriage_inquiry',
-      'context_id': inquiryId,
-      'man_id': manId,
-      'woman_id': womanId,
-      'mahram_id': mahramId,
-      'man_name': manName,
-      'woman_name': womanName,
-    }).eq('id', chatRoomId)
+    final updated = await _db
+        .from('chat_rooms')
+        .update({
+          'context_type': 'marriage_inquiry',
+          'context_id': inquiryId,
+          'man_id': manId,
+          'woman_id': womanId,
+          'mahram_id': mahramId,
+          'man_name': manName,
+          'woman_name': womanName,
+        })
+        .eq('id', chatRoomId)
         .select('id, context_type, context_id, man_name, woman_name')
         .maybeSingle();
 
     if (updated == null) {
       throw Exception('chat_rooms update blocked by RLS (0 rows updated).');
     }
-
-
 
     // ✅ insert INTRO system message into the group
     await _db.from('messages').insert({
@@ -2265,11 +2301,14 @@ class DatabaseService {
       'created_at': DateTime.now().toUtc().toIso8601String(),
     });
 
-    await _db.from('marriage_inquiries').update({
-      'status': 'group_created',
-      'chat_room_id': chatRoomId,
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', inquiryId);
+    await _db
+        .from('marriage_inquiries')
+        .update({
+          'status': 'group_created',
+          'chat_room_id': chatRoomId,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', inquiryId);
 
     final bodyCode =
         'MARRIAGE_INQUIRY_GROUP_CREATED:$inquiryId::$chatRoomId::$groupName';
@@ -2294,23 +2333,23 @@ class DatabaseService {
     }
   }
 
-
-
-  Future<Map<String, dynamic>?> getLatestActiveInquiryBetweenMeAnd(String otherUserId) async {
+  Future<Map<String, dynamic>?> getLatestActiveInquiryBetweenMeAnd(
+    String otherUserId,
+  ) async {
     final currentUserId = _auth.currentUser?.id;
     if (currentUserId == null || currentUserId.isEmpty) return null;
 
     final res = await _db
         .from('marriage_inquiries')
         .select(
-      'id, man_id, woman_id, mahram_id, status, mahram_status, man_status, chat_room_id, updated_at, initiated_by',
-    )
+          'id, man_id, woman_id, mahram_id, status, mahram_status, man_status, chat_room_id, updated_at, initiated_by',
+        )
         .or(
-      'and(man_id.eq.$currentUserId,woman_id.eq.$otherUserId),'
+          'and(man_id.eq.$currentUserId,woman_id.eq.$otherUserId),'
           'and(man_id.eq.$otherUserId,woman_id.eq.$currentUserId),'
           'and(mahram_id.eq.$currentUserId,man_id.eq.$otherUserId),'
           'and(mahram_id.eq.$currentUserId,woman_id.eq.$otherUserId)',
-    )
+        )
         .order('updated_at', ascending: false)
         .limit(1);
 
@@ -2343,7 +2382,9 @@ class DatabaseService {
 
     final status = (inquiry['status'] ?? '').toString().trim();
     final mahramStatusRaw = (inquiry['mahram_status'] ?? '').toString().trim();
-    final mahramStatus = mahramStatusRaw.isEmpty ? 'not_assigned' : mahramStatusRaw;
+    final mahramStatus = mahramStatusRaw.isEmpty
+        ? 'not_assigned'
+        : mahramStatusRaw;
 
     final chatRoomId = (inquiry['chat_room_id'] ?? '').toString();
 
@@ -2354,7 +2395,8 @@ class DatabaseService {
     if (!isViewerMan && !isViewerWoman && !isViewerMahram) return null;
 
     // Once group exists -> show "End inquiry" for man/woman (mahram doesn't need controls)
-    final bool inquiryActive = chatRoomId.isNotEmpty || status == 'group_created';
+    final bool inquiryActive =
+        chatRoomId.isNotEmpty || status == 'group_created';
     if (inquiryActive) {
       if (isViewerMan || isViewerWoman) return 'inquiry_cancel_inquiry';
       return null;
@@ -2388,7 +2430,6 @@ class DatabaseService {
 
     return null;
   }
-
 
   Future<String> getCombinedRelationshipStatus(String otherUserId) async {
     final inquiry = await getLatestActiveInquiryBetweenMeAnd(otherUserId);
@@ -2434,7 +2475,11 @@ class DatabaseService {
         params: {'p_inquiry_id': inquiryId},
       );
 
-      await NotificationService().deleteMarriageInquiryNotifications(inquiryId);
+      await _db.rpc(
+        'delete_marriage_inquiry_notifications_for_all',
+        params: {'p_inquiry_id': inquiryId},
+      );
+
       return;
     }
 
@@ -2442,43 +2487,42 @@ class DatabaseService {
     final updated = await _db
         .from('marriage_inquiries')
         .update({
-      'status': 'cancelled',
-      // you can omit updated_at if you have trigger set_updated_at()
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    })
+          'status': 'cancelled',
+          // you can omit updated_at if you have trigger set_updated_at()
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
         .eq('id', inquiryId)
-    // ✅ IMPORTANT: force RETURNING so RLS issues don't fail silently
+        // ✅ IMPORTANT: force RETURNING so RLS issues don't fail silently
         .select('id, status, updated_at')
         .maybeSingle();
 
     if (updated == null) {
       // This almost always means UPDATE was blocked by RLS (0 rows affected)
-      throw Exception('Cancel failed: update blocked (RLS) or inquiry not found.');
+      throw Exception(
+        'Cancel failed: update blocked (RLS) or inquiry not found.',
+      );
     }
 
-    await NotificationService().deleteMarriageInquiryNotifications(inquiryId);
+    await _db.rpc(
+      'delete_marriage_inquiry_notifications_for_all',
+      params: {'p_inquiry_id': inquiryId},
+    );
   }
 
-
-
-
-  Future<Map<String, dynamic>?> getInquiryByIdInDatabase(String inquiryId) async {
+  Future<Map<String, dynamic>?> getInquiryByIdInDatabase(
+    String inquiryId,
+  ) async {
     final res = await _db
         .from('marriage_inquiries')
         .select(
-      'id, man_id, woman_id, mahram_id, status, mahram_status, man_status, chat_room_id, updated_at, initiated_by',
-    )
+          'id, man_id, woman_id, mahram_id, status, mahram_status, man_status, chat_room_id, updated_at, initiated_by',
+        )
         .eq('id', inquiryId)
         .maybeSingle();
 
     if (res == null) return null;
     return Map<String, dynamic>.from(res);
   }
-
-
-
-
-
 
   /* ==================== FOLLOW / UNFOLLOW ==================== */
 
@@ -2681,91 +2725,111 @@ class DatabaseService {
 
   /* ==================== COMMUNITY ==================== */
 
-  // Fetch all communities
+  // Fetch all communities (RLS will enforce visibility)
   Future<List<Map<String, dynamic>>> getAllCommunitiesFromDatabase() async {
     try {
-      final res = await _db.from('communities').select();
+      final res = await _db
+          .from('communities')
+          .select()
+          .order('created_at', ascending: false);
+
       return List<Map<String, dynamic>>.from(res);
-    } catch (e) {
-      print("❌ Error fetching communities: $e");
+    } catch (e, st) {
+      debugPrint("❌ Error fetching communities: $e\n$st");
       return [];
     }
   }
 
+
+
   // Create new community + auto-join creator
   Future<Map<String, dynamic>?> createCommunityInDatabase(
-    String name,
-    String desc,
-    String country,
-  ) async {
+      String name,
+      String desc,
+      String country, {
+        bool isPrivate = false,
+      }) async {
     try {
-      final userId = _auth.currentUser!.id;
+      // ✅ Use RPC so private creation + auto-join is always allowed under RLS
+      final created = await _db.rpc(
+        'create_community',
+        params: {
+          'p_name': name,
+          'p_description': desc,
+          'p_country': country,
+          'p_is_private': isPrivate,
+        },
+      );
 
-      // 1) Create community and get the created row back (so we have the id)
-      final created = await _db
-          .from('communities')
-          .insert({
-            'name': name,
-            'description': desc,
-            'country': country,
-            'created_by': userId,
-          })
-          .select()
-          .single();
-
-      final communityId = created['id'];
-
-      // 2) Auto-join the creator
-      await _db.from('community_members').insert({
-        'community_id': communityId,
-        'user_id': userId,
-      });
-
-      return Map<String, dynamic>.from(created);
+      return Map<String, dynamic>.from(created as Map);
     } catch (e, st) {
-      debugPrint("❌ Error creating community (auto-join): $e\n$st");
+      debugPrint("❌ Error creating community (RPC): $e\n$st");
       return null;
     }
   }
 
+
+
   Future<bool> isMemberInDatabase(String communityId) async {
     try {
-      final userId = _auth.currentUser!.id;
+      final userId = _auth.currentUser?.id;
+      if (userId == null) return false;
+
       final res = await _db
           .from('community_members')
-          .select()
+          .select('id')
           .eq('community_id', communityId)
           .eq('user_id', userId)
           .maybeSingle();
+
       return res != null;
-    } catch (e) {
-      print("❌ Error checking membership: $e");
+    } catch (e, st) {
+      debugPrint("❌ Error checking membership: $e\n$st");
       return false;
     }
   }
 
-  Future<void> joinCommunityInDatabase(String communityId) async {
+
+  Future<bool> joinCommunityInDatabase({
+    required String communityId,
+    required bool isPrivate,
+  }) async {
     try {
       final userId = _auth.currentUser!.id;
+
+      // 1) Join
       await _db.from('community_members').insert({
         'community_id': communityId,
         'user_id': userId,
       });
-    } catch (e) {
-      print("❌ Error joining community: $e");
+
+      // 2) If private, accept the invite (only if there is a pending one)
+      if (isPrivate) {
+        await _db
+            .from('community_invites')
+            .update({'status': 'accepted'})
+            .eq('community_id', communityId)
+            .eq('invited_user_id', userId)
+            .eq('status', 'pending');
+      }
+
+      return true;
+    } catch (e, st) {
+      debugPrint("❌ Error joining community: $e\n$st");
+      return false;
     }
   }
 
+
   Future<void> leaveCommunityInDatabase(String communityId) async {
+    final id = communityId.trim();
+    if (id.isEmpty) return;
+
     try {
-      final userId = _auth.currentUser!.id;
-      await _db
-          .from('community_members')
-          .delete()
-          .eq('community_id', communityId)
-          .eq('user_id', userId);
-    } catch (e) {
-      print("❌ Error leaving community: $e");
+      await _db.rpc('community_leave', params: {'p_community_id': id});
+    } catch (e, st) {
+      debugPrint("❌ Error leaving community (RPC): $e\n$st");
+      rethrow;
     }
   }
 
@@ -2775,37 +2839,38 @@ class DatabaseService {
     try {
       final userId = _auth.currentUser!.id;
       final q = query.trim();
-
       if (q.isEmpty) return [];
 
-      // OR search across name, description, and country (case-insensitive via ILIKE)
-      final response = await _db
-          .from('communities')
-          .select(
-            'id, name, description, country, members:community_members(user_id)',
-          )
-          .or(
-            'name.ilike.%$q%,'
-            'description.ilike.%$q%,'
-            'country.ilike.%$q%',
-          )
-          .limit(30);
+      // ✅ NEW: RPC search (typo-tolerant + respects private communities)
+      final res = await _db.rpc('search_communities', params: {'p_query': q});
 
-      return (response as List)
-          .map<Map<String, dynamic>>(
-            (c) => {
-              'id': c['id'],
-              'name': c['name'],
-              'description': c['description'],
-              'country': c['country'],
-              'is_joined': (c['members'] as List).any(
-                (m) => m['user_id'] == userId,
-              ),
-            },
-          )
-          .toList();
+      final rows = List<Map<String, dynamic>>.from(res as List);
+
+      if (rows.isEmpty) return [];
+
+      // ✅ membership hydration (so UI can show Join/Joined correctly)
+      final myMemberships = await getMyCommunityMembershipsFromDatabase();
+      final joinedIds = myMemberships
+          .map((r) => r['community_id']?.toString())
+          .whereType<String>()
+          .toSet();
+
+      return rows.map<Map<String, dynamic>>((c) {
+        final id = c['id']?.toString() ?? '';
+        return {
+          'id': c['id'],
+          'name': c['name'],
+          'description': c['description'],
+          'country': c['country'],
+          'created_by': c['created_by'],
+          'created_at': c['created_at'],
+          'member_count': c['member_count'],
+          'is_private': c['is_private'],
+          'is_joined': id.isNotEmpty && joinedIds.contains(id),
+        };
+      }).toList();
     } catch (e, st) {
-      print("❌ Error searching communities: $e\n$st");
+      debugPrint("❌ Error searching communities (RPC): $e\n$st");
       return [];
     }
   }
@@ -2825,41 +2890,57 @@ class DatabaseService {
     }
   }
 
-  // Fetch full profiles of all community members
+  // Fetch all community member profiles
   Future<List<Map<String, dynamic>>> getCommunityMemberProfilesFromDatabase(
-    String communityId,
-  ) async {
+      String communityId,
+      ) async {
     try {
-      // Step 1: Get all user_ids from community_members
+      final cid = communityId.trim();
+      if (cid.isEmpty) return [];
+
+      // 1) Get user_ids from community_members
       final memberLinks = await _db
           .from('community_members')
           .select('user_id')
-          .eq('community_id', communityId);
+          .eq('community_id', cid);
 
-      if (memberLinks.isEmpty) return [];
+      final links = List<Map<String, dynamic>>.from(memberLinks);
+      if (links.isEmpty) return [];
 
-      // Extract user_ids
-      final userIds = (memberLinks as List)
-          .map((m) => m['user_id'].toString())
+      final userIds = links
+          .map((m) => (m['user_id'] ?? '').toString())
+          .where((id) => id.isNotEmpty)
           .toList();
 
-      // Step 2: Fetch full profiles from profiles table
-      // Using filter 'id' in array
+      if (userIds.isEmpty) return [];
+
+      // 2) Fetch profiles for those ids (robust IN filter)
       final profiles = await _db
           .from('profiles')
-          .select()
-          .filter(
-            'id',
-            'in',
-            '(${userIds.join(',')})',
-          ); // Supabase requires string like "(id1,id2)"
+          .select(
+        'id, name, username, email, bio, profile_photo_url, created_at',
+      )
+          .inFilter('id', userIds);
 
-      return List<Map<String, dynamic>>.from(profiles);
-    } catch (e) {
-      print("❌ Error fetching community member profiles: $e");
+      // Optional: keep original member order
+      final profileList = List<Map<String, dynamic>>.from(profiles);
+      final index = <String, int>{
+        for (var i = 0; i < userIds.length; i++) userIds[i]: i,
+      };
+
+      profileList.sort((a, b) {
+        final ai = index[(a['id'] ?? '').toString()] ?? 999999;
+        final bi = index[(b['id'] ?? '').toString()] ?? 999999;
+        return ai.compareTo(bi);
+      });
+
+      return profileList;
+    } catch (e, st) {
+      debugPrint("❌ Error fetching community member profiles: $e\n$st");
       return [];
     }
   }
+
 
   Future<List<Map<String, dynamic>>>
   getMyCommunityMembershipsFromDatabase() async {
@@ -2877,6 +2958,157 @@ class DatabaseService {
       return [];
     }
   }
+
+  Future<void> inviteUserToCommunityInDatabase(
+    String communityId,
+    String invitedUserId,
+    String communityName,
+    String inviterName, // ✅ NEW
+  ) async {
+    final id = communityId.trim();
+    final invited = invitedUserId.trim();
+    final cname = communityName.trim();
+    final iname = inviterName.trim();
+
+    if (id.isEmpty || invited.isEmpty) return;
+    if (iname.isEmpty) return; // ✅ optional safety
+
+    // DB invite record
+    await _db.rpc(
+      'community_invite_user',
+      params: {'p_community_id': id, 'p_invited_user_id': invited},
+    );
+
+    final inviterId = _auth.currentUser?.id ?? '';
+    if (inviterId.isEmpty) return;
+
+    // ✅ Standard body format for NotificationPage: COMMUNITY_INVITE:<id>::<name>
+    // ✅ change body + pushArgs keys
+    await NotificationService().createNotificationForUser(
+      targetUserId: invited,
+      title: 'COMMUNITY_INVITE',
+      body: 'COMMUNITY_INVITE:$id::$cname::$iname', // ✅ now includes inviter
+      fromUserId: inviterId,
+      type: 'community',
+      isRead: false,
+      unreadCount: 1,
+      sendPush: true,
+      pushArgs: {
+        'name': cname,
+        'senderName': iname, // ✅ edge reads senderName
+      },
+      data: {
+        'type': 'COMMUNITY_INVITE',
+        'communityId': id,
+        'communityName': cname,
+        'fromUserId': inviterId,
+        'senderName': iname, // ✅ keep consistent
+      },
+    );
+  }
+
+  Future<void> acceptCommunityInviteInDatabase(String communityId) async {
+    final id = communityId.trim();
+    if (id.isEmpty) return;
+
+    try {
+      await _db.rpc('community_accept_invite', params: {'p_community_id': id});
+    } catch (e) {
+      print("❌ Error accepting community invite: $e");
+      rethrow;
+    }
+  }
+
+  Future<void> declineCommunityInviteInDatabase(String communityId) async {
+    final id = communityId.trim();
+    if (id.isEmpty) return;
+
+    try {
+      await _db.rpc('community_decline_invite', params: {'p_community_id': id});
+    } catch (e) {
+      print("❌ Error declining community invite: $e");
+      rethrow;
+    }
+  }
+
+  Future<bool> hasPendingCommunityInviteInDatabase(String communityId) async {
+    try {
+      final userId = _auth.currentUser!.id;
+
+      final res = await _db
+          .from('community_invites')
+          .select('id')
+          .eq('community_id', communityId)
+          .eq('invited_user_id', userId)
+          .eq('status', 'pending')
+          .maybeSingle();
+
+      return res != null;
+    } catch (e) {
+      debugPrint("❌ Error checking pending community invite: $e");
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getCommunityByIdFromDatabase(
+    String communityId,
+  ) async {
+    try {
+      final res = await _db
+          .from('communities')
+          .select()
+          .eq('id', communityId)
+          .maybeSingle();
+
+      if (res == null) return null;
+      return Map<String, dynamic>.from(res);
+    } catch (e) {
+      debugPrint("❌ Error fetching community by id: $e");
+      return null;
+    }
+  }
+
+  Future<Set<String>> getCommunityMemberIdsFromDatabase(
+    String communityId,
+  ) async {
+    final res = await _db
+        .from('community_members')
+        .select('user_id')
+        .eq('community_id', communityId);
+
+    return (res as List)
+        .map((r) => (r['user_id'] ?? '').toString())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+  }
+
+  Future<Set<String>> getPendingCommunityInviteIdsFromDatabase(
+    String communityId,
+  ) async {
+    final res = await _db
+        .from('community_invites')
+        .select('invited_user_id')
+        .eq('community_id', communityId)
+        .eq('status', 'pending');
+
+    return (res as List)
+        .map((r) => (r['invited_user_id'] ?? '').toString())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+  }
+
+  Future<void> deleteCommunityInDatabase(String communityId) async {
+    final id = communityId.trim();
+    if (id.isEmpty) return;
+
+    await _db.from('communities').delete().eq('id', id);
+
+    // No manual deletes needed:
+    // - community_members removed by FK cascade
+    // - community_invites removed by FK cascade
+    // - posts removed by FK cascade
+  }
+
 
   /* ==================== STORY PROGRESS ==================== */
 

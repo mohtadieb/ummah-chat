@@ -226,8 +226,8 @@
   "notif_mahram_chosen_for_marriage":
   "{name} heeft jou gekozen als haar mahram voor een huwelijksaanvraag. Tik om het profiel van de man te bekijken.",
   "notif_marriage_inquiry_man_decision": "{name} heeft een huwelijksaanvraag gedaan. Klik hier om naar haar profiel te gaan om te accepteren of te weigeren.",
-  "notif_marriage_inquiry_mahram_accepted_title": "Mahram geaccepteerd",
-  "notif_marriage_inquiry_mahram_accepted_sent_to": "Mahram geaccepteerd, aanvraag doorgestuurd naar {name}.",
+  "notif_marriage_inquiry_mahram_accepted_title": "Mahram heeft de huwelijksaanvraag geaccepteerd.",
+  "notif_marriage_inquiry_mahram_accepted_sent_to": "Mahram heeft de huwelijksaanvraag geaccepteerd, aanvraag doorgestuurd naar {name}.",
 
   "mahram_required_for_marriage_inquiry": "Om een huwelijksverzoek te starten, moet er een mahram aanwezig zijn. Voeg een mahram toe om verder te gaan.",
   "marriage_group_intro_message": "Welkom in deze huwelijksaanvraag-groep.\nDeze ruimte is aangemaakt voor respectvolle en transparante communicatie, met aanwezigheid van de mahram.\nGa het gesprek aan met oprechtheid, goede intenties en wederzijds respect. 🤍",
@@ -258,7 +258,33 @@
   "notif_marriage_inquiry_group_created": "Groep voor huwelijksaanvraag aangemaakt",
   "notif_marriage_inquiry_accepted": "{name} heeft de huwelijksaanvraag geaccepteerd",
   "notif_marriage_inquiry_declined": "{name} heeft de huwelijksaanvraag afgewezen",
-  "mahram_selected": "Mahram geselecteerd",
+  "mahram_selected": "Mahram geselecteerd. Wachten op bevestiging.",
+  "community_invite_banner": "Je bent uitgenodigd om lid te worden van deze community.",
+  "Failed to accept invite.": "Uitnodiging accepteren is mislukt.",
+  "Failed to decline invite.": "Uitnodiging weigeren is mislukt.",
+  "community_invite_members": "Leden uitnodigen",
+  "community_invite": "Uitnodigen",
+  "community_invited": "Uitgenodigd",
+  "community_member": "Lid",
+  "community_invite_sent": "Uitnodiging verstuurd",
+  "community_invite_failed": "Kon gebruiker niet uitnodigen. Probeer opnieuw.",
+  "community_search_friends": "Zoek vrienden",
+  "community_no_friends_found": "Geen vrienden gevonden",
+  "notif_community_invite": "Je bent uitgenodigd voor {name}",
+  "notif_community_invite_from": "{inviter} heeft je uitgenodigd voor {community}",
+  "Private community": "Privécommunity",
+  "private_community_hint": "Alleen uitgenodigde leden kunnen deze community zien en deelnemen.",
+  "delete_community_title": "Community verwijderen?",
+  "delete_community_warning": "Dit zal de community permanent verwijderen, alle leden verwijderen, uitnodigingen annuleren en alle berichten verwijderen.",
+  "delete_community": "Community verwijderen",
+  "community_owner": "Beheerder",
+  "community_deleted": "Community verwijderd.",
+  "crop_profile_photo": "Profielfoto bijsnijden",
+
+
+
+
+
 
 
 

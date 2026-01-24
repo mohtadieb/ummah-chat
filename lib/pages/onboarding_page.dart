@@ -27,17 +27,17 @@ class _OnboardingPageState extends State<OnboardingPage> {
     _OnboardingData(
       titleKey: 'onboarding_welcome_title',
       subtitleKey: 'onboarding_welcome_subtitle',
-      assetPath: 'assets/onboarding_ummah_chat_1.png',
+      assetPath: 'assets/images/onboarding_ummah_chat_1.png',
     ),
     _OnboardingData(
       titleKey: 'onboarding_dua_title',
       subtitleKey: 'onboarding_dua_subtitle',
-      assetPath: 'assets/onboarding_dua_wall.png',
+      assetPath: 'assets/images/onboarding_dua_wall.png',
     ),
     _OnboardingData(
       titleKey: 'onboarding_stories_title',
       subtitleKey: 'onboarding_stories_subtitle',
-      assetPath: 'assets/onboarding_stories_communities.png',
+      assetPath: 'assets/images/onboarding_stories_communities.png',
     ),
   ];
 

@@ -398,6 +398,47 @@ class NotificationService {
     );
   }
 
+  // -----------------------------
+  // MUTATIONS – COMMUNITY INVITE
+  // -----------------------------
+
+  Future<void> createCommunityInviteNotification({
+    required String targetUserId,
+    required String communityId,
+    required String communityName,
+    required String inviterId,
+    required String inviterName,
+  }) async {
+    if (targetUserId.trim().isEmpty || communityId.trim().isEmpty) return;
+    if (targetUserId == inviterId) return;
+
+    final safeName = communityName.replaceAll('::', ' ').trim();
+
+    await createNotificationForUser(
+      targetUserId: targetUserId,
+      title: '$inviterName invited you to $safeName',
+      body: 'CO_localizedTitleForMMUNITY_INVITE:$communityId::$safeName::$inviterName', // ✅ UPDATED
+      fromUserId: inviterId,
+      type: 'social',
+      isRead: false,
+      unreadCount: 1,
+      sendPush: true,
+      pushArgs: {
+        'name': safeName,
+        'senderName': inviterName,
+      },
+      data: {
+        'type': 'COMMUNITY_INVITE',
+        'communityId': communityId,
+        'communityName': safeName,
+        'fromUserId': inviterId,
+        'senderName': inviterName,
+      },
+    );
+  }
+
+
+
   // -------------------------
   // PUSH SENDER (NEW MODE)
   // -------------------------
@@ -452,6 +493,7 @@ class NotificationService {
     if (b.startsWith('FRIEND_ACCEPTED:')) return 'FRIEND_ACCEPTED';
     if (b.startsWith('MAHRAM_REQUEST:')) return 'MAHRAM_REQUEST';
     if (b.startsWith('MAHRAM_ACCEPTED:')) return 'MAHRAM_ACCEPTED';
+    if (b.startsWith('COMMUNITY_INVITE:')) return 'COMMUNITY_INVITE';
     if (b.startsWith('LIKE_POST:')) return 'LIKE_POST';
     if (b.startsWith('COMMENT_POST:')) return 'COMMENT_POST';
     if (b.startsWith('COMMENT_REPLY:')) return 'COMMENT_REPLY'; // ✅ NEW
@@ -554,6 +596,20 @@ class NotificationService {
         .delete()
         .ilike('body', 'MARRIAGE_INQUIRY_%:$id%');
   }
+
+  // Future<void> deleteCommunityInviteNotification({
+  //   required String targetUserId,
+  //   required String communityId,
+  // }) async {
+  //   if (targetUserId.isEmpty || communityId.isEmpty) return;
+  //
+  //   await _db
+  //       .from('notifications')
+  //       .delete()
+  //       .eq('user_id', targetUserId)
+  //       .eq('body', 'COMMUNITY_INVITE:$communityId');
+  // }
+
 
 
 

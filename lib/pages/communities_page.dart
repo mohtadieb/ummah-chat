@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -20,6 +22,10 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
+  // ✅ Debounce to avoid calling DB/RPC every keystroke
+  Timer? _searchDebounce;
+  static const _debounceDuration = Duration(milliseconds: 350);
+
   @override
   void initState() {
     super.initState();
@@ -29,8 +35,28 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onCommunitySearchChanged(String value) {
+    setState(() => _searchQuery = value);
+
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(_debounceDuration, () async {
+      final q = value.trim();
+
+      if (!mounted) return;
+
+      final provider = Provider.of<DatabaseProvider>(context, listen: false);
+
+      if (q.isNotEmpty) {
+        await provider.searchCommunities(q);
+      } else {
+        provider.clearCommunitySearchResults();
+      }
+    });
   }
 
   @override
@@ -53,16 +79,11 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
           MySearchBar(
             controller: _searchController,
             hintText: 'Search communities'.tr(),
-            onChanged: (value) async {
-              setState(() => _searchQuery = value);
-
-              if (value.isNotEmpty) {
-                await listeningProvider.searchCommunities(value);
-              } else {
-                listeningProvider.clearCommunitySearchResults();
-              }
+            onChanged: (value) {
+              _onCommunitySearchChanged(value);
             },
             onClear: () {
+              _searchDebounce?.cancel();
               setState(() => _searchQuery = '');
               listeningProvider.clearCommunitySearchResults();
             },
@@ -133,8 +154,7 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
                               builder: (_) => CommunityPostsPage(
                                 communityId: community['id'],
                                 communityName: community['name'] ?? '',
-                                communityDescription:
-                                community['description'],
+                                communityDescription: community['description'],
                               ),
                             ),
                           );
@@ -194,8 +214,7 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
             child: joinedCommunities.isEmpty
                 ? Center(
               child: Padding(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 24.0),
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -205,7 +224,8 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
                       color: colorScheme.primary,
                     ),
                     const SizedBox(height: 10),
-                    Text("You haven't joined any communities yet".tr(),
+                    Text(
+                      "You haven't joined any communities yet".tr(),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 15,
@@ -214,7 +234,9 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Text("Explore communities above or create your own to connect with others.".tr(),
+                    Text(
+                      "Explore communities above or create your own to connect with others."
+                          .tr(),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 13,
@@ -234,8 +256,7 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
                 keyboardDismissBehavior:
                 ScrollViewKeyboardDismissBehavior.onDrag,
                 itemCount: joinedCommunities.length,
-                separatorBuilder: (_, __) =>
-                const SizedBox(height: 10),
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {
                   final community = joinedCommunities[index];
 
@@ -250,8 +271,7 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
                           builder: (_) => CommunityPostsPage(
                             communityId: community['id'],
                             communityName: community['name'] ?? '',
-                            communityDescription:
-                            community['description'],
+                            communityDescription: community['description'],
                           ),
                         ),
                       );

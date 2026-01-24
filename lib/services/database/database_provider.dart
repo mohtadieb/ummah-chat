@@ -54,7 +54,6 @@ class DatabaseProvider extends ChangeNotifier {
   /// Update user bio
   Future<void> updateBio(String bio) => _db.updateUserBioInDatabase(bio);
 
-
   /// Update about me (city + languages + interests)
   Future<void> updateAboutMe({
     required String? city,
@@ -728,7 +727,6 @@ class DatabaseProvider extends ChangeNotifier {
   Future<String> getFriendshipStatus(String otherUserId) =>
       _db.getFriendshipStatusFromDatabase(otherUserId);
 
-
   /* ==================== FRIEND IDS (For You ranking) ==================== */
 
   Set<String> _friendIds = {};
@@ -750,6 +748,14 @@ class DatabaseProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('Error loading friend ids: $e');
     }
+  }
+
+  Future<Set<String>> getCommunityMemberIds(String communityId) {
+    return _db.getCommunityMemberIdsFromDatabase(communityId);
+  }
+
+  Future<Set<String>> getPendingCommunityInviteIds(String communityId) {
+    return _db.getPendingCommunityInviteIdsFromDatabase(communityId);
   }
 
   /* ==================== FOLLOWERS / FOLLOWING ==================== */
@@ -935,10 +941,9 @@ class DatabaseProvider extends ChangeNotifier {
 
   Future<List<UserProfile>> getMyMahrams() => _db.getMyMahramsInDatabase();
 
-
-// =========================================================
-// MARRIAGE INQUIRIES (DatabaseProvider)
-// =========================================================
+  // =========================================================
+  // MARRIAGE INQUIRIES (DatabaseProvider)
+  // =========================================================
 
   Future<String> createMarriageInquiry({
     required String manId,
@@ -956,9 +961,7 @@ class DatabaseProvider extends ChangeNotifier {
 
   /// FLOW 1 ONLY (initiated_by=man):
   /// Woman declines the inquiry.
-  Future<void> womanDeclineInquiry({
-    required String inquiryId,
-  }) async {
+  Future<void> womanDeclineInquiry({required String inquiryId}) async {
     await _db.womanDeclineInquiryInDatabase(inquiryId: inquiryId);
   }
 
@@ -1000,8 +1003,8 @@ class DatabaseProvider extends ChangeNotifier {
 
   /// Used by ProfilePage combined relationship status (button state override)
   Future<Map<String, dynamic>?> getLatestActiveInquiryBetweenMeAnd(
-      String otherUserId,
-      ) async {
+    String otherUserId,
+  ) async {
     return _db.getLatestActiveInquiryBetweenMeAnd(otherUserId);
   }
 
@@ -1022,9 +1025,7 @@ class DatabaseProvider extends ChangeNotifier {
     return _db.getCombinedRelationshipStatus(otherUserId);
   }
 
-  Future<void> cancelOrEndMarriageInquiry({
-    required String inquiryId,
-  }) async {
+  Future<void> cancelOrEndMarriageInquiry({required String inquiryId}) async {
     await _db.cancelOrEndMarriageInquiryInDatabase(inquiryId: inquiryId);
   }
 
@@ -1161,8 +1162,18 @@ class DatabaseProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> createCommunity(String name, String desc, String country) async {
-    final created = await _db.createCommunityInDatabase(name, desc, country);
+  Future<void> createCommunity(
+    String name,
+    String desc,
+    String country, {
+    bool isPrivate = false,
+  }) async {
+    final created = await _db.createCommunityInDatabase(
+      name,
+      desc,
+      country,
+      isPrivate: isPrivate,
+    );
 
     if (created != null) {
       // Optimistic: show instantly as joined
@@ -1179,24 +1190,48 @@ class DatabaseProvider extends ChangeNotifier {
     return await _db.isMemberInDatabase(communityId);
   }
 
+
   Future<void> joinCommunity(String communityId) async {
-    final community = _allCommunities.firstWhere((c) => c['id'] == communityId);
-    community['is_joined'] = true;
-    notifyListeners();
+    final id = communityId.trim();
+    if (id.isEmpty) return;
+
+    Map<String, dynamic>? community;
+    try {
+      community = _allCommunities.firstWhere((c) => c['id'] == id);
+    } catch (_) {
+      community = null;
+    }
+
+    // Optimistic UI
+    if (community != null) {
+      community['is_joined'] = true;
+      notifyListeners();
+    }
 
     try {
-      await _db.joinCommunityInDatabase(communityId);
+      await _db.joinCommunityInDatabase(
+        communityId: communityId,
+        isPrivate: (community?['is_private'] == true),
+      );
       await getAllCommunities();
     } catch (e) {
-      community['is_joined'] = false;
-      notifyListeners();
+      // Revert optimistic
+      if (community != null) {
+        community['is_joined'] = false;
+        notifyListeners();
+      }
+      rethrow;
     }
   }
 
   Future<void> leaveCommunity(String communityId) async {
     await _db.leaveCommunityInDatabase(communityId);
+
+    // refresh community lists / membership flags
     await getAllCommunities();
+    notifyListeners();
   }
+
 
   Future<void> searchCommunities(String query) async {
     final q = query.trim();
@@ -1222,6 +1257,54 @@ class DatabaseProvider extends ChangeNotifier {
     String communityId,
   ) async {
     return await _db.getCommunityMemberProfilesFromDatabase(communityId);
+  }
+
+  Future<void> inviteUserToCommunity(
+    String communityId,
+    String invitedUserId,
+    String communityName,
+    String inviterName, // ✅ NEW
+  ) async {
+    await _db.inviteUserToCommunityInDatabase(
+      communityId,
+      invitedUserId,
+      communityName,
+      inviterName,
+    );
+    await getAllCommunities();
+  }
+
+  Future<void> acceptCommunityInvite(String communityId) async {
+    final id = communityId.trim();
+    if (id.isEmpty) return;
+
+    await _db.acceptCommunityInviteInDatabase(id);
+    await getAllCommunities();
+  }
+
+  Future<void> declineCommunityInvite(String communityId) async {
+    final id = communityId.trim();
+    if (id.isEmpty) return;
+
+    await _db.declineCommunityInviteInDatabase(id);
+    await getAllCommunities();
+  }
+
+  Future<bool> hasPendingCommunityInvite(String communityId) async {
+    return await _db.hasPendingCommunityInviteInDatabase(communityId);
+  }
+
+  Future<Map<String, dynamic>?> getCommunityById(String communityId) async {
+    return await _db.getCommunityByIdFromDatabase(communityId);
+  }
+
+
+  Future<void> deleteCommunity(String communityId) async {
+    await _db.deleteCommunityInDatabase(communityId);
+
+    // instant local update
+    _allCommunities.removeWhere((c) => c['id']?.toString() == communityId);
+    notifyListeners();
   }
 
   /* ==================== STORY PROGRESS ==================== */

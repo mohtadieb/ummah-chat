@@ -33,13 +33,30 @@ enum _GroupMenuAction { viewMembers, addMembers, leaveGroup, deleteGroup }
 
 class GroupChatPage extends StatefulWidget {
   final String chatRoomId;
+
+  // ✅ what we currently pass (could be "L10N:marriage_inquiry")
   final String groupName;
+
+  // ✅ NEW: optional context payload (so notification tap can also show the right title)
+  final String? contextType;
+  final String? manId;
+  final String? womanId;
+  final String? mahramId;
+  final String? manName;
+  final String? womanName;
 
   const GroupChatPage({
     super.key,
     required this.chatRoomId,
     required this.groupName,
+    this.contextType,
+    this.manId,
+    this.womanId,
+    this.mahramId,
+    this.manName,
+    this.womanName,
   });
+
 
   @override
   State<GroupChatPage> createState() => _GroupChatPageState();
@@ -1059,7 +1076,33 @@ class _GroupChatPageState extends State<GroupChatPage> {
       return raw;
     }
 
-    final appBarTitle = localizeGroupName(widget.groupName);
+    final baseTitle = localizeGroupName(widget.groupName);
+
+// ✅ Compute marriage inquiry title with name (works for GroupsPage + notification taps)
+    String computedTitle = baseTitle;
+
+    final isMarriageInquiryRoom =
+        (widget.contextType ?? '').toString().trim() == 'marriage_inquiry';
+
+    if (isMarriageInquiryRoom) {
+      final manId = (widget.manId ?? '').toString().trim();
+      final womanId = (widget.womanId ?? '').toString().trim();
+
+      final manName = (widget.manName ?? '').toString().trim();
+      final womanName = (widget.womanName ?? '').toString().trim();
+
+      // Your rule:
+      // - man sees: Marriage inquiry for (woman)
+      // - woman + mahram see: Marriage inquiry for (man)
+      final targetName = (_currentUserId == manId) ? womanName : manName;
+
+      if (targetName.isNotEmpty) {
+        computedTitle = 'marriage_inquiry_for'.tr(namedArgs: {'name': targetName});
+      }
+    }
+
+    final appBarTitle = computedTitle;
+
 
 
     return PopScope(
@@ -1089,9 +1132,15 @@ class _GroupChatPageState extends State<GroupChatPage> {
               : Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                appBarTitle,
-                style: const TextStyle(fontWeight: FontWeight.w600),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  appBarTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                ),
               ),
               Text(
                 subtitleText,

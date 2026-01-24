@@ -290,12 +290,39 @@
   "notif_mahram_chosen_for_marriage":
   "{name} has chosen you to be her mahram for a marriage inquiry. Tap to view the man’s profile.",
   "notif_marriage_inquiry_man_decision": "{name} requested a marriage inquiry. Click here to go to her profile to accept or decline.",
-  "notif_marriage_inquiry_mahram_accepted_title": "Mahram accepted",
-  "notif_marriage_inquiry_mahram_accepted_sent_to": "Mahram accepted, inquiry sent to {name}.",
-  "mahram_selected": "Mahram selected",
+  "notif_marriage_inquiry_mahram_accepted_title": "Mahram accepted the marriage inquiry.",
+  "notif_marriage_inquiry_mahram_accepted_sent_to": "Mahram accepted the marriage inquiry, request forwarded to {name}.",
+  "mahram_selected": "Mahram selected. Waiting for confirmation.",
   "mahram_required_for_marriage_inquiry": "To continue a marriage inquiry, a mahram must be present. Please add a mahram first.",
   "marriage_group_intro_message": "Welcome to this marriage inquiry group.\nThis space has been created to allow respectful and transparent communication, with the presence of the mahram.\nPlease proceed with sincerity, good intentions, and mutual respect. 🤍",
   "marriage_inquiry_for": "Marriage inquiry for {name}",
+  "community_invite_banner": "You have been invited to join this community.",
+  "Failed to accept invite.": "Failed to accept invite.",
+  "Failed to decline invite.": "Failed to decline invite.",
+  "community_invite_members": "Invite members",
+  "community_invite": "Invite",
+  "community_invited": "Invited",
+  "community_member": "Member",
+  "community_invite_sent": "Invite sent",
+  "community_invite_failed": "Failed to invite user. Please try again.",
+  "community_search_friends": "Search friends",
+  "community_no_friends_found": "No friends found",
+  "notif_community_invite_from": "{inviter} invited you to {community}",
+  "notif_community_invite": "You were invited to {name}.",
+  "Private community": "Private community",
+  "private_community_hint": "Only invited members can see and join this community.",
+  "delete_community_title": "Delete community?",
+  "delete_community_warning": "This will permanently delete the community, remove all members, cancel all invites, and delete all posts.",
+  "delete_community": "Delete community",
+  "community_owner": "Admin",
+  "community_deleted": "Community deleted.",
+  "crop_profile_photo": "Crop profile photo",
+
+
+
+
+
+
 
 
 

@@ -199,7 +199,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           const SizedBox(height: 12),
 
                           Image.asset(
-                            'assets/login_page_image_green.png',
+                            'assets/images/login_page_image_green.png',
                             width: 256,
                             height: 256,
                             fit: BoxFit.contain,

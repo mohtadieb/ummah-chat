@@ -1047,6 +1047,29 @@ class ChatService {
     return row != null;
   }
 
+  // ---------------------------------------------------------------------------
+// 🆕 CHAT ROOM CONTEXT (for marriage inquiry groups)
+// ---------------------------------------------------------------------------
+
+  Future<Map<String, dynamic>?> fetchChatRoomContextByIdFromDatabase(String chatRoomId) async {
+    final id = chatRoomId.trim();
+    if (id.isEmpty) return null;
+
+    final row = await _supabase
+        .from('chat_rooms')
+        .select(
+      'id, name, context_type, context_id, '
+          'man_id, woman_id, mahram_id, '
+          'man_name, woman_name',
+    )
+        .eq('id', id)
+        .maybeSingle();
+
+    if (row == null) return null;
+    return Map<String, dynamic>.from(row);
+  }
+
+
 
   // ---------------------------------------------------------------------------
   // 👥 GROUP MEMBERS

@@ -6,6 +6,7 @@ import 'package:ummah_chat/models/notification.dart' as models;
 import 'package:ummah_chat/pages/profile_page.dart';
 import 'package:ummah_chat/pages/chat_page.dart';
 import 'package:ummah_chat/pages/group_chat_page.dart'; // 👈 NEW
+import 'community_posts_page.dart';
 
 import '../helper/navigate_pages.dart';
 import '../helper/time_ago_text.dart';
@@ -48,7 +49,8 @@ class _NotificationPageState extends State<NotificationPage> {
   bool _isLoading = true;
 
   // ✅ Cache names so titles show FULL NAME consistently
-  final Map<String, String> _userNameCache = {}; // userId -> display name (full name preferred)
+  final Map<String, String> _userNameCache =
+      {}; // userId -> display name (full name preferred)
   final Set<String> _nameFetchInFlight = {};
 
   @override
@@ -56,7 +58,7 @@ class _NotificationPageState extends State<NotificationPage> {
     super.initState();
 
     _sub = notificationService.notificationsStream().listen(
-          (data) {
+      (data) {
         setState(() {
           _notifications = data;
           _isLoading = false;
@@ -103,6 +105,13 @@ class _NotificationPageState extends State<NotificationPage> {
             if (parts.isNotEmpty) _cacheName(parts[0].trim());
           }
 
+          // ✅ COMMUNITY_INVITE:<communityId>::<communityName>::<inviterId>
+          if (body.startsWith('COMMUNITY_INVITE:')) {
+            final rest = body.substring('COMMUNITY_INVITE:'.length);
+            final parts = rest.split('::');
+            if (parts.length > 2) _cacheName(parts[2].trim()); // ✅ inviterId
+          }
+
           // MARRIAGE_INQUIRY_REQUEST:<inquiryId>::<manId>
           if (body.startsWith('MARRIAGE_INQUIRY_REQUEST:')) {
             final rest = body.substring('MARRIAGE_INQUIRY_REQUEST:'.length);
@@ -119,7 +128,9 @@ class _NotificationPageState extends State<NotificationPage> {
 
           // MARRIAGE_INQUIRY_MAN_DECISION:<inquiryId>::<womanId>::<mahramId>
           if (body.startsWith('MARRIAGE_INQUIRY_MAN_DECISION:')) {
-            final rest = body.substring('MARRIAGE_INQUIRY_MAN_DECISION:'.length);
+            final rest = body.substring(
+              'MARRIAGE_INQUIRY_MAN_DECISION:'.length,
+            );
             final parts = rest.split('::');
             if (parts.length > 1) _cacheName(parts[1].trim()); // ✅ womanId
           }
@@ -140,14 +151,18 @@ class _NotificationPageState extends State<NotificationPage> {
 
           // MARRIAGE_INQUIRY_MAHRAM_ACCEPTED:<inquiryId>::<manId>
           if (body.startsWith('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED:')) {
-            final rest = body.substring('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED:'.length);
+            final rest = body.substring(
+              'MARRIAGE_INQUIRY_MAHRAM_ACCEPTED:'.length,
+            );
             final parts = rest.split('::');
             if (parts.length > 1) _cacheName(parts[1].trim()); // manId
           }
 
           // ✅ NEW: MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:<inquiryId>::<manId>
           if (body.startsWith('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:')) {
-            final rest = body.substring('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:'.length);
+            final rest = body.substring(
+              'MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:'.length,
+            );
             final parts = rest.split('::');
             if (parts.length > 1) _cacheName(parts[1].trim()); // manId
           }
@@ -200,6 +215,65 @@ class _NotificationPageState extends State<NotificationPage> {
     return cached.isNotEmpty ? cached : fallback;
   }
 
+  Future<void> _openGroupChatWithContext({
+    required BuildContext context,
+    required String chatRoomId,
+    required String fallbackGroupName,
+  }) async {
+    if (chatRoomId.trim().isEmpty) return;
+
+    final currentUserId = AuthService().getCurrentUserId();
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
+    // ✅ Fetch context payload for correct title ("Marriage inquiry for X")
+    Map<String, dynamic>? ctx;
+    try {
+      ctx = await chatProvider.fetchChatRoomContext(chatRoomId);
+    } catch (_) {
+      ctx = null;
+    }
+
+    final String passedGroupName = (fallbackGroupName.trim().isNotEmpty)
+        ? fallbackGroupName.trim()
+        : ((ctx?['name']?.toString().trim().isNotEmpty == true)
+              ? ctx!['name'].toString().trim()
+              : 'Group'.tr());
+
+    if (currentUserId.isNotEmpty) {
+      await chatProvider.setActiveChatRoom(
+        userId: currentUserId,
+        chatRoomId: chatRoomId,
+      );
+    }
+
+    try {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => GroupChatPage(
+            chatRoomId: chatRoomId,
+            groupName: passedGroupName,
+
+            // ✅ pass context fields so GroupChatPage computes title correctly
+            contextType: ctx?['context_type']?.toString(),
+            manId: ctx?['man_id']?.toString(),
+            womanId: ctx?['woman_id']?.toString(),
+            mahramId: ctx?['mahram_id']?.toString(),
+            manName: ctx?['man_name']?.toString(),
+            womanName: ctx?['woman_name']?.toString(),
+          ),
+        ),
+      );
+    } finally {
+      if (currentUserId.isNotEmpty) {
+        await chatProvider.setActiveChatRoom(
+          userId: currentUserId,
+          chatRoomId: null,
+        );
+      }
+    }
+  }
+
   // --------- OPTIMISTIC HELPERS ---------
 
   void _optimisticMarkOneAsRead(models.Notification n) async {
@@ -217,7 +291,9 @@ class _NotificationPageState extends State<NotificationPage> {
 
   void _optimisticMarkAllAsRead() async {
     setState(() {
-      _notifications = _notifications.map((n) => n.copyWith(isRead: true)).toList();
+      _notifications = _notifications
+          .map((n) => n.copyWith(isRead: true))
+          .toList();
     });
 
     try {
@@ -232,7 +308,8 @@ class _NotificationPageState extends State<NotificationPage> {
 
   /// Build a flattened list of header + notification items grouped by date
   List<_NotificationListItem> _buildGroupedItems() {
-    final sorted = [..._notifications]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final sorted = [..._notifications]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     final List<_NotificationListItem> items = [];
     String? lastHeader;
 
@@ -337,11 +414,38 @@ class _NotificationPageState extends State<NotificationPage> {
       final rest = body.substring('GROUP_ADDED:'.length);
       final parts = rest.split('::');
 
-      final gName = (parts.length > 1 && parts[1].trim().isNotEmpty) ? parts[1].trim() : 'Group'.tr();
-      final adder = (parts.length > 2 && parts[2].trim().isNotEmpty) ? parts[2].trim() : 'Someone'.tr();
+      final gName = (parts.length > 1 && parts[1].trim().isNotEmpty)
+          ? parts[1].trim()
+          : 'Group'.tr();
+      final adder = (parts.length > 2 && parts[2].trim().isNotEmpty)
+          ? parts[2].trim()
+          : 'Someone'.tr();
 
       return 'notif_group_added'.tr(namedArgs: {'name': adder, 'group': gName});
     }
+
+    // ✅ COMMUNITY_INVITE:<communityId>::<communityName>::<inviterId>
+    if (body.startsWith('COMMUNITY_INVITE:')) {
+      final rest = body.substring('COMMUNITY_INVITE:'.length);
+      final parts = rest.split('::');
+
+      final communityName = (parts.length > 1 ? parts[1] : '').trim();
+      final inviterName = (parts.length > 2 ? parts[2] : '').trim();
+
+      // ✅ If inviter exists, use the new key:
+      if (inviterName.isNotEmpty && communityName.isNotEmpty) {
+        return 'notif_community_invite_from'.tr(namedArgs: {
+          'inviter': inviterName,
+          'community': communityName,
+        });
+      }
+
+      // ✅ fallback (old notifications without inviter)
+      return 'notif_community_invite'.tr(namedArgs: {
+        'name': communityName.isNotEmpty ? communityName : 'a community'.tr(),
+      });
+    }
+
 
     // Marriage inquiry: use manId (2nd part)
     if (body.startsWith('MARRIAGE_INQUIRY_REQUEST:')) {
@@ -370,11 +474,15 @@ class _NotificationPageState extends State<NotificationPage> {
 
     // ✅ NEW: when woman initiates, show "sent to {man}"
     if (body.startsWith('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:')) {
-      final rest = body.substring('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:'.length);
+      final rest = body.substring(
+        'MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:'.length,
+      );
       final parts = rest.split('::');
       final manId = parts.length > 1 ? parts[1].trim() : '';
       final name = _nameFromIdOrFallback(manId, legacyName);
-      return 'notif_marriage_inquiry_mahram_accepted_sent_to'.tr(namedArgs: {'name': name});
+      return 'notif_marriage_inquiry_mahram_accepted_sent_to'.tr(
+        namedArgs: {'name': name},
+      );
     }
 
     if (body.startsWith('MARRIAGE_INQUIRY_MAN_DECISION:')) {
@@ -385,7 +493,9 @@ class _NotificationPageState extends State<NotificationPage> {
       final womanId = parts.length > 1 ? parts[1].trim() : '';
       final name = _nameFromIdOrFallback(womanId, legacyName);
 
-      return 'notif_marriage_inquiry_man_decision'.tr(namedArgs: {'name': name});
+      return 'notif_marriage_inquiry_man_decision'.tr(
+        namedArgs: {'name': name},
+      );
     }
 
     if (body.startsWith('MARRIAGE_INQUIRY_GROUP_CREATED:')) {
@@ -433,11 +543,7 @@ class _NotificationPageState extends State<NotificationPage> {
         actions: [
           TextButton.icon(
             onPressed: _notifications.isEmpty ? null : _optimisticMarkAllAsRead,
-            icon: Icon(
-              Icons.done_all,
-              size: 18,
-              color: colorScheme.primary,
-            ),
+            icon: Icon(Icons.done_all, size: 18, color: colorScheme.primary),
             label: Text(
               'Mark all'.tr(),
               style: TextStyle(
@@ -454,10 +560,10 @@ class _NotificationPageState extends State<NotificationPage> {
   }
 
   Widget _buildBody(
-      BuildContext context,
-      ColorScheme colorScheme,
-      DatabaseProvider dbProvider,
-      ) {
+    BuildContext context,
+    ColorScheme colorScheme,
+    DatabaseProvider dbProvider,
+  ) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -530,6 +636,7 @@ class _NotificationPageState extends State<NotificationPage> {
         // ----- TYPE DETECTION -----
         final isFriendRequest = body.startsWith('FRIEND_REQUEST:');
         final isFriendAccepted = body.startsWith('FRIEND_ACCEPTED:');
+        final isCommunityInvite = body.startsWith('COMMUNITY_INVITE:');
         final isLike = body.startsWith('LIKE_POST:');
         final isComment = body.startsWith('COMMENT_POST:');
         final isCommentReply = body.startsWith('COMMENT_REPLY:');
@@ -540,19 +647,33 @@ class _NotificationPageState extends State<NotificationPage> {
         final isMahramRequest = body.startsWith('MAHRAM_REQUEST:');
         final isMahramAccepted = body.startsWith('MAHRAM_ACCEPTED:');
 
-        final isMarriageInquiryRequest = body.startsWith('MARRIAGE_INQUIRY_REQUEST:');
-        final isMarriageInquiryMahram = body.startsWith('MARRIAGE_INQUIRY_MAHRAM:');
-        final isMarriageInquiryManDecision = body.startsWith('MARRIAGE_INQUIRY_MAN_DECISION:');
-        final isMarriageInquiryGroupCreated = body.startsWith('MARRIAGE_INQUIRY_GROUP_CREATED:');
-        final isMarriageInquiryAccepted = body.startsWith('MARRIAGE_INQUIRY_ACCEPTED:');
-        final isMarriageInquiryDeclined = body.startsWith('MARRIAGE_INQUIRY_DECLINED:');
+        final isMarriageInquiryRequest = body.startsWith(
+          'MARRIAGE_INQUIRY_REQUEST:',
+        );
+        final isMarriageInquiryMahram = body.startsWith(
+          'MARRIAGE_INQUIRY_MAHRAM:',
+        );
+        final isMarriageInquiryManDecision = body.startsWith(
+          'MARRIAGE_INQUIRY_MAN_DECISION:',
+        );
+        final isMarriageInquiryGroupCreated = body.startsWith(
+          'MARRIAGE_INQUIRY_GROUP_CREATED:',
+        );
+        final isMarriageInquiryAccepted = body.startsWith(
+          'MARRIAGE_INQUIRY_ACCEPTED:',
+        );
+        final isMarriageInquiryDeclined = body.startsWith(
+          'MARRIAGE_INQUIRY_DECLINED:',
+        );
 
-        final isMarriageInquiryMahramAccepted =
-        body.startsWith('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED:');
+        final isMarriageInquiryMahramAccepted = body.startsWith(
+          'MARRIAGE_INQUIRY_MAHRAM_ACCEPTED:',
+        );
 
         // ✅ NEW
-        final isMarriageInquiryMahramAcceptedSentTo =
-        body.startsWith('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:');
+        final isMarriageInquiryMahramAcceptedSentTo = body.startsWith(
+          'MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:',
+        );
 
         String? friendRequesterId;
         String? friendAcceptedUserId;
@@ -575,6 +696,10 @@ class _NotificationPageState extends State<NotificationPage> {
 
         String? groupAddedRoomId;
         String? groupAddedName;
+
+        String? communityInviteCommunityId;
+        String? communityInviteCommunityName; // ✅ NEW
+        String? communityInviteInviterId; // ✅ NEW
 
         String? inquiryId;
         String? inquiryRequesterId;
@@ -674,6 +799,23 @@ class _NotificationPageState extends State<NotificationPage> {
           if (parts.length > 1) groupAddedName = parts[1].trim();
         }
 
+        // ✅ COMMUNITY_INVITE:<communityId>::<communityName>::<inviterId>
+        if (isCommunityInvite) {
+          final rest = body.substring('COMMUNITY_INVITE:'.length);
+          final parts = rest.split('::');
+
+          if (parts.isNotEmpty) {
+            communityInviteCommunityId = parts[0].trim();
+          }
+          if (parts.length > 1) {
+            communityInviteCommunityName = parts[1].trim();
+          }
+          if (parts.length > 2) {
+            communityInviteInviterId = parts[2].trim();
+            _cacheName(communityInviteInviterId!); // ✅ cache inviter name
+          }
+        }
+
         if (isMarriageInquiryRequest) {
           final rest = body.substring('MARRIAGE_INQUIRY_REQUEST:'.length);
           final parts = rest.split('::');
@@ -696,7 +838,9 @@ class _NotificationPageState extends State<NotificationPage> {
         }
 
         if (isMarriageInquiryMahramAccepted) {
-          final rest = body.substring('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED:'.length);
+          final rest = body.substring(
+            'MARRIAGE_INQUIRY_MAHRAM_ACCEPTED:'.length,
+          );
           final parts = rest.split('::');
           if (parts.isNotEmpty) inquiryId = parts[0].trim();
           if (parts.length > 1) {
@@ -707,7 +851,9 @@ class _NotificationPageState extends State<NotificationPage> {
 
         // ✅ NEW: same parsing, different body prefix
         if (isMarriageInquiryMahramAcceptedSentTo) {
-          final rest = body.substring('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:'.length);
+          final rest = body.substring(
+            'MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:'.length,
+          );
           final parts = rest.split('::');
           if (parts.isNotEmpty) inquiryId = parts[0].trim();
           if (parts.length > 1) {
@@ -774,6 +920,7 @@ class _NotificationPageState extends State<NotificationPage> {
             !isChatMessage &&
             !isGroupMessage &&
             !isGroupAdded &&
+            !isCommunityInvite &&
             !isMarriageInquiryRequest &&
             !isMarriageInquiryMahram &&
             !isMarriageInquiryManDecision &&
@@ -796,6 +943,7 @@ class _NotificationPageState extends State<NotificationPage> {
           isChatMessage: isChatMessage,
           isGroupMessage: isGroupMessage,
           isGroupAdded: isGroupAdded,
+          isCommunityInvite: isCommunityInvite,
           isLike: isLike,
           isComment: isComment,
           isCommentReply: isCommentReply,
@@ -807,7 +955,8 @@ class _NotificationPageState extends State<NotificationPage> {
           isMarriageInquiryAccepted: isMarriageInquiryAccepted,
           isMarriageInquiryDeclined: isMarriageInquiryDeclined,
           isMarriageInquiryMahramAccepted: isMarriageInquiryMahramAccepted,
-          isMarriageInquiryMahramAcceptedSentTo: isMarriageInquiryMahramAcceptedSentTo,
+          isMarriageInquiryMahramAcceptedSentTo:
+              isMarriageInquiryMahramAcceptedSentTo,
         );
 
         final leading = Container(
@@ -896,8 +1045,12 @@ class _NotificationPageState extends State<NotificationPage> {
 
               // 3) Likes / comments → post
               if ((isLike || isComment || isCommentReply) &&
-                  (likePostId != null || commentPostId != null || commentReplyPostId != null)) {
-                final postId = isLike ? likePostId : (isComment ? commentPostId : commentReplyPostId);
+                  (likePostId != null ||
+                      commentPostId != null ||
+                      commentReplyPostId != null)) {
+                final postId = isLike
+                    ? likePostId
+                    : (isComment ? commentPostId : commentReplyPostId);
                 if (postId == null) return;
 
                 final post = await dbProvider.getPostById(postId);
@@ -932,16 +1085,22 @@ class _NotificationPageState extends State<NotificationPage> {
               }
 
               // 5) Chat message → open DM
-              if (isChatMessage && chatFriendId != null && chatFriendId!.isNotEmpty) {
+              if (isChatMessage &&
+                  chatFriendId != null &&
+                  chatFriendId!.isNotEmpty) {
                 if (!mounted) return;
 
-                final profile = await DatabaseService().getUserFromDatabase(chatFriendId!);
+                final profile = await DatabaseService().getUserFromDatabase(
+                  chatFriendId!,
+                );
 
                 final displayName = (profile?.name ?? '').trim().isNotEmpty
                     ? profile!.name
                     : ((profile?.username ?? '').trim().isNotEmpty
-                    ? profile!.username
-                    : ((chatFriendName ?? '').trim().isNotEmpty ? chatFriendName! : 'Chat'.tr()));
+                          ? profile!.username
+                          : ((chatFriendName ?? '').trim().isNotEmpty
+                                ? chatFriendName!
+                                : 'Chat'.tr()));
 
                 if (!mounted) return;
 
@@ -959,87 +1118,95 @@ class _NotificationPageState extends State<NotificationPage> {
 
                 final currentUserId = AuthService().getCurrentUserId();
                 if (currentUserId.isNotEmpty) {
-                  final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+                  final chatProvider = Provider.of<ChatProvider>(
+                    context,
+                    listen: false,
+                  );
                   final chatRoomId = await chatProvider.getOrCreateChatRoomId(
                     currentUserId,
                     chatFriendId!,
                   );
-                  await chatProvider.markRoomMessagesAsRead(chatRoomId, currentUserId);
+                  await chatProvider.markRoomMessagesAsRead(
+                    chatRoomId,
+                    currentUserId,
+                  );
                 }
                 return;
               }
 
-              // 6) Group message → open GroupChatPage with presence set/clear
-              if (isGroupMessage && groupChatRoomId != null && groupChatRoomId!.isNotEmpty) {
+              // 6) Group message → open GroupChatPage (with context)
+              if (isGroupMessage &&
+                  groupChatRoomId != null &&
+                  groupChatRoomId!.isNotEmpty) {
                 if (!mounted) return;
 
-                final currentUserId = AuthService().getCurrentUserId();
-                final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+                await _openGroupChatWithContext(
+                  context: context,
+                  chatRoomId: groupChatRoomId!,
+                  fallbackGroupName: (groupName ?? '').trim().isNotEmpty
+                      ? groupName!.trim()
+                      : 'Group'.tr(),
+                );
 
-                if (currentUserId.isNotEmpty) {
-                  await chatProvider.setActiveChatRoom(
-                    userId: currentUserId,
-                    chatRoomId: groupChatRoomId!,
-                  );
-                }
-
-                try {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => GroupChatPage(
-                        chatRoomId: groupChatRoomId!,
-                        groupName: (groupName != null && groupName!.trim().isNotEmpty)
-                            ? groupName!.trim()
-                            : 'Group'.tr(),
-                      ),
-                    ),
-                  );
-                } finally {
-                  if (currentUserId.isNotEmpty) {
-                    await chatProvider.setActiveChatRoom(
-                      userId: currentUserId,
-                      chatRoomId: null,
-                    );
-                  }
-                }
+                if (!mounted) return;
+                setState(() {});
                 return;
               }
 
-              // 7) Group added → open GroupChatPage with presence set/clear
-              if (isGroupAdded && groupAddedRoomId != null && groupAddedRoomId!.isNotEmpty) {
+              // 7) Group added → open GroupChatPage (with context)
+              if (isGroupAdded &&
+                  groupAddedRoomId != null &&
+                  groupAddedRoomId!.isNotEmpty) {
                 if (!mounted) return;
 
-                final currentUserId = AuthService().getCurrentUserId();
-                final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+                await _openGroupChatWithContext(
+                  context: context,
+                  chatRoomId: groupAddedRoomId!,
+                  fallbackGroupName: (groupAddedName ?? '').trim().isNotEmpty
+                      ? groupAddedName!.trim()
+                      : 'Group'.tr(),
+                );
 
-                if (currentUserId.isNotEmpty) {
-                  await chatProvider.setActiveChatRoom(
-                    userId: currentUserId,
-                    chatRoomId: groupAddedRoomId!,
-                  );
-                }
+                if (!mounted) return;
+                setState(() {});
+                return;
+              }
 
-                try {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => GroupChatPage(
-                        chatRoomId: groupAddedRoomId!,
-                        groupName: (groupAddedName != null && groupAddedName!.trim().isNotEmpty)
-                            ? groupAddedName!.trim()
-                            : 'Group'.tr(),
-                      ),
+              // ✅ Community invite → open CommunityPostsPage (banner will show there)
+              if (isCommunityInvite &&
+                  communityInviteCommunityId != null &&
+                  communityInviteCommunityId!.isNotEmpty) {
+                if (!mounted) return;
+
+                final community = await dbProvider.getCommunityById(
+                  communityInviteCommunityId!,
+                );
+
+                if (!mounted) return;
+
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CommunityPostsPage(
+                      communityId: communityInviteCommunityId!,
+                      communityName:
+                          (community?['name'] ??
+                                  (communityInviteCommunityName
+                                              ?.trim()
+                                              .isNotEmpty ==
+                                          true
+                                      ? communityInviteCommunityName!.trim()
+                                      : 'Community'.tr()))
+                              .toString(),
+                      communityDescription: community?['description']
+                          ?.toString(),
+                      openedFromInvite: true,
                     ),
-                  );
-                } finally {
-                  if (currentUserId.isNotEmpty) {
-                    await chatProvider.setActiveChatRoom(
-                      userId: currentUserId,
-                      chatRoomId: null,
-                    );
-                  }
-                }
+                  ),
+                );
+
+                if (!mounted) return;
+                setState(() {});
                 return;
               }
 
@@ -1067,7 +1234,8 @@ class _NotificationPageState extends State<NotificationPage> {
               }
 
               // ✅ MAHRAM_ACCEPTED (both variants) → open MAN profile (same behavior)
-              if ((isMarriageInquiryMahramAccepted || isMarriageInquiryMahramAcceptedSentTo) &&
+              if ((isMarriageInquiryMahramAccepted ||
+                      isMarriageInquiryMahramAcceptedSentTo) &&
                   inquiryMahramAcceptedManId != null &&
                   inquiryMahramAcceptedManId!.isNotEmpty) {
                 if (!mounted) return;
@@ -1177,32 +1345,32 @@ class _NotificationPageState extends State<NotificationPage> {
                 return;
               }
 
-              // 💍 Marriage inquiry group created → open group chat
+              // 💍 Marriage inquiry group created → open group chat (with context)
               if (isMarriageInquiryGroupCreated &&
                   inquiryChatRoomId != null &&
                   inquiryChatRoomId!.isNotEmpty) {
                 if (!mounted) return;
 
-                final exists = await ChatService().groupRoomExistsInDatabase(inquiryChatRoomId!);
+                final exists = await ChatService().groupRoomExistsInDatabase(
+                  inquiryChatRoomId!,
+                );
 
                 if (!exists) {
                   if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('This group is no longer available.'.tr())),
+                    SnackBar(
+                      content: Text('This group is no longer available.'.tr()),
+                    ),
                   );
                   return;
                 }
 
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => GroupChatPage(
-                      chatRoomId: inquiryChatRoomId!,
-                      groupName: (inquiryGroupName != null && inquiryGroupName!.trim().isNotEmpty)
-                          ? inquiryGroupName!.trim()
-                          : 'Group'.tr(),
-                    ),
-                  ),
+                await _openGroupChatWithContext(
+                  context: context,
+                  chatRoomId: inquiryChatRoomId!,
+                  fallbackGroupName: (inquiryGroupName ?? '').trim().isNotEmpty
+                      ? inquiryGroupName!.trim()
+                      : 'Group'.tr(),
                 );
 
                 if (!mounted) return;
@@ -1221,7 +1389,10 @@ class _NotificationPageState extends State<NotificationPage> {
                 ),
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
@@ -1239,8 +1410,12 @@ class _NotificationPageState extends State<NotificationPage> {
                                   _localizedTitleFor(n, body),
                                   style: TextStyle(
                                     fontSize: 14,
-                                    fontWeight: isUnread ? FontWeight.w600 : FontWeight.w400,
-                                    color: Theme.of(context).colorScheme.primary,
+                                    fontWeight: isUnread
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
                                   ),
                                 ),
                               ),
@@ -1254,7 +1429,8 @@ class _NotificationPageState extends State<NotificationPage> {
                               ),
                             ],
                           ),
-                          if (subtitleText != null && subtitleText.isNotEmpty) ...[
+                          if (subtitleText != null &&
+                              subtitleText.isNotEmpty) ...[
                             const SizedBox(height: 4),
                             Text(
                               subtitleText,
@@ -1301,6 +1477,7 @@ class _NotificationPageState extends State<NotificationPage> {
     required bool isMarriageInquiryDeclined,
     required bool isMarriageInquiryMahramAccepted,
     required bool isMarriageInquiryMahramAcceptedSentTo,
+    required bool isCommunityInvite,
   }) {
     if (isFriendRequest) return Icons.person_add_alt_1;
     if (isFriendAccepted) return Icons.handshake;
@@ -1312,9 +1489,11 @@ class _NotificationPageState extends State<NotificationPage> {
     if (isLike) return Icons.favorite;
     if (isComment || isCommentReply) return Icons.mode_comment_outlined;
     if (isFollow) return Icons.person;
+    if (isCommunityInvite) return Icons.mail_outline;
 
     // ✅ icon for MARRIAGE_INQUIRY_MAHRAM_ACCEPTED (both types)
-    if (isMarriageInquiryMahramAccepted || isMarriageInquiryMahramAcceptedSentTo) {
+    if (isMarriageInquiryMahramAccepted ||
+        isMarriageInquiryMahramAcceptedSentTo) {
       return Icons.verified_user;
     }
 

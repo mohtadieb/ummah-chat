@@ -352,7 +352,13 @@ class _GroupsPageState extends State<GroupsPage> {
                                       MaterialPageRoute(
                                         builder: (_) => GroupChatPage(
                                           chatRoomId: groupId,
-                                          groupName: displayGroupName,
+                                          groupName: rawGroupName, // keep raw so L10N: still works
+                                          contextType: group['context_type']?.toString(),
+                                          manId: group['man_id']?.toString(),
+                                          womanId: group['woman_id']?.toString(),
+                                          mahramId: group['mahram_id']?.toString(),
+                                          manName: group['man_name']?.toString(),
+                                          womanName: group['woman_name']?.toString(),
                                         ),
                                       ),
                                     );
