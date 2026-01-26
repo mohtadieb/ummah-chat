@@ -317,6 +317,19 @@
   "community_owner": "Admin",
   "community_deleted": "Community deleted.",
   "crop_profile_photo": "Crop profile photo",
+  "Reset password": "Reset password",
+  "Enter your email first.": "Enter your email first.",
+  "Reset link sent. Check your email.": "Reset link sent. Check your email.",
+  "Something went wrong. Try again.": "Something went wrong. Try again.",
+
+  "Please fill in both password fields.": "Please fill in both password fields.",
+  "Passwords do not match.": "Passwords do not match.",
+  "Reset link expired. Please request a new one.": "Reset link expired. Please request a new one.",
+  "Password updated.": "Password updated.",
+
+  "New password": "New password",
+  "Confirm new password": "Confirm new password",
+  "Save password": "Save password",
 
 
 

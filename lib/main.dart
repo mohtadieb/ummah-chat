@@ -14,6 +14,8 @@ import 'services/chat/chat_provider.dart';
 import 'themes/theme_provider.dart';
 import 'services/navigation/bottom_nav_provider.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:app_links/app_links.dart';
+import 'pages/reset_password_page.dart';
 
 // 🔔 Push notification utilities
 import 'services/notifications/push_notification_service.dart';
@@ -84,16 +86,15 @@ Future<void> main() async {
   await Supabase.initialize(
     url: 'https://njotewktazwhoprvhsvj.supabase.co',
     anonKey:
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qb3Rld2t0YXp3aG9wcnZoc3ZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4MzY1NjgsImV4cCI6MjA3NzQxMjU2OH0.SDr9TdrMIm-6LXdaaAMMhFDujt-PAgqyreebWPtV9NQ',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qb3Rld2t0YXp3aG9wcnZoc3ZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4MzY1NjgsImV4cCI6MjA3NzQxMjU2OH0.SDr9TdrMIm-6LXdaaAMMhFDujt-PAgqyreebWPtV9NQ',
+    authOptions: const FlutterAuthClientOptions(
+      authFlowType: AuthFlowType.pkce,
+    ),
   );
 
   runApp(
     EasyLocalization(
-      supportedLocales: const [
-        Locale('en'),
-        Locale('nl'),
-        Locale('ar'),
-      ],
+      supportedLocales: const [Locale('en'), Locale('nl'), Locale('ar')],
       path: 'assets/lang',
       fallbackLocale: const Locale('en'),
       saveLocale: true,
@@ -120,10 +121,59 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  final AppLinks _appLinks = AppLinks();
+  bool _didHandleInitialLink = false;
+
+  void _startResetPasswordDeepLinkListener() {
+    // Handle links while app is open / resumed
+    _appLinks.uriLinkStream.listen((uri) async {
+      await _handleIncomingUri(uri);
+    });
+
+    // Handle the very first link if app was launched from the email
+    _handleInitialUriOnce();
+  }
+
+  Future<void> _handleInitialUriOnce() async {
+    if (_didHandleInitialLink) return;
+    _didHandleInitialLink = true;
+
+    try {
+      final uri = await _appLinks.getInitialLink();
+      if (uri != null) {
+        await _handleIncomingUri(uri);
+      }
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  Future<void> _handleIncomingUri(Uri uri) async {
+    // Example: ummahchat://reset-password#access_token=...&refresh_token=...&type=recovery
+    try {
+      await Supabase.instance.client.auth.getSessionFromUrl(uri);
+    } catch (_) {
+      // If parsing fails, still allow navigation attempt
+    }
+
+    final isReset =
+        (uri.host == 'reset-password') || uri.path.contains('reset-password');
+
+    if (!isReset) return;
+
+    final nav = PushNotificationService.navigatorKey.currentState;
+    if (nav == null) return;
+
+    nav.pushNamedAndRemoveUntil('/reset-password', (route) => route.isFirst);
+  }
+
   @override
   void initState() {
     super.initState();
     setupPushNotifications();
+
+    // ✅ Add this:
+    _startResetPasswordDeepLinkListener();
   }
 
   @override
@@ -148,7 +198,8 @@ class _MyAppState extends State<MyApp> {
         // 1) Try exact match
         for (final l in supportedLocales) {
           final countryOk =
-              (l.countryCode == null) || (l.countryCode == deviceLocale.countryCode);
+              (l.countryCode == null) ||
+              (l.countryCode == deviceLocale.countryCode);
           if (l.languageCode == deviceLocale.languageCode && countryOk) {
             return l;
           }
@@ -169,6 +220,7 @@ class _MyAppState extends State<MyApp> {
         '/home': (context) => const HomePage(),
         '/search': (context) => const SearchPage(),
         '/settings': (context) => const SettingsPage(),
+        '/reset-password': (context) => const ResetPasswordPage(),
 
         // ✅ NEW: Post deep link route used by pushes
         '/post': (context) {
@@ -176,7 +228,8 @@ class _MyAppState extends State<MyApp> {
           final map = (args is Map) ? args : <String, dynamic>{};
 
           final postId = (map['postId'] ?? '').toString();
-          final highlightCommentId = (map['highlightCommentId'] ?? '').toString();
+          final highlightCommentId = (map['highlightCommentId'] ?? '')
+              .toString();
 
           return PostPage(
             post: null,
@@ -184,8 +237,9 @@ class _MyAppState extends State<MyApp> {
             // for comment notifications, we highlight the comments area
             scrollToComments: true,
             highlightComments: true,
-            highlightCommentId:
-            highlightCommentId.isNotEmpty ? highlightCommentId : null,
+            highlightCommentId: highlightCommentId.isNotEmpty
+                ? highlightCommentId
+                : null,
           );
         },
       },

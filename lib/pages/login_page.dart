@@ -1,5 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../components/my_button.dart';
 import '../components/my_dialogs.dart';
 import '../components/my_text_field.dart';
@@ -73,6 +74,49 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) setState(() => _isLoggingIn = false);
     }
   }
+
+  Future<void> sendResetEmail(String email) async {
+    FocusScope.of(context).unfocus();
+
+    final trimmed = email.trim();
+
+    if (trimmed.isEmpty) {
+      showAppErrorDialog(
+        context,
+        title: 'Reset Password'.tr(),
+        message: 'Enter your email first.'.tr(),
+      );
+      return;
+    }
+
+    try {
+      await Supabase.instance.client.auth.resetPasswordForEmail(
+        trimmed,
+        redirectTo: 'ummahchat://reset-password',
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Reset link sent. Check your email.'.tr())),
+      );
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      showAppErrorDialog(
+        context,
+        title: 'Reset Password'.tr(),
+        message: e.message, // ✅ SHOW REAL SUPABASE ERROR
+      );
+    } catch (e) {
+      if (!mounted) return;
+      showAppErrorDialog(
+        context,
+        title: 'Reset Password'.tr(),
+        message: e.toString(), // ✅ SHOW ANY OTHER ERROR
+      );
+    }
+  }
+
+
 
   @override
   void dispose() {
@@ -198,6 +242,26 @@ class _LoginPageState extends State<LoginPage> {
                             hintText: "Enter password".tr(),
                             obscureText: true,
                           ),
+
+                          const SizedBox(height: 10),
+
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: GestureDetector(
+                              onTap: _isLoggingIn
+                                  ? null
+                                  : () => sendResetEmail(emailController.text),
+                              child: Text(
+                                "Forgot password?".tr(),
+                                style: TextStyle(
+                                  color: colorScheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ),
+
 
                           const SizedBox(height: 28),
 

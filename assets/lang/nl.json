@@ -280,7 +280,19 @@
   "community_owner": "Beheerder",
   "community_deleted": "Community verwijderd.",
   "crop_profile_photo": "Profielfoto bijsnijden",
+  "Reset password": "Wachtwoord resetten",
+  "Enter your email first.": "Voer eerst je e-mailadres in.",
+  "Reset link sent. Check your email.": "Resetlink verzonden. Controleer je e-mail.",
+  "Something went wrong. Try again.": "Er is iets misgegaan. Probeer het opnieuw.",
 
+  "Please fill in both password fields.": "Vul beide wachtwoordvelden in.",
+  "Passwords do not match.": "Wachtwoorden komen niet overeen.",
+  "Reset link expired. Please request a new one.": "De resetlink is verlopen. Vraag een nieuwe aan.",
+  "Password updated.": "Wachtwoord bijgewerkt.",
+
+  "New password": "Nieuw wachtwoord",
+  "Confirm new password": "Bevestig nieuw wachtwoord",
+  "Save password": "Wachtwoord opslaan",
 
 
 

@@ -236,7 +236,19 @@
   "community_owner": "المشرف",
   "community_deleted": "تم حذف المجتمع.",
   "crop_profile_photo": "اقتصاص صورة الملف الشخصي",
+  "Reset password": "إعادة تعيين كلمة المرور",
+  "Enter your email first.": "يرجى إدخال بريدك الإلكتروني أولاً.",
+  "Reset link sent. Check your email.": "تم إرسال رابط إعادة التعيين. تحقق من بريدك الإلكتروني.",
+  "Something went wrong. Try again.": "حدث خطأ ما. يرجى المحاولة مرة أخرى.",
 
+  "Please fill in both password fields.": "يرجى ملء حقلي كلمة المرور.",
+  "Passwords do not match.": "كلمتا المرور غير متطابقتين.",
+  "Reset link expired. Please request a new one.": "انتهت صلاحية رابط إعادة التعيين. يرجى طلب رابط جديد.",
+  "Password updated.": "تم تحديث كلمة المرور.",
+
+  "New password": "كلمة المرور الجديدة",
+  "Confirm new password": "تأكيد كلمة المرور الجديدة",
+  "Save password": "حفظ كلمة المرور",
 
 
 
