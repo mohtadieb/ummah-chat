@@ -1,4 +1,5 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../components/my_button.dart';
@@ -6,6 +7,10 @@ import '../components/my_dialogs.dart';
 import '../components/my_text_field.dart';
 import '../services/auth/auth_service.dart';
 import '../services/localization/locale_sync_service.dart';
+
+// ✅ Legal pages
+import 'legal/privacy_policy_page.dart';
+import 'legal/terms_of_use_page.dart';
 
 class RegisterPage extends StatefulWidget {
   final void Function()? onTap; // Callback to switch to LoginPage
@@ -134,10 +139,10 @@ class _RegisterPageState extends State<RegisterPage> {
 
     return PopupMenuButton<Locale>(
       tooltip: 'Language'.tr(),
-        onSelected: (locale) async {
-          await context.setLocale(locale);
-          await LocaleSyncService.syncLocaleToSupabase(context);
-        },
+      onSelected: (locale) async {
+        await context.setLocale(locale);
+        await LocaleSyncService.syncLocaleToSupabase(context);
+      },
       itemBuilder: (context) => const [
         PopupMenuItem(value: Locale('en'), child: Text('English')),
         PopupMenuItem(value: Locale('nl'), child: Text('Nederlands')),
@@ -167,6 +172,56 @@ class _RegisterPageState extends State<RegisterPage> {
             color: colorScheme.primary.withOpacity(0.7),
           ),
         ],
+      ),
+    );
+  }
+
+  // ✅ NEW: Legal row (Terms + Privacy links)
+  Widget _legalRow(ColorScheme colorScheme) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: RichText(
+        textAlign: TextAlign.center,
+        text: TextSpan(
+          style: TextStyle(
+            color: colorScheme.onSurface.withOpacity(0.65),
+            fontSize: 12,
+            height: 1.3,
+          ),
+          children: [
+            TextSpan(text: 'legal.by_registering_prefix'.tr()),
+            TextSpan(
+              text: 'terms.title'.tr(),
+              style: TextStyle(
+                color: colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+              recognizer: TapGestureRecognizer()
+                ..onTap = () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const TermsOfUsePage()),
+                  );
+                },
+            ),
+            TextSpan(text: 'legal.and'.tr()),
+            TextSpan(
+              text: 'privacy.title'.tr(),
+              style: TextStyle(
+                color: colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+              recognizer: TapGestureRecognizer()
+                ..onTap = () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()),
+                  );
+                },
+            ),
+            TextSpan(text: 'legal.dot'.tr()),
+          ],
+        ),
       ),
     );
   }
@@ -239,7 +294,10 @@ class _RegisterPageState extends State<RegisterPage> {
                             obscureText: true,
                           ),
 
-                          const SizedBox(height: 28),
+                          const SizedBox(height: 20),
+
+                          // ✅ NEW: legal links
+                          _legalRow(colorScheme),
 
                           MyButton(
                             text: "Register".tr(),
@@ -281,9 +339,11 @@ class _RegisterPageState extends State<RegisterPage> {
                           SizedBox(
                             width: double.infinity,
                             child: OutlinedButton(
-                              onPressed: _isRegistering ? null : registerWithGoogle,
+                              onPressed:
+                              _isRegistering ? null : registerWithGoogle,
                               style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding:
+                                const EdgeInsets.symmetric(vertical: 12),
                                 side: BorderSide(
                                   color: colorScheme.primary.withOpacity(0.3),
                                 ),

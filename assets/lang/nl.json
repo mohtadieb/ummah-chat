@@ -32,7 +32,7 @@
   "Home": "Home",
   "Stories": "Verhalen",
   "Chats": "Chats",
-  "Communities": "Gemeenschappen",
+  "Communities": "Communities",
   "yes_unfriend": "Ja, verwijderen",
   "confirm_unfriend_message": "Weet je zeker dat je deze persoon uit je vrienden wilt verwijderen?",
   "Profile": "Profiel",
@@ -3163,5 +3163,151 @@
       "o3": "Kinderen krijgen gaat alleen om plezier",
       "o4": "Vertrouw Allah en blijf oprecht dua doen"
     }
-  }
+  },
+  "terms": {
+    "title": "Gebruiksvoorwaarden",
+    "effective_date": "Ingangsdatum: [datum invullen]",
+    "intro": "Welkom bij Ummah Chat. Door de app te gebruiken, ga je akkoord met deze gebruiksvoorwaarden.",
+
+    "section_1": {
+      "title": "1. Toelating",
+      "body": "Je moet minimaal 13 jaar oud zijn en de app op een rechtmatige manier gebruiken."
+    },
+    "section_2": {
+      "title": "2. Gebruikersaccounts",
+      "body": "Je bent verantwoordelijk voor de beveiliging van je account. Accounts die deze voorwaarden schenden kunnen worden geschorst of beëindigd."
+    },
+    "section_3": {
+      "title": "3. Toegestaan gebruik",
+      "body": "Je gaat ermee akkoord om niet:",
+      "bullets": {
+        "1": "Anderen lastig te vallen, te bedreigen of te schaden",
+        "2": "Illegale of expliciete inhoud te plaatsen",
+        "3": "Te spammen of het platform te manipuleren",
+        "4": "Ongeautoriseerde toegang te proberen"
+      }
+    },
+    "section_4": {
+      "title": "4. Gebruikersinhoud",
+      "body": "Je behoudt het eigendom van je content. Door content te plaatsen geef je Ummah Chat toestemming om deze binnen de app te tonen."
+    },
+    "section_5": {
+      "title": "5. Moderatie",
+      "body": "We kunnen content verwijderen of accounts beperken om de community te beschermen."
+    },
+    "section_6": {
+      "title": "6. Beëindiging",
+      "body": "Je kunt je account op elk moment verwijderen. Toegang kan worden beëindigd indien nodig."
+    },
+    "section_7": {
+      "title": "7. Disclaimer",
+      "body": "De app wordt geleverd zoals deze is, zonder garanties."
+    },
+    "section_8": {
+      "title": "8. Aansprakelijkheid",
+      "body": "Voor zover wettelijk toegestaan zijn wij niet aansprakelijk voor indirecte schade."
+    },
+    "section_9": {
+      "title": "9. Wijzigingen",
+      "body": "Deze voorwaarden kunnen worden bijgewerkt. Verder gebruik betekent acceptatie."
+    },
+    "section_10": {
+      "title": "10. Toepasselijk recht",
+      "body": "[bijv. Nederland]"
+    },
+    "section_11": {
+      "title": "11. Contact",
+      "body": "[support e-mailadres invullen]"
+    }
+  },
+
+  "privacy": {
+    "title": "Privacybeleid",
+    "effective_date": "Ingangsdatum: [datum invullen]",
+    "intro": "Ummah Chat hecht veel waarde aan je privacy. Dit beleid legt uit hoe wij omgaan met je gegevens.",
+
+    "section_1": {
+      "title": "1. Gegevens die wij verzamelen",
+      "a": {
+        "title": "Accountgegevens",
+        "body": "Naam, gebruikersnaam, e-mailadres, profielfoto en bio."
+      },
+      "b": {
+        "title": "Gebruikersinhoud",
+        "body": "Berichten, posts, reacties, likes en geüploade media."
+      },
+      "c": {
+        "title": "Technische gegevens",
+        "body": "Gebruik van de app, apparaatinformatie en loggegevens."
+      },
+      "d": {
+        "title": "Meldingen",
+        "body": "Push tokens en interactie met meldingen."
+      }
+    },
+    "section_2": {
+      "title": "2. Gebruik van gegevens",
+      "bullets": {
+        "1": "Accountbeheer",
+        "2": "Chat- en communityfunctionaliteit",
+        "3": "Belangrijke meldingen",
+        "4": "Verbetering van de app",
+        "5": "Veiligheid en moderatie",
+        "6": "Wettelijke verplichtingen"
+      }
+    },
+    "section_3": {
+      "title": "3. Wettelijke grondslag (AVG)",
+      "bullets": {
+        "1": "Uitvoering van de overeenkomst",
+        "2": "Toestemming",
+        "3": "Gerechtvaardigd belang",
+        "4": "Wettelijke verplichting"
+      }
+    },
+    "section_4": {
+      "title": "4. Opslag en beveiliging",
+      "body": "Gegevens worden veilig opgeslagen met passende maatregelen."
+    },
+    "section_5": {
+      "title": "5. Delen van gegevens",
+      "body": "Wij verkopen geen gegevens en delen alleen wanneer noodzakelijk."
+    },
+    "section_6": {
+      "title": "6. Rechten van gebruikers",
+      "body": "Je kunt inzage, correctie of verwijdering aanvragen."
+    },
+    "section_7": {
+      "title": "7. Bewaartermijn",
+      "body": "Gegevens worden bewaard zolang je account actief is."
+    },
+    "section_8": {
+      "title": "8. Privacy van kinderen",
+      "body": "De app is niet bedoeld voor kinderen onder de 13 jaar."
+    },
+    "section_9": {
+      "title": "9. Wijzigingen",
+      "body": "Bij belangrijke wijzigingen word je geïnformeerd."
+    },
+    "section_10": {
+      "title": "10. Contact",
+      "body": "[support e-mailadres invullen]"
+    }
+  },
+
+  "legal": {
+    "by_registering_prefix": "Door je te registreren ga je akkoord met onze ",
+    "by_continuing_prefix": "Door verder te gaan ga je akkoord met onze ",
+    "and": " en ",
+    "dot": "."
+  },
+
+
+  "Skip": "Overslaan",
+  "Next": "Volgende",
+  "Get started": "Aan de slag",
+
+  "Forgot password?": "Wachtwoord vergeten?",
+  "Reset Password": "Wachtwoord resetten"
+
 }
