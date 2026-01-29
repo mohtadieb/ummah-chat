@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../helper/navigate_pages.dart';
 import '../helper/time_ago_text.dart';
 import '../models/post.dart';
 import '../models/post_media.dart';
@@ -415,14 +416,16 @@ class _MyPostTileState extends State<MyPostTile>
   void _handleUserTap() {
     final currentUserId = AuthService().getCurrentUserId();
 
+    // 👉 Other user → normal navigation
     if (widget.post.userId != currentUserId) {
       widget.onUserTap?.call();
       return;
     }
 
-    final bottomNav = Provider.of<BottomNavProvider>(context, listen: false);
-    bottomNav.setIndex(4);
+    // 👉 Own post → jump to own profile tab
+    goToOwnProfileTab(context);
   }
+
 
   Widget _buildHeader(BuildContext context) {
     final theme = Theme.of(context);

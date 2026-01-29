@@ -9,6 +9,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../helper/navigate_pages.dart';
 import '../helper/time_ago_text.dart';
 import '../models/comment.dart';
 import '../services/auth/auth_service.dart';
@@ -172,19 +173,13 @@ class _MyCommentTileState extends State<MyCommentTile> {
   void _handleUserTap() {
     final currentUserId = AuthService().getCurrentUserId();
 
-    // 👉 If comment belongs to the logged-in user: switch to profile tab
+    // 👉 If comment belongs to the logged-in user: go to own profile tab
     if (widget.comment.userId == currentUserId) {
-      final bottomNav = Provider.of<BottomNavProvider>(context, listen: false);
-      bottomNav.setIndex(4); // profile tab index
-
-      // Also go back so MainLayout becomes visible
-      if (Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
+      goToOwnProfileTab(context);
       return;
     }
 
-    // 👉 If it's another user → do the normal navigation
+    // 👉 If it's another user → normal navigation
     if (widget.onUserTap != null) {
       widget.onUserTap!();
     }
