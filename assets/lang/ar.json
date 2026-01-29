@@ -246,6 +246,27 @@
   "Reset link expired. Please request a new one.": "انتهت صلاحية رابط إعادة التعيين. يرجى طلب رابط جديد.",
   "Password updated.": "تم تحديث كلمة المرور.",
 
+  "Shared post": "منشور مُشارَك",
+  "Share in chat": "مشاركة في الدردشة",
+  "No friends found": "لم يتم العثور على أصدقاء",
+  "Share externally": "مشاركة خارجية",
+  "Tap to view": "اضغط لعرض المنشور",
+  "Post not found": "المنشور غير موجود",
+  "Share in group": "مشاركة في مجموعة",
+  "No groups found": "لا توجد مجموعات",
+  "Feedback": "ملاحظات",
+
+  "Please enter your feedback.": "يرجى إدخال ملاحظاتك.",
+  "Thanks for your feedback!": "شكرًا لملاحظاتك!",
+  "Failed to send feedback. Please try again.": "فشل إرسال الملاحظات. يرجى المحاولة مرة أخرى.",
+  "Tell us what you think…": "أخبرنا برأيك…",
+  "Send": "إرسال",
+  "general": "عام",
+  "bug": "خطأ",
+  "idea": "فكرة",
+  "other": "أخرى",
+
+
   "New password": "كلمة المرور الجديدة",
   "Confirm new password": "تأكيد كلمة المرور الجديدة",
   "Save password": "حفظ كلمة المرور",

@@ -5,6 +5,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:ummah_chat/pages/post_page.dart';
 import 'package:ummah_chat/pages/profile_page.dart';
 import 'package:uuid/uuid.dart';
 
@@ -15,6 +16,7 @@ import '../components/my_chat_text_field.dart';
 import '../components/my_voice_message_bubble.dart';
 import '../components/my_selectable_bubble.dart';
 import '../components/my_reply_preview_bar.dart';
+import '../helper/post_share.dart';
 import '../helper/time_ago_text.dart';
 import '../helper/chat_separators.dart';
 import '../helper/chat_media_helper.dart';
@@ -22,19 +24,26 @@ import '../helper/message_grouping.dart';
 import '../helper/voice_recorder_helper.dart';
 import '../helper/likes_bottom_sheet_helper.dart';
 import '../models/message.dart';
+import '../models/post.dart';
+import '../models/post_media.dart';
 import '../models/user_profile.dart';
 import '../services/chat/chat_provider.dart';
+import '../services/database/database_provider.dart';
 import '../services/database/database_service.dart';
 import '../services/notifications/notification_service.dart';
 
 class ChatPage extends StatefulWidget {
   final String friendId;
   final String friendName;
+  final String? initialDraftMessage;
+  final bool sendDraftOnOpen;
 
   const ChatPage({
     super.key,
     required this.friendId,
     required this.friendName,
+    this.initialDraftMessage,
+    this.sendDraftOnOpen = false,
   });
 
   @override
@@ -199,6 +208,24 @@ class _ChatPageState extends State<ChatPage> {
 
     await _chatProvider.listenToRoom(chatRoomId);
 
+    // ============================================================
+    // ✅ PHASE 1 (Step 3): auto-send draft marker AFTER room is ready
+    // ============================================================
+    if (widget.sendDraftOnOpen == true &&
+        widget.initialDraftMessage != null &&
+        widget.initialDraftMessage!.trim().isNotEmpty) {
+      final marker = widget.initialDraftMessage!.trim();
+
+      // Optional: show it in the input briefly (nice UX)
+      _messageController.text = marker;
+
+      // Send next frame so UI is mounted and room stream is active
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _sendMessage(textOverride: marker);
+      });
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollDown());
 
     await _chatProvider.markRoomMessagesAsRead(chatRoomId, _currentUserId);
@@ -207,6 +234,7 @@ class _ChatPageState extends State<ChatPage> {
 
     _subscribeToFriendTyping(chatRoomId);
   }
+
 
   void _subscribeToFriendTyping(String chatRoomId) {
     _friendTypingSub?.cancel();
@@ -380,8 +408,9 @@ class _ChatPageState extends State<ChatPage> {
   // Send text
   // ---------------------------------------------------------------------------
 
-  Future<void> _sendMessage() async {
-    final text = _messageController.text.trim();
+  Future<void> _sendMessage({String? textOverride}) async {
+    final text = (textOverride ?? _messageController.text).trim();
+    if (text.isEmpty) return;
     if (text.isEmpty || _chatRoomId == null) return;
     if (_currentUserId.isEmpty) return;
 
@@ -948,21 +977,42 @@ class _ChatPageState extends State<ChatPage> {
                         }
 
                         Widget innerBubble;
-                        if (lastMsg.isAudio &&
-                            (lastMsg.audioUrl ?? '').trim().isNotEmpty) {
+
+                        if (lastMsg.isAudio && (lastMsg.audioUrl ?? '').trim().isNotEmpty) {
                           innerBubble = MyVoiceMessageBubble(
                             key: ValueKey(lastMsg.id),
                             audioUrl: lastMsg.audioUrl!,
                             isCurrentUser: isCurrentUser,
                             durationSeconds: lastMsg.audioDurationSeconds,
                           );
+                        } else if (PostShare.isPostShareMessage(lastMsg.message)) {
+                          final sharedPostId = PostShare.extractPostId(lastMsg.message);
+
+                          innerBubble = _SharedPostBubble(
+                            postId: sharedPostId ?? '',
+                            isCurrentUser: isCurrentUser,
+                            createdAt: lastMsg.createdAt,
+                            onTap: () {
+                              if (sharedPostId == null || sharedPostId.trim().isEmpty) return;
+
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PostPage(
+                                    post: null,
+                                    postId: sharedPostId.trim(),
+                                    highlightPost: true,
+                                  ),
+                                ),
+                              );
+                            },
+                          );
                         } else {
                           innerBubble = MyChatBubble(
                             key: ValueKey(lastMsg.id),
                             message: lastMsg.message,
                             imageUrls: imageUrls,
-                            imageUrl:
-                            imageUrls.isNotEmpty ? imageUrls.first : null,
+                            imageUrl: imageUrls.isNotEmpty ? imageUrls.first : null,
                             videoUrl: effectiveVideoUrl,
                             isCurrentUser: isCurrentUser,
                             createdAt: lastMsg.createdAt,
@@ -972,8 +1022,7 @@ class _ChatPageState extends State<ChatPage> {
                             likeCount: likeCount,
                             isUploading: lastMsg.isUploading,
                             isDeleted: lastMsg.isDeleted,
-                            senderName:
-                            isCurrentUser ? 'You'.tr() : widget.friendName,
+                            senderName: isCurrentUser ? 'You'.tr() : widget.friendName,
                             onDoubleTap: () async {
                               if (_isSelectionMode) return;
                               if (_currentUserId.isEmpty) return;
@@ -984,10 +1033,7 @@ class _ChatPageState extends State<ChatPage> {
                               );
                             },
                             onLongPress: !_isSelectionMode && !lastMsg.isDeleted
-                                ? () => _handleBubbleLongPress(
-                              lastMsg,
-                              isCurrentUser,
-                            )
+                                ? () => _handleBubbleLongPress(lastMsg, isCurrentUser)
                                 : null,
                             onLikeTap: likedBy.isEmpty
                                 ? null
@@ -1121,6 +1167,208 @@ class _ChatPageState extends State<ChatPage> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+class _SharedPostBubble extends StatelessWidget {
+  final String postId;
+  final bool isCurrentUser;
+  final DateTime createdAt; // you already added this
+  final VoidCallback onTap;
+
+  const _SharedPostBubble({
+    required this.postId,
+    required this.isCurrentUser,
+    required this.createdAt,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final db = context.read<DatabaseProvider>();
+
+    final bg = isCurrentUser ? const Color(0xFF467E55) : cs.tertiary;
+    final fg = isCurrentUser ? Colors.white : cs.inversePrimary;
+
+    if (postId.trim().isEmpty) {
+      return _buildShell(
+        context,
+        bg: bg,
+        fg: fg,
+        title: 'Shared post'.tr(),
+        subtitle: 'Post not found'.tr(),
+        imageUrls: const [],
+        onTap: () {},
+      );
+    }
+
+    return FutureBuilder<Post?>(
+      future: db.getPostById(postId.trim()),
+      builder: (context, postSnap) {
+        final post = postSnap.data;
+
+        return FutureBuilder<List<PostMedia>>(
+          future: db.getPostMediaCached(postId.trim()),
+          builder: (context, mediaSnap) {
+            final media = mediaSnap.data ?? const <PostMedia>[];
+
+            // Only show images in the preview grid (videos optional later)
+            final imageUrls = media
+                .where((m) => m.type == 'image')
+                .map((m) => m.url.trim())
+                .where((u) => u.isNotEmpty)
+                .toList(growable: false);
+
+            final caption = (post?.message ?? '').trim();
+
+            final subtitle = caption.isNotEmpty
+                ? caption
+                : (post == null ? 'Post not found'.tr() : 'Tap to view'.tr());
+
+            return _buildShell(
+              context,
+              bg: bg,
+              fg: fg,
+              title: 'Shared post'.tr(),
+              subtitle: subtitle,
+              imageUrls: imageUrls,
+              onTap: post == null ? () {} : onTap,
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildShell(
+      BuildContext context, {
+        required Color bg,
+        required Color fg,
+        required String title,
+        required String subtitle,
+        required List<String> imageUrls,
+        required VoidCallback onTap,
+      }) {
+    final cs = Theme.of(context).colorScheme;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+        padding: const EdgeInsets.all(10),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.78,
+        ),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: cs.primary.withValues(alpha: 0.12),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.article_outlined, color: fg, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: fg,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(Icons.open_in_new, color: fg.withValues(alpha: 0.9), size: 16),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // ✅ image preview grid (up to 4)
+            if (imageUrls.isNotEmpty)
+              _SharedPostImageGrid(
+                imageUrls: imageUrls.take(4).toList(),
+                borderRadius: 12,
+              )
+            else
+              Container(
+                height: 120,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                alignment: Alignment.center,
+                child: Icon(Icons.image_outlined, color: fg.withValues(alpha: 0.85)),
+              ),
+
+            const SizedBox(height: 8),
+
+            Text(
+              subtitle,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: fg.withValues(alpha: 0.95),
+                fontWeight: FontWeight.w600,
+                height: 1.25,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SharedPostImageGrid extends StatelessWidget {
+  final List<String> imageUrls;
+  final double borderRadius;
+
+  const _SharedPostImageGrid({
+    required this.imageUrls,
+    this.borderRadius = 12,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final count = imageUrls.length;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: AspectRatio(
+        aspectRatio: 1.25, // nice “preview card” ratio
+        child: GridView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: count == 1 ? 1 : 2,
+            mainAxisSpacing: 2,
+            crossAxisSpacing: 2,
+          ),
+          itemCount: count,
+          itemBuilder: (_, i) {
+            return Image.network(
+              imageUrls[i],
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                color: Colors.black.withValues(alpha: 0.08),
+                alignment: Alignment.center,
+                child: const Icon(Icons.broken_image_outlined),
+              ),
+            );
+          },
         ),
       ),
     );

@@ -10,6 +10,8 @@ import '../helper/navigate_pages.dart';
 import '../helper/time_ago_text.dart';
 import '../models/post.dart';
 import '../models/post_media.dart';
+import '../pages/share/share_post_to_friend_page.dart';
+import '../pages/share/share_post_to_group_page.dart';
 import '../services/database/database_provider.dart';
 import '../components/my_input_alert_box.dart';
 import '../services/auth/auth_service.dart';
@@ -172,7 +174,7 @@ class _MyPostTileState extends State<MyPostTile>
     }
   }
 
-  Future<void> _sharePost() async {
+  Future<void> _shareExternally() async {
     try {
       final name = widget.post.name.trim();
       final username = widget.post.username.trim();
@@ -202,6 +204,67 @@ class _MyPostTileState extends State<MyPostTile>
         SnackBar(content: Text('could_not_share'.tr())),
       );
     }
+  }
+
+
+  Future<void> _openShareChooser() async {
+    final cs = Theme.of(context).colorScheme;
+
+    await showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: Icon(Icons.chat_bubble_outline, color: cs.primary),
+                title: Text('Share in chat'.tr()),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => SharePostToFriendPage(post: widget.post),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.group_outlined, color: cs.primary),
+                title: Text('Share in group'.tr()),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => SharePostToGroupPage(post: widget.post),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.share_outlined, color: cs.primary),
+                title: Text('Share externally'.tr()),
+                onTap: () async {
+                  Navigator.pop(sheetContext);
+                  await _shareExternally();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.close),
+                title: Text('Cancel'.tr()),
+                onTap: () => Navigator.pop(sheetContext),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _openNewCommentBox() {
@@ -793,7 +856,7 @@ class _MyPostTileState extends State<MyPostTile>
             tooltip: 'private_reflection'.tr(),
           ),
           IconButton(
-            onPressed: _sharePost,
+            onPressed: () => _openShareChooser(),
             icon: const Icon(Icons.send_outlined),
             color: iconColor,
             splashRadius: 20,
@@ -922,6 +985,9 @@ class _MyPostTileState extends State<MyPostTile>
       ],
     );
   }
+}
+
+class SharePostToChatPage {
 }
 
 class _VideoPostPlayer extends StatefulWidget {

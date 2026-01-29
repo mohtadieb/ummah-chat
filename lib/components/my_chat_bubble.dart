@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 
 import '../pages/fullscreen_image_page.dart';
 import 'my_chat_video_bubble.dart';
+import '../helper/post_share.dart';
+import '../pages/post_page.dart';
+
 
 enum ChatBubbleShape {
   single,
@@ -123,12 +126,17 @@ class MyChatBubble extends StatelessWidget {
         ? [imageUrl!]
         : <String>[]);
 
+    // ✅ Phase 1: detect internal post share marker
+    final bool isPostShare = !isDeleted && PostShare.isPostShareMessage(message);
+    final String? sharedPostId = isPostShare ? PostShare.extractPostId(message) : null;
+
+
     // If deleted: never show images / videos / text content.
     final bool hasImages =
         !isDeleted && effectiveImageUrls.isNotEmpty;
     final bool hasVideo =
         !isDeleted && videoUrl != null && videoUrl!.trim().isNotEmpty;
-    final bool hasText = !isDeleted && message.trim().isNotEmpty;
+    final bool hasText = !isDeleted && !isPostShare && message.trim().isNotEmpty;
 
     // 🟢 Sender (current user) bubble style
     final senderBg = const Color(0xFF467E55);
@@ -551,6 +559,62 @@ class MyChatBubble extends StatelessWidget {
               _buildImageGrid(context),
               if (hasText) const SizedBox(height: 6),
             ],
+
+            // 🆕 Internal shared post card (Phase 1)
+            if (!isDeleted && isPostShare && sharedPostId != null) ...[
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => PostPage(
+                        post: null,
+                        postId: sharedPostId,
+                        highlightPost: true,
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: isCurrentUser
+                        ? Colors.black.withValues(alpha: 0.10)
+                        : Colors.black.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.black.withValues(alpha: 0.06),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.article_outlined, size: 18),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Shared a post'.tr(),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: textColor.withValues(alpha: 0.95),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.chevron_right,
+                        size: 18,
+                        color: textColor.withValues(alpha: 0.55),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+            ],
+
 
             // Caption / text
             if (hasText) ...[

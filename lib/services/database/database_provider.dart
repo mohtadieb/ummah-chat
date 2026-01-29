@@ -1542,4 +1542,25 @@ class DatabaseProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  // =====================
+// Feedback
+// =====================
+  Future<void> submitFeedback({
+    required String userId,
+    required String message,
+    String category = 'general',
+    String? appVersion,
+    String? device,
+  }) async {
+    await _db.submitFeedbackInDatabase(
+      userId: userId,
+      message: message,
+      category: category,
+      appVersion: appVersion,
+      device: device,
+    );
+  }
+
+
 }

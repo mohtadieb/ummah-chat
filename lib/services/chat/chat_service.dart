@@ -1,10 +1,12 @@
 // lib/services/chat/chat_service.dart
 import 'dart:async';
 import 'dart:io';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart'; // for debugPrint
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../helper/post_share.dart';
 import '../../models/message.dart';
 import '../database/database_service.dart';
 import '../notifications/notification_service.dart';
@@ -15,12 +17,16 @@ class LastMessageInfo {
   final String? text;
   final DateTime? createdAt;
   final bool sentByCurrentUser;
+  // ✅ add this
+  final bool isPostShare;
 
   LastMessageInfo({
     required this.friendId,
     required this.text,
     required this.createdAt,
     required this.sentByCurrentUser,
+    this.isPostShare = false,
+
   });
 }
 
@@ -481,12 +487,21 @@ class ChatService {
         createdAt = rawCreatedAt;
       }
 
+      final rawText = (messageText ?? '').trim();
+      final isPostShare = PostShare.isPostShareMessage(rawText);
+
+      final String? previewText = isPostShare
+          ? 'Shared post'.tr()
+          : (rawText.isEmpty ? null : rawText);
+
       lastMessages[friendId] = LastMessageInfo(
         friendId: friendId,
-        text: messageText,
+        text: previewText,
         createdAt: createdAt,
         sentByCurrentUser: senderId == currentUserId,
+        isPostShare: isPostShare,
       );
+
     }
 
     return lastMessages;
@@ -1138,14 +1153,19 @@ class ChatService {
 
     for (final row in data) {
       final map = Map<String, dynamic>.from(row as Map);
+
+      // ✅ Normalize post-share marker for group list preview
+      final rawText = (map['message'] ?? '').toString().trim();
+      if (PostShare.isPostShareMessage(rawText)) {
+        map['message'] = 'Shared post'.tr(); // or a localized value later
+      }
+
       final message = MessageModel.fromMap(map);
 
       final String roomId =
           message.chatRoomId ?? map['chat_room_id']?.toString() ?? '';
       if (roomId.isEmpty) continue;
 
-      // We ordered by created_at DESC, so the first time we see this room
-      // is already the newest message → keep it and skip older ones.
       if (result.containsKey(roomId)) continue;
 
       result[roomId] = message;

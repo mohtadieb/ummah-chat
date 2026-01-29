@@ -290,6 +290,27 @@
   "Reset link expired. Please request a new one.": "De resetlink is verlopen. Vraag een nieuwe aan.",
   "Password updated.": "Wachtwoord bijgewerkt.",
 
+  "Shared post": "Gedeelde post",
+  "Share in chat": "Delen in chat",
+  "No friends found": "Geen vrienden gevonden",
+  "Share externally": "Extern delen",
+  "Feedback": "Feedback",
+  "Please enter your feedback.": "Voer alstublieft uw feedback in.",
+  "Thanks for your feedback!": "Bedankt voor je feedback!",
+  "Failed to send feedback. Please try again.": "Het verzenden van feedback is mislukt. Probeer het opnieuw.",
+  "Tell us what you think…": "Laat ons weten wat je ervan vindt…",
+  "Send": "Versturen",
+  "general": "Algemeen",
+  "bug": "Fout",
+  "idea": "Idee",
+  "other": "Overig",
+
+
+  "Tap to view": "Tik om te bekijken",
+  "Post not found": "Bericht niet gevonden",
+  "Share in group": "Delen in groep",
+  "No groups found": "Geen groepen gevonden",
+
   "New password": "Nieuw wachtwoord",
   "Confirm new password": "Bevestig nieuw wachtwoord",
   "Save password": "Wachtwoord opslaan",

@@ -3437,4 +3437,35 @@ class DatabaseService {
       return null;
     }
   }
+// =====================
+// Feedback
+// =====================
+  Future<void> submitFeedbackInDatabase({
+    required String userId,
+    required String message,
+    String category = 'general', // e.g. bug / idea / other / general
+    String? appVersion,
+    String? device,
+  }) async {
+    if (userId.trim().isEmpty) {
+      throw Exception('submitFeedbackInDatabase: userId is empty');
+    }
+
+    final cleaned = message.trim();
+    if (cleaned.isEmpty) {
+      throw Exception('submitFeedbackInDatabase: message is empty');
+    }
+
+    final payload = <String, dynamic>{
+      'user_id': userId.trim(),
+      'message': cleaned,
+      'category': category.trim().isEmpty ? 'general' : category.trim(),
+      'app_version': appVersion?.trim(),
+      'device': device?.trim(),
+    };
+
+    await _db.from('feedback').insert(payload);
+  }
+
+
 }

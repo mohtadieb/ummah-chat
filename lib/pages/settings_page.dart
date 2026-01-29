@@ -15,6 +15,7 @@ import '../services/database/database_provider.dart';
 import '../services/localization/locale_sync_service.dart';
 import '../services/notifications/notification_service.dart';
 import '../themes/theme_provider.dart';
+import 'feedback_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -186,7 +187,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 onChanged: (newLocale) async {
                   if (newLocale == null) return;
 
-                  if (newLocale.languageCode == context.locale.languageCode) return;
+                  if (newLocale.languageCode == context.locale.languageCode) {
+                    return;
+                  }
 
                   await context.setLocale(newLocale);
 
@@ -196,7 +199,6 @@ class _SettingsPageState extends State<SettingsPage> {
                   if (!mounted) return;
                   setState(() {});
                 },
-
               ),
             ),
 
@@ -271,7 +273,26 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
 
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
+
+            // FEEDBACK (same spacing as other tiles/sections)
+            MySettingsTile(
+              title: 'Feedback'.tr(),
+              leadingIcon: Icons.feedback_outlined,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const FeedbackPage()),
+                );
+              },
+              trailing: Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 18,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+
+            const SizedBox(height: 24),
 
             // DANGER ZONE / LOGOUT
             Text(
@@ -283,7 +304,6 @@ class _SettingsPageState extends State<SettingsPage> {
                     .withValues(alpha: 0.9),
               ),
             ),
-
             const SizedBox(height: 10),
 
             MySettingsTile(
@@ -295,6 +315,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 color: Theme.of(context).colorScheme.error,
               ),
             ),
+
             const SizedBox(height: 30),
           ],
         ),
