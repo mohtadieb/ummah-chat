@@ -1,11 +1,17 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../components/my_button.dart';
 import '../components/my_dialogs.dart';
 import '../components/my_text_field.dart';
 import '../services/auth/auth_service.dart';
 import '../services/localization/locale_sync_service.dart';
+
+// ✅ Legal pages
+import 'legal/privacy_policy_page.dart';
+import 'legal/terms_of_use_page.dart';
 
 class LoginPage extends StatefulWidget {
   final void Function()? onTap; // Callback to switch to RegisterPage
@@ -116,8 +122,6 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-
-
   @override
   void dispose() {
     emailController.dispose();
@@ -177,6 +181,56 @@ class _LoginPageState extends State<LoginPage> {
             color: colorScheme.primary.withOpacity(0.7),
           ),
         ],
+      ),
+    );
+  }
+
+  // ✅ NEW: Legal row (Terms + Privacy links)
+  Widget _legalRow(ColorScheme colorScheme) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: RichText(
+        textAlign: TextAlign.center,
+        text: TextSpan(
+          style: TextStyle(
+            color: colorScheme.onSurface.withOpacity(0.65),
+            fontSize: 12,
+            height: 1.3,
+          ),
+          children: [
+            TextSpan(text: 'legal.by_continuing_prefix'.tr()),
+            TextSpan(
+              text: 'terms.title'.tr(),
+              style: TextStyle(
+                color: colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+              recognizer: TapGestureRecognizer()
+                ..onTap = () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const TermsOfUsePage()),
+                  );
+                },
+            ),
+            TextSpan(text: 'legal.and'.tr()),
+            TextSpan(
+              text: 'privacy.title'.tr(),
+              style: TextStyle(
+                color: colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+              recognizer: TapGestureRecognizer()
+                ..onTap = () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()),
+                  );
+                },
+            ),
+            TextSpan(text: 'legal.dot'.tr()),
+          ],
+        ),
       ),
     );
   }
@@ -262,7 +316,6 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           ),
 
-
                           const SizedBox(height: 28),
 
                           MyButton(
@@ -302,12 +355,16 @@ class _LoginPageState extends State<LoginPage> {
 
                           const SizedBox(height: 16),
 
+                          // ✅ NEW: legal links
+                          _legalRow(colorScheme),
+
                           SizedBox(
                             width: double.infinity,
                             child: OutlinedButton(
                               onPressed: _isLoggingIn ? null : loginWithGoogle,
                               style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding:
+                                const EdgeInsets.symmetric(vertical: 12),
                                 side: BorderSide(
                                   color: colorScheme.primary.withOpacity(0.3),
                                 ),

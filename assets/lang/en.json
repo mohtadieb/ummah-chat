@@ -3162,5 +3162,153 @@
       "o3": "Having children is only about enjoyment",
       "o4": "Trust Allah and keep making sincere du‘a"
     }
-  }
+  },
+  "terms": {
+    "title": "Terms of Use",
+    "effective_date": "Effective date: [insert date]",
+    "intro": "Welcome to Ummah Chat. By using the App, you agree to these Terms of Use.",
+
+    "section_1": {
+      "title": "1. Eligibility",
+      "body": "You must be at least 13 years old and use the app lawfully."
+    },
+    "section_2": {
+      "title": "2. User Accounts",
+      "body": "You are responsible for your account security. We may suspend or terminate accounts that violate these terms."
+    },
+    "section_3": {
+      "title": "3. Acceptable Use",
+      "body": "You agree not to:",
+      "bullets": {
+        "1": "Harass, abuse, threaten, or harm others",
+        "2": "Post illegal or explicit content",
+        "3": "Spam or manipulate the platform",
+        "4": "Attempt unauthorized access"
+      }
+    },
+    "section_4": {
+      "title": "4. User Content",
+      "body": "You retain ownership of your content. By posting, you grant Ummah Chat a non-exclusive license to display and distribute content within the app."
+    },
+    "section_5": {
+      "title": "5. Moderation",
+      "body": "We may remove content or limit accounts to protect the community."
+    },
+    "section_6": {
+      "title": "6. Termination",
+      "body": "You may delete your account at any time. We may suspend access when required for safety or legal reasons."
+    },
+    "section_7": {
+      "title": "7. Disclaimer",
+      "body": "The App is provided “as is” without guarantees."
+    },
+    "section_8": {
+      "title": "8. Limitation of Liability",
+      "body": "To the extent permitted by law, we are not liable for indirect or consequential damages."
+    },
+    "section_9": {
+      "title": "9. Changes",
+      "body": "We may update these terms. Continued use means acceptance."
+    },
+    "section_10": {
+      "title": "10. Governing Law",
+      "body": "[insert country, e.g. Netherlands]"
+    },
+    "section_11": {
+      "title": "11. Contact",
+      "body": "[insert support email]"
+    }
+  },
+
+  "privacy": {
+    "title": "Privacy Policy",
+    "effective_date": "Effective date: [insert date]",
+    "intro": "Ummah Chat (“we”, “our”, “us”) values your privacy. This policy explains how we collect, use, store, and protect your personal information.",
+
+    "section_1": {
+      "title": "1. Information We Collect",
+      "a": {
+        "title": "Account Information",
+        "body": "Name, username, email address, profile photo, bio, and optional profile details."
+      },
+      "b": {
+        "title": "User-Generated Content",
+        "body": "Messages, posts, comments, likes, community content, and uploaded media."
+      },
+      "c": {
+        "title": "Usage & Technical Data",
+        "body": "App usage data, device information, and logs such as errors and timestamps."
+      },
+      "d": {
+        "title": "Notifications",
+        "body": "Push notification tokens and notification interaction data."
+      }
+    },
+    "section_2": {
+      "title": "2. How We Use Your Information",
+      "bullets": {
+        "1": "Create and manage your account",
+        "2": "Enable messaging, posts, and community features",
+        "3": "Send important notifications",
+        "4": "Improve app functionality and user experience",
+        "5": "Maintain safety, moderation, and abuse prevention",
+        "6": "Comply with legal obligations"
+      }
+    },
+    "section_3": {
+      "title": "3. Legal Basis (GDPR)",
+      "bullets": {
+        "1": "Contractual necessity",
+        "2": "User consent",
+        "3": "Legitimate interest",
+        "4": "Legal obligations"
+      }
+    },
+    "section_4": {
+      "title": "4. Data Storage & Security",
+      "body": "Data is stored using trusted infrastructure with reasonable safeguards."
+    },
+    "section_5": {
+      "title": "5. Data Sharing",
+      "body": "We do not sell your data. Data may be shared only when required."
+    },
+    "section_6": {
+      "title": "6. User Rights",
+      "body": "You may request access, correction, deletion, or objection to processing."
+    },
+    "section_7": {
+      "title": "7. Data Retention",
+      "body": "We retain data while your account is active unless legally required otherwise."
+    },
+    "section_8": {
+      "title": "8. Children’s Privacy",
+      "body": "Ummah Chat is not intended for children under 13."
+    },
+    "section_9": {
+      "title": "9. Changes",
+      "body": "We may update this policy and notify users of significant changes."
+    },
+    "section_10": {
+      "title": "10. Contact",
+      "body": "[insert support email]"
+    }
+  },
+
+  "legal": {
+    "by_registering_prefix": "By registering, you agree to our ",
+    "by_continuing_prefix": "By continuing, you agree to our ",
+    "and": " and ",
+    "dot": "."
+  },
+
+  "Skip": "Skip",
+  "Next": "Next",
+  "Get started": "Get started",
+
+  "Forgot password?": "Forgot password?",
+  "Reset Password": "Reset Password"
+
+
 }
+
+
