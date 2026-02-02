@@ -416,10 +416,15 @@ class NotificationService {
 
     await createNotificationForUser(
       targetUserId: targetUserId,
+
+      // ✅ Uniform fallback title (human readable)
       title: '$inviterName invited you to $safeName',
-      body: 'CO_localizedTitleForMMUNITY_INVITE:$communityId::$safeName::$inviterName', // ✅ UPDATED
+
+      // ✅ Uniform body format (ID at the end)
+      body: 'COMMUNITY_INVITE:$communityId::$safeName::$inviterId',
+
       fromUserId: inviterId,
-      type: 'social',
+      type: 'community',
       isRead: false,
       unreadCount: 1,
       sendPush: true,
@@ -436,8 +441,6 @@ class NotificationService {
       },
     );
   }
-
-
 
   // -------------------------
   // PUSH SENDER (NEW MODE)

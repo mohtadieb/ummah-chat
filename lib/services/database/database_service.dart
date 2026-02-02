@@ -2740,15 +2740,13 @@ class DatabaseService {
     }
   }
 
-
-
   // Create new community + auto-join creator
   Future<Map<String, dynamic>?> createCommunityInDatabase(
-      String name,
-      String desc,
-      String country, {
-        bool isPrivate = false,
-      }) async {
+    String name,
+    String desc,
+    String country, {
+    bool isPrivate = false,
+  }) async {
     try {
       // ✅ Use RPC so private creation + auto-join is always allowed under RLS
       final created = await _db.rpc(
@@ -2768,8 +2766,6 @@ class DatabaseService {
     }
   }
 
-
-
   Future<bool> isMemberInDatabase(String communityId) async {
     try {
       final userId = _auth.currentUser?.id;
@@ -2788,7 +2784,6 @@ class DatabaseService {
       return false;
     }
   }
-
 
   Future<bool> joinCommunityInDatabase({
     required String communityId,
@@ -2819,7 +2814,6 @@ class DatabaseService {
       return false;
     }
   }
-
 
   Future<void> leaveCommunityInDatabase(String communityId) async {
     final id = communityId.trim();
@@ -2892,8 +2886,8 @@ class DatabaseService {
 
   // Fetch all community member profiles
   Future<List<Map<String, dynamic>>> getCommunityMemberProfilesFromDatabase(
-      String communityId,
-      ) async {
+    String communityId,
+  ) async {
     try {
       final cid = communityId.trim();
       if (cid.isEmpty) return [];
@@ -2918,8 +2912,8 @@ class DatabaseService {
       final profiles = await _db
           .from('profiles')
           .select(
-        'id, name, username, email, bio, profile_photo_url, created_at',
-      )
+            'id, name, username, email, bio, profile_photo_url, created_at',
+          )
           .inFilter('id', userIds);
 
       // Optional: keep original member order
@@ -2941,7 +2935,6 @@ class DatabaseService {
     }
   }
 
-
   Future<List<Map<String, dynamic>>>
   getMyCommunityMembershipsFromDatabase() async {
     try {
@@ -2960,18 +2953,17 @@ class DatabaseService {
   }
 
   Future<void> inviteUserToCommunityInDatabase(
-    String communityId,
-    String invitedUserId,
-    String communityName,
-    String inviterName, // ✅ NEW
-  ) async {
+      String communityId,
+      String invitedUserId,
+      String communityName,
+      String inviterName,
+      ) async {
     final id = communityId.trim();
     final invited = invitedUserId.trim();
     final cname = communityName.trim();
     final iname = inviterName.trim();
 
     if (id.isEmpty || invited.isEmpty) return;
-    if (iname.isEmpty) return; // ✅ optional safety
 
     // DB invite record
     await _db.rpc(
@@ -2980,29 +2972,34 @@ class DatabaseService {
     );
 
     final inviterId = _auth.currentUser?.id ?? '';
-    if (inviterId.isEmpty) return;
+    if (inviterId.trim().isEmpty) return;
 
-    // ✅ Standard body format for NotificationPage: COMMUNITY_INVITE:<id>::<name>
-    // ✅ change body + pushArgs keys
+    // ✅ IMPORTANT: keep body machine-readable + uniform with your NotificationPage parser:
+    // COMMUNITY_INVITE:<communityId>::<communityName>::<inviterId>
+    final body = 'COMMUNITY_INVITE:$id::$cname::$inviterId';
+
     await NotificationService().createNotificationForUser(
       targetUserId: invited,
-      title: 'COMMUNITY_INVITE',
-      body: 'COMMUNITY_INVITE:$id::$cname::$iname', // ✅ now includes inviter
+      // ✅ human readable like your other notifications
+      title: '$iname invited you to $cname',
+      body: body,
+
       fromUserId: inviterId,
       type: 'community',
       isRead: false,
       unreadCount: 1,
+
       sendPush: true,
       pushArgs: {
         'name': cname,
-        'senderName': iname, // ✅ edge reads senderName
+        'senderName': iname,
       },
       data: {
         'type': 'COMMUNITY_INVITE',
         'communityId': id,
         'communityName': cname,
         'fromUserId': inviterId,
-        'senderName': iname, // ✅ keep consistent
+        'senderName': iname,
       },
     );
   }
@@ -3107,6 +3104,43 @@ class DatabaseService {
     // - community_members removed by FK cascade
     // - community_invites removed by FK cascade
     // - posts removed by FK cascade
+  }
+
+  Future<String> updateCommunityAvatarInDatabase({
+    required String communityId,
+    required String filePath,
+  }) async {
+    try {
+      final file = File(filePath);
+
+      // e.g. community_avatars/<communityId>.jpg
+      // Use timestamp so cache updates immediately
+      final ext = filePath.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final storagePath = '$communityId/avatar_$ts.$ext';
+
+      await _db.storage.from('community_avatars').upload(
+        storagePath,
+        file,
+        fileOptions: const FileOptions(
+          upsert: true,
+        ),
+      );
+
+      final publicUrl =
+      _db.storage.from('community_avatars').getPublicUrl(storagePath);
+
+      // ✅ Save to communities table
+      await _db
+          .from('communities')
+          .update({'avatar_url': publicUrl})
+          .eq('id', communityId);
+
+      return publicUrl;
+    } catch (e) {
+      debugPrint('updateCommunityAvatarInDatabase error: $e');
+      rethrow;
+    }
   }
 
 
@@ -3437,9 +3471,10 @@ class DatabaseService {
       return null;
     }
   }
-// =====================
-// Feedback
-// =====================
+
+  // =====================
+  // Feedback
+  // =====================
   Future<void> submitFeedbackInDatabase({
     required String userId,
     required String message,
@@ -3466,6 +3501,4 @@ class DatabaseService {
 
     await _db.from('feedback').insert(payload);
   }
-
-
 }

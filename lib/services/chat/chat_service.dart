@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart'; // for debugPrint
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
@@ -10,6 +11,8 @@ import '../../helper/post_share.dart';
 import '../../models/message.dart';
 import '../database/database_service.dart';
 import '../notifications/notification_service.dart';
+import 'dart:typed_data';
+
 
 /// Info about the last message exchanged with a friend (DM only)
 class LastMessageInfo {
@@ -534,13 +537,33 @@ class ChatService {
     required String userId,
     required bool isTyping,
   }) async {
-    await _supabase.from('typing_status').upsert({
-      'user_id': userId,
-      'chat_room_id': chatRoomId,
-      'is_typing': isTyping,
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    });
+    final roomId = chatRoomId.trim();
+    final uid = userId.trim();
+    if (roomId.isEmpty || uid.isEmpty) return;
+
+    try {
+      await _supabase.from('typing_status').upsert({
+        'user_id': uid,
+        'chat_room_id': roomId,
+        'is_typing': isTyping,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      });
+    } on PostgrestException catch (e) {
+      // ✅ Room deleted → FK violation → ignore silently
+      if (e.code == '23503') return;
+
+      // ✅ Optional: if you later enable RLS and user loses access, also ignore
+      // (prevents crashes when user is no longer a member / room is private, etc.)
+      if (e.code == '42501') return;
+
+      rethrow;
+    } catch (_) {
+      // Optional: swallow any unexpected non-Postgrest errors if you want typing to never crash the app
+      // Otherwise remove this catch.
+      return;
+    }
   }
+
 
   /// Stream that tells whether [friendId] is currently typing in [chatRoomId] (FROM DATABASE).
   ///
@@ -1273,6 +1296,34 @@ class ChatService {
       rethrow;
     }
   }
+  Future<String> updateGroupAvatarInDatabase({
+    required String chatRoomId,
+    required String filePath,
+  }) async {
+    final Uint8List bytes = await XFile(filePath).readAsBytes();
+
+    final storagePath =
+        '${chatRoomId}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+    // ✅ use your bucket name (change if needed)
+    const bucket = 'group_avatars';
+
+    await _supabase.storage.from(bucket).uploadBinary(
+      storagePath,
+      bytes,
+      fileOptions: const FileOptions(upsert: true),
+    );
+
+    final publicUrl = _supabase.storage.from(bucket).getPublicUrl(storagePath);
+
+    await _supabase.from('chat_rooms').update({
+      'avatar_url': publicUrl,
+    }).eq('id', chatRoomId);
+
+    return publicUrl;
+  }
+
+
 
   // =======================================================================
   //                              DELETE MESSAGES

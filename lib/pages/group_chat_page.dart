@@ -30,17 +30,21 @@ import 'add_group_members_page.dart';
 import '../services/notifications/notification_service.dart';
 import 'profile_page.dart';
 import 'post_page.dart';
+import 'package:image_picker/image_picker.dart';
+
+
 
 // ✅ NEW: for jumping to your own profile tab in MainLayout
 import '../services/navigation/bottom_nav_provider.dart';
 
-enum _GroupMenuAction { viewMembers, addMembers, leaveGroup, deleteGroup }
+enum _GroupMenuAction { viewMembers, addMembers, changeGroupPhoto, leaveGroup, deleteGroup }
 
 class GroupChatPage extends StatefulWidget {
   final String chatRoomId;
 
   // ✅ what we currently pass (could be "L10N:marriage_inquiry")
   final String groupName;
+  final String? avatarUrl;
 
   // ✅ NEW: optional context payload (so notification tap can also show the right title)
   final String? contextType;
@@ -56,6 +60,7 @@ class GroupChatPage extends StatefulWidget {
     super.key,
     required this.chatRoomId,
     required this.groupName,
+    this.avatarUrl,
     this.contextType,
     this.manId,
     this.womanId,
@@ -120,6 +125,9 @@ class _GroupChatPageState extends State<GroupChatPage> {
   // AFTER the unread separator captured.
   bool _didInitialMarkRead = false;
 
+  String? _groupAvatarUrl;
+
+
   @override
   void initState() {
     super.initState();
@@ -144,6 +152,8 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
     // Init room (presence + listen) — DO NOT mark read here immediately
     _initGroupRoom();
+
+    _groupAvatarUrl = widget.avatarUrl;
 
     // Auto-scroll when keyboard opens
     _focusNode.addListener(() {
@@ -480,6 +490,36 @@ class _GroupChatPageState extends State<GroupChatPage> {
     );
   }
 
+  Widget _buildGroupAvatar({double size = 34}) {
+    final cs = Theme.of(context).colorScheme;
+    final url = (_groupAvatarUrl ?? '').trim();
+
+    // ✅ Same fallback logic as MyGroupTile:
+    // - image if available
+    // - else show first letter of group name
+    final rawName = widget.groupName.trim();
+    final initial = rawName.isNotEmpty ? rawName[0].toUpperCase() : 'G';
+
+    return CircleAvatar(
+      radius: size / 2,
+      backgroundColor: url.isNotEmpty
+          ? cs.surfaceContainerHighest
+          : cs.primary.withValues(alpha: 0.12),
+      backgroundImage: url.isNotEmpty ? NetworkImage(url) : null,
+      child: url.isEmpty
+          ? Text(
+        initial,
+        style: TextStyle(
+          color: cs.primary,
+          fontWeight: FontWeight.w600,
+        ),
+      )
+          : null,
+    );
+  }
+
+
+
   Future<void> _confirmLeaveGroup() async {
     if (_currentUserId.isEmpty) return;
 
@@ -613,6 +653,45 @@ class _GroupChatPageState extends State<GroupChatPage> {
       await _loadMembers();
     }
   }
+
+  Future<void> _changeGroupPhoto() async {
+    if (!_isCurrentUserAdmin) return;
+
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
+
+      if (picked == null) return;
+
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
+      // ✅ you will add this method in ChatProvider + ChatService (below)
+      final newUrl = await chatProvider.updateGroupAvatar(
+        chatRoomId: widget.chatRoomId,
+        filePath: picked.path,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _groupAvatarUrl = newUrl; // ✅ update appbar instantly
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Group photo updated.'.tr())),
+      );
+    } catch (e) {
+      debugPrint('Error changing group photo: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update group photo.'.tr())),
+      );
+    }
+  }
+
 
   // ---------------------------------------------------------------------------
   // Scroll
@@ -1182,27 +1261,36 @@ class _GroupChatPageState extends State<GroupChatPage> {
             '${_selectedMessageIds.length} ${"selected".tr()}',
             style: const TextStyle(fontWeight: FontWeight.w600),
           )
-              : Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+              : Row(
             children: [
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  appBarTitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-              Text(
-                subtitleText,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: colorScheme.primary.withValues(alpha: 0.7),
+              _buildGroupAvatar(size: 34),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        appBarTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15, // ✅ smaller title text
+                          height: 1.1,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      subtitleText,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.primary.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -1231,6 +1319,9 @@ class _GroupChatPageState extends State<GroupChatPage> {
                     break;
                   case _GroupMenuAction.addMembers:
                     await _openAddMembers();
+                    break;
+                  case _GroupMenuAction.changeGroupPhoto:
+                    await _changeGroupPhoto();
                     break;
                   case _GroupMenuAction.leaveGroup:
                     await _confirmLeaveGroup();
@@ -1273,6 +1364,23 @@ class _GroupChatPageState extends State<GroupChatPage> {
                           ),
                           const SizedBox(width: 12),
                           Text('Add members'.tr()),
+                        ],
+                      ),
+                    ),
+                  );
+
+                  items.add(
+                    PopupMenuItem(
+                      value: _GroupMenuAction.changeGroupPhoto,
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.photo_camera_back_outlined,
+                            size: 20,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(width: 12),
+                          Text('Change group photo'.tr()),
                         ],
                       ),
                     ),

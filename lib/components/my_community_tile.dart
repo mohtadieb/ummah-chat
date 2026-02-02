@@ -6,6 +6,9 @@ class MyCommunityTile extends StatelessWidget {
   final String? description;
   final String? country;
 
+  /// ✅ NEW: avatar url (public url from storage)
+  final String? avatarUrl;
+
   /// Tap handler → open community posts page
   final VoidCallback onTap;
 
@@ -14,12 +17,18 @@ class MyCommunityTile extends StatelessWidget {
     required this.name,
     this.description,
     this.country,
+    this.avatarUrl, // ✅ NEW
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+
+    final url = (avatarUrl ?? '').trim();
+
+    // ✅ Optional cache-bust so new image shows immediately if URL is reused
+    final cacheBustedUrl = url.isNotEmpty ? '$url?t=${DateTime.now().millisecondsSinceEpoch}' : '';
 
     return MyCardTile(
       onTap: onTap,
@@ -35,7 +44,24 @@ class MyCommunityTile extends StatelessWidget {
               color: colorScheme.secondary.withValues(alpha: 0.5),
             ),
             alignment: Alignment.center,
-            child: Icon(
+            child: url.isNotEmpty
+                ? ClipOval(
+              child: Image.network(
+                cacheBustedUrl,
+                width: 40,
+                height: 40,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) {
+                  // fallback on error
+                  return Icon(
+                    Icons.groups_2,
+                    size: 22,
+                    color: colorScheme.primary,
+                  );
+                },
+              ),
+            )
+                : Icon(
               Icons.groups_2,
               size: 22,
               color: colorScheme.primary,

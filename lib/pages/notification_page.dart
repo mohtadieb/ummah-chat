@@ -222,6 +222,18 @@ class _NotificationPageState extends State<NotificationPage> {
   }) async {
     if (chatRoomId.trim().isEmpty) return;
 
+    // ✅ NEW: prevent "ghost rooms"
+    final exists = await ChatService().groupRoomExistsInDatabase(chatRoomId.trim());
+    if (!exists) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('This group is no longer available.'.tr()),
+        ),
+      );
+      return;
+    }
+
     final currentUserId = AuthService().getCurrentUserId();
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
@@ -236,8 +248,8 @@ class _NotificationPageState extends State<NotificationPage> {
     final String passedGroupName = (fallbackGroupName.trim().isNotEmpty)
         ? fallbackGroupName.trim()
         : ((ctx?['name']?.toString().trim().isNotEmpty == true)
-              ? ctx!['name'].toString().trim()
-              : 'Group'.tr());
+        ? ctx!['name'].toString().trim()
+        : 'Group'.tr());
 
     if (currentUserId.isNotEmpty) {
       await chatProvider.setActiveChatRoom(
@@ -253,8 +265,6 @@ class _NotificationPageState extends State<NotificationPage> {
           builder: (_) => GroupChatPage(
             chatRoomId: chatRoomId,
             groupName: passedGroupName,
-
-            // ✅ pass context fields so GroupChatPage computes title correctly
             contextType: ctx?['context_type']?.toString(),
             manId: ctx?['man_id']?.toString(),
             womanId: ctx?['woman_id']?.toString(),
@@ -273,6 +283,7 @@ class _NotificationPageState extends State<NotificationPage> {
       }
     }
   }
+
 
   // --------- OPTIMISTIC HELPERS ---------
 

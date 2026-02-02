@@ -353,6 +353,7 @@ class _GroupsPageState extends State<GroupsPage> {
                                         builder: (_) => GroupChatPage(
                                           chatRoomId: groupId,
                                           groupName: rawGroupName, // keep raw so L10N: still works
+                                          avatarUrl: avatarUrl, // ✅ add this
                                           contextType: group['context_type']?.toString(),
                                           manId: group['man_id']?.toString(),
                                           womanId: group['woman_id']?.toString(),

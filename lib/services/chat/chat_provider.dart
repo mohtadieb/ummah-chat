@@ -486,6 +486,17 @@ class ChatProvider with ChangeNotifier {
     );
   }
 
+  Future<String> updateGroupAvatar({
+    required String chatRoomId,
+    required String filePath,
+  }) {
+    return _chatService.updateGroupAvatarInDatabase(
+      chatRoomId: chatRoomId,
+      filePath: filePath,
+    );
+  }
+
+
   // ---------------------------------------------------------------------------
   // LIFECYCLE
   // ---------------------------------------------------------------------------

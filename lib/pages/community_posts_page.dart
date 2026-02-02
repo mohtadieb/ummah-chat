@@ -20,8 +20,9 @@ import 'create_post_page.dart';
 enum _CommunityMenuAction {
   viewMembers,
   joinCommunity,
-  leaveCommunity,
   inviteMembers,
+  changeCommunityPhoto, // ✅ NEW
+  leaveCommunity,
   deleteCommunity,
 }
 
@@ -29,6 +30,7 @@ class CommunityPostsPage extends StatefulWidget {
   final String communityId;
   final String communityName;
   final String? communityDescription;
+  final String? communityAvatarUrl;
 
   final bool openedFromInvite;
 
@@ -37,6 +39,7 @@ class CommunityPostsPage extends StatefulWidget {
     required this.communityId,
     required this.communityName,
     this.communityDescription,
+    this.communityAvatarUrl,
     this.openedFromInvite = false,
   });
 
@@ -74,6 +77,8 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
 
   String get _myId => databaseProvider.currentUserId;
 
+  String? _communityAvatarUrl;
+
   @override
   void initState() {
     super.initState();
@@ -90,6 +95,13 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
       _hasPendingInvite = false;
     }
     _loadPendingInviteState();
+
+    // ✅ Use passed avatar (fast path)
+    _communityAvatarUrl = widget.communityAvatarUrl;
+
+    // ✅ Optional: if avatar not passed, fetch it from DB
+    // (so appbar still gets it even when opened from notification/invite)
+    _loadCommunityAvatarIfMissing();
   }
 
   void _goToMyProfileInMainLayout() {
@@ -158,6 +170,89 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
     }
   }
 
+  Future<void> _loadCommunityAvatarIfMissing() async {
+    // only fetch if we don't already have one
+    final current = (_communityAvatarUrl ?? '').trim();
+    if (current.isNotEmpty) return;
+
+    try {
+      final c = await databaseProvider.getCommunityById(widget.communityId);
+      final url = (c?['avatar_url'] ?? '').toString().trim();
+      if (!mounted) return;
+
+      if (url.isNotEmpty) {
+        setState(() => _communityAvatarUrl = url);
+      }
+    } catch (e) {
+      debugPrint('Error loading community avatar: $e');
+    }
+  }
+
+  Widget _buildCommunityAvatar(ColorScheme colorScheme) {
+    const radius = 18.0;
+
+    final url = (_communityAvatarUrl ?? '').trim();
+
+    if (url.isNotEmpty) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundImage: NetworkImage(url),
+      );
+    }
+
+    final initial = widget.communityName.trim().isNotEmpty
+        ? widget.communityName.trim()[0].toUpperCase()
+        : 'C';
+
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: colorScheme.primary.withValues(alpha: 0.12),
+      child: Text(
+        initial,
+        style: TextStyle(
+          color: colorScheme.primary,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _changeCommunityPhoto() async {
+    if (!_isOwner) return;
+
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
+
+      if (picked == null) return;
+
+      final newUrl = await databaseProvider.updateCommunityAvatar(
+        communityId: widget.communityId,
+        filePath: picked.path,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _communityAvatarUrl = newUrl; // ✅ update appbar instantly
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Community photo updated.'.tr())),
+      );
+    } catch (e) {
+      debugPrint('Error changing community photo: $e');
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update community photo.'.tr())),
+      );
+    }
+  }
+
   Future<void> _loadMembers() async {
     setState(() => _isLoadingMembers = true);
 
@@ -168,7 +263,8 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
 
       final members = rawMembers.map((member) {
         final createdAt = member['created_at'] != null
-            ? DateTime.tryParse(member['created_at'].toString()) ?? DateTime.now()
+            ? DateTime.tryParse(member['created_at'].toString()) ??
+            DateTime.now()
             : DateTime.now();
 
         return UserProfile(
@@ -203,7 +299,6 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
       setState(() => _isLoadingMembers = false);
     }
   }
-
 
   Future<void> _openMembersBottomSheet() async {
     await _loadMembers();
@@ -392,11 +487,11 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
                           final filtered = query.isEmpty
                               ? friends
                               : friends.where((f) {
-                                  final name = (f.name).toLowerCase();
-                                  final username = (f.username).toLowerCase();
-                                  return name.contains(query) ||
-                                      username.contains(query);
-                                }).toList();
+                            final name = (f.name).toLowerCase();
+                            final username = (f.username).toLowerCase();
+                            return name.contains(query) ||
+                                username.contains(query);
+                          }).toList();
 
                           if (filtered.isEmpty) {
                             return Center(
@@ -438,15 +533,15 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
                               return ListTile(
                                 leading: CircleAvatar(
                                   backgroundImage:
-                                      (friend.profilePhotoUrl ?? '').isNotEmpty
+                                  (friend.profilePhotoUrl ?? '').isNotEmpty
                                       ? NetworkImage(friend.profilePhotoUrl!)
                                       : null,
                                   child: (friend.profilePhotoUrl ?? '').isEmpty
                                       ? Text(
-                                          friend.name.isNotEmpty
-                                              ? friend.name[0]
-                                              : '?',
-                                        )
+                                    friend.name.isNotEmpty
+                                        ? friend.name[0]
+                                        : '?',
+                                  )
                                       : null,
                                 ),
                                 title: Text(
@@ -462,68 +557,65 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
                                   onPressed: disabled
                                       ? null
                                       : () async {
-                                          // ✅ instant feedback
-                                          setModalState(() {
-                                            invitingIds.add(friendId);
-                                          });
+                                    // ✅ instant feedback
+                                    setModalState(() {
+                                      invitingIds.add(friendId);
+                                    });
 
-                                          try {
-                                            final inviterName =
-                                                _inviterName.trim().isNotEmpty
-                                                ? _inviterName.trim()
-                                                : 'Someone'.tr(); // fallback
+                                    try {
+                                      final inviterName =
+                                      _inviterName.trim().isNotEmpty
+                                          ? _inviterName.trim()
+                                          : 'Someone'.tr(); // fallback
 
-                                            await databaseProvider
-                                                .inviteUserToCommunity(
-                                                  widget.communityId,
-                                                  friendId,
-                                                  widget.communityName,
-                                                  inviterName,
-                                                );
+                                      await databaseProvider
+                                          .inviteUserToCommunity(
+                                        widget.communityId,
+                                        friendId,
+                                        widget.communityName,
+                                        inviterName,
+                                      );
 
-                                            // ✅ optimistic disable button
-                                            setModalState(() {
-                                              invitingIds.remove(friendId);
-                                              _pendingInviteIds.add(friendId);
-                                            });
+                                      // ✅ optimistic disable button
+                                      setModalState(() {
+                                        invitingIds.remove(friendId);
+                                        _pendingInviteIds.add(friendId);
+                                      });
 
-                                            if (!mounted) return;
-                                            ScaffoldMessenger.of(
-                                              this.context,
-                                            ).showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                  'community_invite_sent'.tr(),
-                                                ),
-                                              ),
-                                            );
-                                          } catch (e) {
-                                            // ❌ revert so button becomes clickable again
-                                            setModalState(() {
-                                              invitingIds.remove(friendId);
-                                            });
+                                      if (!mounted) return;
+                                      ScaffoldMessenger.of(this.context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'community_invite_sent'.tr(),
+                                          ),
+                                        ),
+                                      );
+                                    } catch (e) {
+                                      // ❌ revert so button becomes clickable again
+                                      setModalState(() {
+                                        invitingIds.remove(friendId);
+                                      });
 
-                                            if (!mounted) return;
-                                            ScaffoldMessenger.of(
-                                              this.context,
-                                            ).showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                  'community_invite_failed'
-                                                      .tr(),
-                                                ),
-                                              ),
-                                            );
-                                          }
-                                        },
+                                      if (!mounted) return;
+                                      ScaffoldMessenger.of(this.context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'community_invite_failed'.tr(),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
                                   child: isInviting
                                       ? const SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                          ),
-                                        )
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
                                       : Text(trailingText),
                                 ),
                               );
@@ -641,8 +733,7 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
       context: context,
       builder: (_) => AlertDialog(
         title: Text("delete_community_title".tr()),
-        content: Text("delete_community_warning".tr(),
-        ),
+        content: Text("delete_community_warning".tr()),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -669,9 +760,9 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
 
       if (!mounted) return;
       Navigator.pop(context); // leave CommunityPostsPage
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Community deleted.'.tr())));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Community deleted.'.tr())),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -683,8 +774,7 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
   Widget _buildInviteBanner(ColorScheme colorScheme) {
     if (!_inviteChecked) return const SizedBox.shrink();
     if (!_hasPendingInvite) return const SizedBox.shrink();
-    if (_isJoined)
-      return const SizedBox.shrink(); // already a member -> no banner
+    if (_isJoined) return const SizedBox.shrink(); // already a member -> no banner
 
     return Container(
       width: double.infinity,
@@ -730,8 +820,7 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
 
                   if (!mounted) return;
                   setState(() {
-                    _hasPendingInvite =
-                        false; // ensure hidden even if check slow
+                    _hasPendingInvite = false; // ensure hidden even if check slow
                   });
 
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -830,31 +919,42 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
         backgroundColor: colorScheme.surface,
         elevation: 0,
         centerTitle: false,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        title: Row(
           children: [
-            Text(
-              widget.communityName,
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: colorScheme.primary.withValues(alpha: 0.7),
-              ),
-            ),
-            if ((widget.communityDescription ?? '').trim().isNotEmpty)
-              Text(
-                widget.communityDescription!,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: colorScheme.primary.withValues(alpha: 0.7),
-                ),
-              ),
-            Text(
-              membersSubtitle,
-              style: TextStyle(
-                fontSize: 12,
-                color: colorScheme.primary.withValues(alpha: 0.7),
+            _buildCommunityAvatar(colorScheme),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.communityName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 21,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.primary.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  if ((widget.communityDescription ?? '').trim().isNotEmpty)
+                    Text(
+                      widget.communityDescription!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.primary.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  Text(
+                    membersSubtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colorScheme.primary.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -870,11 +970,14 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
                 case _CommunityMenuAction.joinCommunity:
                   await _joinCommunity();
                   break;
-                case _CommunityMenuAction.leaveCommunity:
-                  await _confirmLeaveCommunity();
-                  break;
                 case _CommunityMenuAction.inviteMembers:
                   await _openInviteFriendsSheet();
+                  break;
+                case _CommunityMenuAction.changeCommunityPhoto:
+                  await _changeCommunityPhoto();
+                  break;
+                case _CommunityMenuAction.leaveCommunity:
+                  await _confirmLeaveCommunity();
                   break;
                 case _CommunityMenuAction.deleteCommunity:
                   await _confirmDeleteCommunity();
@@ -884,16 +987,13 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
             itemBuilder: (context) {
               final items = <PopupMenuEntry<_CommunityMenuAction>>[];
 
+              // 1) View members (always)
               items.add(
                 PopupMenuItem(
                   value: _CommunityMenuAction.viewMembers,
                   child: Row(
                     children: [
-                      Icon(
-                        Icons.group_outlined,
-                        size: 20,
-                        color: colorScheme.primary,
-                      ),
+                      Icon(Icons.group_outlined, size: 20, color: colorScheme.primary),
                       const SizedBox(width: 12),
                       Text('View members'.tr()),
                     ],
@@ -901,26 +1001,8 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
                 ),
               );
 
-              items.add(const PopupMenuDivider());
-
-              if (_isJoined) {
-                items.add(
-                  PopupMenuItem(
-                    value: _CommunityMenuAction.leaveCommunity,
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.logout,
-                          size: 20,
-                          color: Colors.red.shade600,
-                        ),
-                        const SizedBox(width: 12),
-                        Text('Leave community'.tr()),
-                      ],
-                    ),
-                  ),
-                );
-              } else {
+              // 2) Join (only if NOT joined)
+              if (!_isJoined) {
                 items.add(
                   PopupMenuItem(
                     value: _CommunityMenuAction.joinCommunity,
@@ -935,39 +1017,68 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
                 );
               }
 
-              // ✅ Owner-only: Invite members
+              // 3) Owner-only: Invite members
               if (_isOwner) {
-                items.add(const PopupMenuDivider());
                 items.add(
                   PopupMenuItem(
                     value: _CommunityMenuAction.inviteMembers,
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.person_add_alt_1,
-                          size: 20,
-                          color: colorScheme.primary,
-                        ),
+                        Icon(Icons.person_add_alt_1, size: 20, color: colorScheme.primary),
                         const SizedBox(width: 12),
                         Text('community_invite_members'.tr()),
                       ],
                     ),
                   ),
                 );
-                items.add(const PopupMenuDivider());
+
+                // 4) Owner-only: Change photo
+                items.add(
+                  PopupMenuItem(
+                    value: _CommunityMenuAction.changeCommunityPhoto,
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.photo_camera_back_outlined,
+                          size: 20,
+                          color: colorScheme.primary,
+                        ),
+                        const SizedBox(width: 12),
+                        Text('Change community photo'.tr()),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              // 5) Leave community (joined, ABOVE delete)
+              if (_isJoined) {
+                items.add(
+                  PopupMenuItem(
+                    value: _CommunityMenuAction.leaveCommunity,
+                    child: Row(
+                      children: [
+                        Icon(Icons.logout, size: 20, color: Colors.red.shade600),
+                        const SizedBox(width: 12),
+                        Text('Leave community'.tr()),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              // 6) Delete community (owner-only, LAST)
+              if (_isOwner) {
                 items.add(
                   PopupMenuItem(
                     value: _CommunityMenuAction.deleteCommunity,
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.delete_outline,
-                          size: 20,
-                          color: Colors.red.shade600,
-                        ),
+                        Icon(Icons.delete_outline,
+                            size: 20, color: Colors.red.shade600),
                         const SizedBox(width: 12),
                         Text(
-                          "delete_community".tr(),
+                          'delete_community'.tr(),
                           style: const TextStyle(color: Colors.red),
                         ),
                       ],
@@ -978,25 +1089,26 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
 
               return items;
             },
+
           ),
         ],
       ),
       floatingActionButton: _isJoined
           ? FloatingActionButton(
-              backgroundColor: colorScheme.primary,
-              child: const Icon(Icons.add),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CreatePostPage(
-                      communityId: widget.communityId,
-                      communityName: widget.communityName,
-                    ),
-                  ),
-                );
-              },
-            )
+        backgroundColor: colorScheme.primary,
+        child: const Icon(Icons.add),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => CreatePostPage(
+                communityId: widget.communityId,
+                communityName: widget.communityName,
+              ),
+            ),
+          );
+        },
+      )
           : null,
       body: Column(
         children: [

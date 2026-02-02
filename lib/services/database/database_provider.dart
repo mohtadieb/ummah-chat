@@ -1307,6 +1307,22 @@ class DatabaseProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<String> updateCommunityAvatar({
+    required String communityId,
+    required String filePath,
+  }) async {
+    final url = await _db.updateCommunityAvatarInDatabase(
+      communityId: communityId,
+      filePath: filePath,
+    );
+
+    // ✅ refresh so CommunitiesPage shows it too
+    await getAllCommunities();
+
+    return url;
+  }
+
+
   /* ==================== STORY PROGRESS ==================== */
 
   final Set<String> _completedStoryIds = {};

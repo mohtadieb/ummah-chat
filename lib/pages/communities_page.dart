@@ -155,6 +155,7 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
                                 communityId: community['id'],
                                 communityName: community['name'] ?? '',
                                 communityDescription: community['description'],
+                                communityAvatarUrl: community['avatar_url'], // ✅ adjust field name
                               ),
                             ),
                           );
@@ -264,6 +265,7 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
                     name: community['name'] ?? '',
                     description: community['description'],
                     country: community['country'],
+                    avatarUrl: community['avatar_url'],
                     onTap: () {
                       Navigator.push(
                         context,
@@ -272,6 +274,7 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
                             communityId: community['id'],
                             communityName: community['name'] ?? '',
                             communityDescription: community['description'],
+                            communityAvatarUrl: community['avatar_url'], // ✅ adjust field name
                           ),
                         ),
                       );
