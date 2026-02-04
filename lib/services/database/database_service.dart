@@ -3501,4 +3501,23 @@ class DatabaseService {
 
     await _db.from('feedback').insert(payload);
   }
+
+// DatabaseService
+  Future<void> setProfileVisibilityInDatabase({required String visibility}) async {
+    final uid = AuthService().getCurrentUserId();
+
+    // safety normalize
+    final v = visibility.trim().toLowerCase();
+    if (v != 'everyone' && v != 'friends' && v != 'nobody') {
+      throw Exception('Invalid profile_visibility: $visibility');
+    }
+
+    await Supabase.instance.client
+        .from('profiles')
+        .update({'profile_visibility': v})
+        .eq('id', uid);
+  }
+
+
+
 }

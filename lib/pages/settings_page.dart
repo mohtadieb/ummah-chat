@@ -1,19 +1,16 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ummah_chat/components/my_loading_circle.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:easy_localization/easy_localization.dart'; // 👈 NEW
+import 'package:easy_localization/easy_localization.dart';
 
 import '../components/my_dialogs.dart';
 import '../components/my_settings_tile.dart';
 import '../helper/navigate_pages.dart';
-import '../services/auth/auth_gate.dart';
 import '../services/auth/auth_service.dart';
 import '../services/database/database_provider.dart';
 import '../services/localization/locale_sync_service.dart';
-import '../services/notifications/notification_service.dart';
 import '../themes/theme_provider.dart';
 import 'feedback_page.dart';
 
@@ -26,6 +23,17 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   final AuthService _auth = AuthService();
+
+  // ✅ Your app green (same as you use elsewhere)
+  static const Color _ummahGreen = Color(0xFF0F8254);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<DatabaseProvider>().hydrateMyProfileVisibility();
+    });
+  }
 
   Future<void> _logout() async {
     FocusScope.of(context).unfocus();
@@ -100,7 +108,6 @@ class _SettingsPageState extends State<SettingsPage> {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
-  // 👇 Helper: how to show locale names in the dropdown
   String _localeLabel(Locale locale) {
     switch (locale.languageCode) {
       case 'en':
@@ -114,21 +121,32 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  String _visibilityLabel(String v) {
+    switch (v.trim().toLowerCase()) {
+      case 'friends':
+        return 'Friends'.tr();
+      case 'nobody':
+        return 'Nobody'.tr();
+      case 'everyone':
+      default:
+        return 'Everyone'.tr();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
+    final cs = Theme.of(context).colorScheme;
 
-    // current & supported locales from EasyLocalization
     final currentLocale = context.locale;
     final supportedLocales = context.supportedLocales;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: cs.surface,
       appBar: AppBar(
-        // later you can do: 'settings_title'.tr()
         title: Text("Settings".tr()),
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        foregroundColor: Theme.of(context).colorScheme.primary,
+        backgroundColor: cs.surface,
+        foregroundColor: cs.primary,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: true,
@@ -140,50 +158,47 @@ class _SettingsPageState extends State<SettingsPage> {
             vertical: 20.0,
           ),
           children: [
-            // APPEARANCE SECTION
-            Text(
-              'Appearance'.tr(), // later: 'settings_appearance'.tr()
-              style: _sectionTitleStyle(context),
-            ),
+            Text('Appearance'.tr(), style: _sectionTitleStyle(context)),
             const SizedBox(height: 10),
 
-            // Dark mode toggle
             MySettingsTile(
-              title: "Dark Mode".tr(), // later: 'settings_dark_mode'.tr()
+              title: "Dark Mode".tr(),
               leadingIcon: Icons.dark_mode_outlined,
-
-              // ✅ Switch rows should NOT navigate on tile tap
-              enabled: false,
-
-              // ✅ New API: use trailing instead of onTap widget
+              enabled: true,
               trailing: CupertinoSwitch(
                 value: themeProvider.isDarkMode,
+                activeColor: _ummahGreen,
                 onChanged: (value) => themeProvider.toggleTheme(),
               ),
             ),
 
             const SizedBox(height: 10),
 
-            // 🌍 Language selector
             MySettingsTile(
-              title: "Language".tr(), // later: 'settings_language'.tr()
+              title: "Language".tr(),
               leadingIcon: Icons.language_outlined,
-
-              // ✅ Dropdown rows should NOT navigate on tile tap
-              enabled: false,
-
+              enabled: true,
               trailing: DropdownButton<Locale>(
                 value: currentLocale,
-                underline: const SizedBox(), // no blue underline
+                underline: const SizedBox(),
                 borderRadius: BorderRadius.circular(12),
+                dropdownColor: cs.surface,
+                style: TextStyle(
+                  color: cs.primary,
+                  fontWeight: FontWeight.w600,
+                ),
                 items: supportedLocales.map((locale) {
                   return DropdownMenuItem<Locale>(
                     value: locale,
-                    child: Text(_localeLabel(locale)),
+                    child: Text(
+                      _localeLabel(locale),
+                      style: TextStyle(
+                        color: cs.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   );
                 }).toList(),
-
-                // ✅ IMPORTANT: await locale save + rebuild
                 onChanged: (newLocale) async {
                   if (newLocale == null) return;
 
@@ -193,7 +208,6 @@ class _SettingsPageState extends State<SettingsPage> {
 
                   await context.setLocale(newLocale);
 
-                  // ✅ NEW: store language for push localization
                   await LocaleSyncService.syncLocaleToSupabase(context);
 
                   if (!mounted) return;
@@ -204,18 +218,12 @@ class _SettingsPageState extends State<SettingsPage> {
 
             const SizedBox(height: 24),
 
-            // PRIVACY & SAFETY SECTION
-            Text(
-              'Privacy & Safety'.tr(),
-              style: _sectionTitleStyle(context),
-            ),
+            Text('Privacy & Safety'.tr(), style: _sectionTitleStyle(context)),
             const SizedBox(height: 10),
 
             MySettingsTile(
               title: "Blocked Users".tr(),
               leadingIcon: Icons.block_outlined,
-
-              // ✅ Whole tile tap navigates
               onPressed: () async {
                 final databaseProvider = Provider.of<DatabaseProvider>(
                   context,
@@ -224,22 +232,63 @@ class _SettingsPageState extends State<SettingsPage> {
                 await databaseProvider.loadBlockedUsers();
                 goBlockedUsersPage(context);
               },
-
-              // ✅ Trailing icon just for visual hint (tile handles tap)
               trailing: Icon(
                 Icons.arrow_forward_ios_rounded,
                 size: 18,
-                color: Theme.of(context).colorScheme.primary,
+                color: cs.primary,
+              ),
+            ),
+
+            const SizedBox(height: 10),
+
+            // ✅ Profile visibility dropdown (replaces private toggle)
+            MySettingsTile(
+              title: "Profile visibility".tr(),
+              leadingIcon: Icons.visibility_outlined,
+              enabled: true,
+              trailing: Consumer<DatabaseProvider>(
+                builder: (_, db, __) {
+                  final v = (db.profileVisibility).trim().toLowerCase();
+                  final safeV = (v == 'friends' || v == 'nobody' || v == 'everyone')
+                      ? v
+                      : 'everyone';
+
+                  return DropdownButton<String>(
+                    value: safeV,
+                    underline: const SizedBox(),
+                    borderRadius: BorderRadius.circular(12),
+                    dropdownColor: cs.surface,
+                    style: TextStyle(
+                      color: cs.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    items: [
+                      DropdownMenuItem(
+                        value: 'everyone',
+                        child: Text(_visibilityLabel('everyone')),
+                      ),
+                      DropdownMenuItem(
+                        value: 'friends',
+                        child: Text(_visibilityLabel('friends')),
+                      ),
+                      DropdownMenuItem(
+                        value: 'nobody',
+                        child: Text(_visibilityLabel('nobody')),
+                      ),
+                    ],
+                    onChanged: (val) async {
+                      if (val == null) return;
+                      if (val == safeV) return;
+                      await db.setProfileVisibility(visibility: val);
+                    },
+                  );
+                },
               ),
             ),
 
             const SizedBox(height: 24),
 
-            // ACCOUNT SECTION
-            Text(
-              'Account'.tr(),
-              style: _sectionTitleStyle(context),
-            ),
+            Text('Account'.tr(), style: _sectionTitleStyle(context)),
             const SizedBox(height: 10),
 
             MySettingsTile(
@@ -249,17 +298,13 @@ class _SettingsPageState extends State<SettingsPage> {
               trailing: Icon(
                 Icons.arrow_forward_ios_rounded,
                 size: 18,
-                color: Theme.of(context).colorScheme.primary,
+                color: cs.primary,
               ),
             ),
 
             const SizedBox(height: 24),
 
-            // SUPPORT SECTION
-            Text(
-              'Support'.tr(),
-              style: _sectionTitleStyle(context),
-            ),
+            Text('Support'.tr(), style: _sectionTitleStyle(context)),
             const SizedBox(height: 10),
 
             MySettingsTile(
@@ -269,13 +314,12 @@ class _SettingsPageState extends State<SettingsPage> {
               trailing: Icon(
                 Icons.arrow_forward_ios_rounded,
                 size: 18,
-                color: Theme.of(context).colorScheme.primary,
+                color: cs.primary,
               ),
             ),
 
             const SizedBox(height: 24),
 
-            // FEEDBACK (same spacing as other tiles/sections)
             MySettingsTile(
               title: 'Feedback'.tr(),
               leadingIcon: Icons.feedback_outlined,
@@ -288,20 +332,16 @@ class _SettingsPageState extends State<SettingsPage> {
               trailing: Icon(
                 Icons.arrow_forward_ios_rounded,
                 size: 18,
-                color: Theme.of(context).colorScheme.primary,
+                color: cs.primary,
               ),
             ),
 
             const SizedBox(height: 24),
 
-            // DANGER ZONE / LOGOUT
             Text(
               'Danger Zone'.tr(),
               style: _sectionTitleStyle(context).copyWith(
-                color: Theme.of(context)
-                    .colorScheme
-                    .error
-                    .withValues(alpha: 0.9),
+                color: cs.error.withValues(alpha: 0.9),
               ),
             ),
             const SizedBox(height: 10),
@@ -312,7 +352,7 @@ class _SettingsPageState extends State<SettingsPage> {
               onPressed: _logout,
               trailing: Icon(
                 Icons.logout,
-                color: Theme.of(context).colorScheme.error,
+                color: cs.error,
               ),
             ),
 

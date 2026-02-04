@@ -1578,5 +1578,47 @@ class DatabaseProvider extends ChangeNotifier {
     );
   }
 
+  // DatabaseProvider
+  String _profileVisibility = 'everyone';
+  String get profileVisibility => _profileVisibility;
+
+  Future<void> hydrateMyProfileVisibility() async {
+    final uid = AuthService().getCurrentUserId();
+    final me = await getUserProfile(uid);
+
+    // default to everyone if missing
+    _profileVisibility = (me?.profileVisibility ?? 'everyone')
+        .trim()
+        .toLowerCase();
+
+    if (_profileVisibility.isEmpty) _profileVisibility = 'everyone';
+
+    notifyListeners();
+  }
+
+  Future<void> setProfileVisibility({required String visibility}) async {
+    final prev = _profileVisibility;
+
+    final v = visibility.trim().toLowerCase();
+    if (v != 'everyone' && v != 'friends' && v != 'nobody') {
+      throw Exception('Invalid profile_visibility: $visibility');
+    }
+
+    _profileVisibility = v; // optimistic
+    notifyListeners();
+
+    try {
+      await _db.setProfileVisibilityInDatabase(visibility: v);
+
+      // refresh my cached profile if you cache it
+      final uid = AuthService().getCurrentUserId();
+      await getUserProfile(uid);
+      notifyListeners();
+    } catch (_) {
+      _profileVisibility = prev; // rollback
+      notifyListeners();
+      rethrow;
+    }
+  }
 
 }

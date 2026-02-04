@@ -309,6 +309,16 @@
   "Community photo updated.": "Communityfoto bijgewerkt.",
   "Change group photo": "Groepsfoto wijzigen",
   "Group photo updated.": "Groepsfoto bijgewerkt.",
+  "Private account": "Privéaccount",
+  "This account is private": "Dit account is privé",
+  "Only the owner can view this profile.": "Alleen de eigenaar kan dit profiel bekijken.",
+  "Profile visibility": "Profielzichtbaarheid",
+  "Everyone": "Iedereen",
+  "Nobody": "Niemand",
+  "Visible to: Everyone": "Zichtbaar voor: Iedereen",
+  "Visible to: Friends": "Zichtbaar voor: Vrienden",
+  "Visible to: Nobody": "Zichtbaar voor: Niemand",
+  "mahram_selected_waiting_confirmation": "Mahram geselecteerd. Wachten op bevestiging.",
 
 
   "Tap to view": "Tik om te bekijken",

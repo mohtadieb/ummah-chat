@@ -350,6 +350,16 @@
   "Community photo updated.": "Community photo updated.",
   "Change group photo": "Change group photo",
   "Group photo updated.": "Group photo updated.",
+  "Private account": "Private account",
+  "This account is private": "This account is private",
+  "Only the owner can view this profile.": "Only the owner can view this profile.",
+  "Profile visibility": "Profile visibility",
+  "Everyone": "Everyone",
+  "Nobody": "Nobody",
+  "Visible to: Everyone": "Visible to: Everyone",
+  "Visible to: Friends": "Visible to: Friends",
+  "Visible to: Nobody": "Visible to: Nobody",
+  "mahram_selected_waiting_confirmation": "Mahram selected. Waiting for confirmation.",
 
 
 

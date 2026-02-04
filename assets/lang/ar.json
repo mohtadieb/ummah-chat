@@ -270,6 +270,16 @@
   "Community photo updated.": "تم تحديث صورة المجتمع.",
   "Change group photo": "تغيير صورة المجموعة",
   "Group photo updated.": "تم تحديث صورة المجموعة.",
+  "Private account": "حساب خاص",
+  "This account is private": "هذا الحساب خاص",
+  "Only the owner can view this profile.": "يمكن لمالك الحساب فقط عرض هذا الملف الشخصي.",
+  "Profile visibility": "خصوصية الملف الشخصي",
+  "Everyone": "الجميع",
+  "Nobody": "لا أحد",
+  "Visible to: Everyone": "مرئي لـ: الجميع",
+  "Visible to: Friends": "مرئي لـ: الأصدقاء",
+  "Visible to: Nobody": "مرئي لـ: لا أحد",
+  "mahram_selected_waiting_confirmation": "تم اختيار المحرم. في انتظار التأكيد.",
 
 
   "New password": "كلمة المرور الجديدة",

@@ -7,20 +7,24 @@ class UserProfile {
   final String profilePhotoUrl;
   final DateTime createdAt;
 
-  /// 🆕 Country (set on CompleteProfilePage)
+  /// Country (set on CompleteProfilePage)
   final String country;
 
-  /// 🆕 City (editable in "About me")
+  /// City (editable in "About me")
   final String? city;
 
-  /// 🆕 Gender: "male" or "female"
+  /// Gender: "male" or "female"
   final String gender;
 
   final List<String> languages;
   final List<String> interests;
 
-  /// 🆕 When the user was last active in the app (UTC in Supabase)
+  /// When the user was last active in the app (UTC in Supabase)
   final DateTime? lastSeenAt;
+
+  /// ✅ NEW: profile visibility
+  /// Allowed values: 'everyone' | 'friends' | 'nobody'
+  final String profileVisibility;
 
   UserProfile({
     required this.id,
@@ -36,6 +40,7 @@ class UserProfile {
     this.gender = '',
     this.languages = const [],
     this.interests = const [],
+    this.profileVisibility = 'everyone', // ✅ default
   });
 
   /// 🟢 Derived convenience: "online" if active in the last 5 minutes
@@ -47,15 +52,18 @@ class UserProfile {
     return diff.inMinutes < 5;
   }
 
+  /// Convenience helpers for visibility
+  bool get isProfilePublic => profileVisibility == 'everyone';
+  bool get isProfileFriendsOnly => profileVisibility == 'friends';
+  bool get isProfileHidden => profileVisibility == 'nobody';
+
   /// Create a UserProfile from a Supabase row (Map)
   factory UserProfile.fromMap(Map<String, dynamic> map) {
     final createdAtRaw = map['created_at'];
     final lastSeenRaw = map['last_seen_at'];
 
     DateTime parseDate(dynamic value) {
-      if (value == null) {
-        return DateTime.now().toUtc();
-      }
+      if (value == null) return DateTime.now().toUtc();
       if (value is DateTime) return value.toUtc();
       return DateTime.parse(value.toString()).toUtc();
     }
@@ -67,7 +75,7 @@ class UserProfile {
     }
 
     return UserProfile(
-      id: map['id'] as String,
+      id: (map['id'] ?? '') as String,
       name: (map['name'] ?? '') as String,
       email: (map['email'] ?? '') as String,
       username: (map['username'] ?? '') as String,
@@ -78,12 +86,17 @@ class UserProfile {
       country: (map['country'] ?? '') as String,
       city: map['city'] as String?,
       gender: (map['gender'] ?? '') as String,
-      languages: List<String>.from(map['languages'] ?? []),
-      interests: List<String>.from(map['interests'] ?? []),
+      languages: List<String>.from(map['languages'] ?? const []),
+      interests: List<String>.from(map['interests'] ?? const []),
+
+      // ✅ NEW column
+      profileVisibility:
+      (map['profile_visibility'] as String?)?.trim().toLowerCase() ??
+          'everyone',
     );
   }
 
-  /// Convert to Map (e.g. if you ever want to upsert/update)
+  /// Convert to Map (e.g. for updates)
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -99,6 +112,9 @@ class UserProfile {
       'gender': gender,
       'languages': languages,
       'interests': interests,
+
+      // ✅ NEW field
+      'profile_visibility': profileVisibility,
     };
   }
 
@@ -117,6 +133,7 @@ class UserProfile {
     String? gender,
     List<String>? languages,
     List<String>? interests,
+    String? profileVisibility,
   }) {
     return UserProfile(
       id: id ?? this.id,
@@ -132,6 +149,7 @@ class UserProfile {
       gender: gender ?? this.gender,
       languages: languages ?? this.languages,
       interests: interests ?? this.interests,
+      profileVisibility: profileVisibility ?? this.profileVisibility,
     );
   }
 }
