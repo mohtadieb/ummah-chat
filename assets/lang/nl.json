@@ -319,7 +319,14 @@
   "Visible to: Friends": "Zichtbaar voor: Vrienden",
   "Visible to: Nobody": "Zichtbaar voor: Niemand",
   "mahram_selected_waiting_confirmation": "Mahram geselecteerd. Wachten op bevestiging.",
+  "onboarding_inquire_for_marriage_title": "Informeer naar een huwelijk",
+  "onboarding_inquire_for_marriage_subtitle": "Toon je intentie op een respectvolle manier en betrek families op de juiste wijze",
+  "search_users": "Zoek gebruikers",
 
+  "cannot_send_friend_request_visibility_nobody": "Je kunt geen vriendschapsverzoeken sturen zolang je profielzichtbaarheid op ‘Niemand’ staat. Pas je zichtbaarheid aan en probeer het opnieuw.",
+  "No friends to show yet.": "Nog geen vrienden om te tonen.",
+  "You can't view this profile": "Je kunt dit profiel niet bekijken",
+  "You are blocked by this user.": "Je bent door deze gebruiker geblokkeerd.",
 
   "Tap to view": "Tik om te bekijken",
   "Post not found": "Bericht niet gevonden",

@@ -76,9 +76,11 @@ class _ProfilePageState extends State<ProfilePage> {
   // loading..
   bool _isLoading = true;
 
-  // ✅ NEW: visibility gate flags
+  // ✅ visibility gate flags
   bool _isRestrictedForMe = false;
-  String _restrictedVisibility = ''; // 'friends' or 'nobody' (for UI text)
+  String _restrictedVisibility =
+      ''; // 'friends' / 'nobody' / 'blocked' (for UI text)
+  bool _isBlockedForMe = false;
 
   // isFollowing state
   bool _isFollowing = false;
@@ -117,19 +119,45 @@ class _ProfilePageState extends State<ProfilePage> {
   }) {
     if (_isOwnProfile) return true;
 
+    final rel = combinedRelationshipStatus.trim().toLowerCase();
+
     final v = profileVisibilityRaw.trim().toLowerCase();
     if (v == 'everyone' || v.isEmpty) return true;
 
     if (v == 'nobody') return false;
 
     if (v == 'friends') {
-      // ✅ only allow if actually friends/mahram
-      return combinedRelationshipStatus == 'accepted' ||
-          combinedRelationshipStatus == 'mahram';
+      // ✅ allow if actually friends/mahram
+      if (rel == 'accepted' || rel == 'mahram') return true;
+
+      // ✅ ALSO allow invited people (receiver side)
+      // This fixes: friends-only profile but the receiver can't open your profile to accept.
+      if (rel == 'pending_received' || rel == 'pending_mahram_received') {
+        return true;
+      }
+
+      // ✅ Optional but useful: inquiry pending received states should also be able to view
+      if (rel.startsWith('inquiry_pending_received')) return true;
+
+      return false;
     }
 
     // fallback: treat unknown values as public (safe)
     return true;
+  }
+
+  bool _myVisibilityIsNobody(UserProfile? me) {
+    final v = (me?.profileVisibility ?? '').trim().toLowerCase();
+    return v == 'nobody';
+  }
+
+  void _showCannotSendFriendRequestVisibilityNobody() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('cannot_send_friend_request_visibility_nobody'.tr()),
+      ),
+    );
   }
 
   @override
@@ -327,12 +355,20 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  Future<void> loadUser() async {
-    if (mounted) {
+  Future<void> loadUser({bool showGlobalLoader = true}) async {
+    if (mounted && showGlobalLoader) {
       setState(() {
         _isLoading = true;
         _isRestrictedForMe = false;
         _restrictedVisibility = '';
+        _isBlockedForMe = false;
+      });
+    } else if (mounted) {
+      // No global spinner, but still reset gate flags so the UI can update cleanly.
+      setState(() {
+        _isRestrictedForMe = false;
+        _restrictedVisibility = '';
+        _isBlockedForMe = false;
       });
     }
 
@@ -349,11 +385,20 @@ class _ProfilePageState extends State<ProfilePage> {
     if (!mounted) return;
 
     if (user == null) {
-      setState(() {
-        _isLoading = false;
-        _isRestrictedForMe = false;
-        _restrictedVisibility = '';
-      });
+      if (showGlobalLoader) {
+        setState(() {
+          _isLoading = false;
+          _isRestrictedForMe = false;
+          _restrictedVisibility = '';
+          _isBlockedForMe = false;
+        });
+      } else {
+        setState(() {
+          _isRestrictedForMe = false;
+          _restrictedVisibility = '';
+          _isBlockedForMe = false;
+        });
+      }
       return;
     }
 
@@ -362,8 +407,51 @@ class _ProfilePageState extends State<ProfilePage> {
     if (!mounted) return;
     _myGender = me?.gender;
 
-    // ✅ We need relationship status to decide friends-only visibility
-    // BUT keep your inquiryId override logic intact for _friendStatus.
+    // ✅ FIRST: load combined relationship for early block fallback
+    String earlyCombinedStatus = 'none';
+    if (!_isOwnProfile) {
+      try {
+        earlyCombinedStatus =
+        await databaseProvider.getCombinedRelationshipStatus(widget.userId);
+      } catch (_) {
+        earlyCombinedStatus = 'none';
+      }
+    }
+
+    // ✅ Directional block check (profile owner blocked viewer)
+    if (!_isOwnProfile) {
+      bool blockedByOwner = false;
+      try {
+        blockedByOwner = await databaseProvider.isViewerBlockedByUser(
+          profileOwnerId: widget.userId,
+          viewerId: currentUserId,
+        );
+      } catch (e, st) {
+        debugPrint('❌ isViewerBlockedByUser failed: $e\n$st');
+        blockedByOwner = false;
+      }
+
+      final bool blockedFallback =
+      (earlyCombinedStatus.trim().toLowerCase() == 'blocked');
+
+      debugPrint(
+        '🧱 BLOCK CHECK | owner=${widget.userId} viewer=$currentUserId | blockedByOwner=$blockedByOwner | earlyCombined=$earlyCombinedStatus | blockedFallback=$blockedFallback',
+      );
+
+      if (blockedByOwner || blockedFallback) {
+        // keep _friendStatus consistent for UI
+        setState(() {
+          _friendStatus = earlyCombinedStatus;
+          _isBlockedForMe = true;
+          _isRestrictedForMe = true;
+          _restrictedVisibility = 'blocked';
+          if (showGlobalLoader) _isLoading = false;
+        });
+        return;
+      }
+    }
+
+    // ✅ Relationship status for friends-only visibility + inquiry override
     final passedInquiryId = (widget.inquiryId ?? '').trim();
 
     if (passedInquiryId.isNotEmpty) {
@@ -396,23 +484,30 @@ class _ProfilePageState extends State<ProfilePage> {
 
     if (!mounted) return;
 
-    // ✅ Visibility gate (everyone/friends/nobody)
+    // ✅ Visibility gate (everyone/friends/nobody) + blocked override
     final visibilityRaw = (user!.profileVisibility).trim().toLowerCase();
+
+    final bool isBlockedNow =
+        (_friendStatus.trim().toLowerCase() == 'blocked') || _isBlockedForMe;
+
     final canView = _canViewProfileContentForMe(
       profileVisibilityRaw: visibilityRaw,
       combinedRelationshipStatus: _friendStatus,
     );
 
-    final restrictedNow = !_isOwnProfile && !canView;
+    final restrictedNow = !_isOwnProfile && (isBlockedNow || !canView);
 
     setState(() {
+      _isBlockedForMe = isBlockedNow;
       _isRestrictedForMe = restrictedNow;
-      _restrictedVisibility = restrictedNow ? visibilityRaw : '';
+      _restrictedVisibility = restrictedNow
+          ? (isBlockedNow ? 'blocked' : visibilityRaw)
+          : '';
     });
 
-    // ✅ If restricted, stop here (don’t load followers/following/posts/etc)
+    // ✅ If restricted, stop here
     if (restrictedNow) {
-      setState(() => _isLoading = false);
+      if (showGlobalLoader) setState(() => _isLoading = false);
       return;
     }
 
@@ -429,7 +524,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
     if (!mounted) return;
 
-    setState(() => _isLoading = false);
+    if (showGlobalLoader) setState(() => _isLoading = false);
   }
 
   void _showEditBioBox() {
@@ -649,9 +744,19 @@ class _ProfilePageState extends State<ProfilePage> {
         _friendStatus = updated;
         _isFriendActionBusy = false;
       });
+
+      // ✅ IMPORTANT: don't show full-page loader after button actions
+      // Only re-check the profile gate silently (needed for friends-only profiles)
+      final visibilityRaw = (user?.profileVisibility ?? '').trim().toLowerCase();
+      final bool mightBeGated = !_isOwnProfile && visibilityRaw == 'friends';
+
+      if (mightBeGated) {
+        await loadUser(showGlobalLoader: false);
+      }
     } catch (e, st) {
       debugPrint('❌ optimistic friend action failed: $e\n$st');
       if (!mounted) return;
+
       setState(() {
         _friendStatus = previous; // rollback
         _isFriendActionBusy = false;
@@ -722,6 +827,8 @@ class _ProfilePageState extends State<ProfilePage> {
     );
     if (!mounted) return;
     setState(() => _friendStatus = updated);
+
+    await loadUser();
   }
 
   void _goToMyProfileInMainLayout() {
@@ -732,6 +839,7 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _cancelMahramFromProfile() async {
     await databaseProvider.cancelMahramRequest(widget.userId);
     setState(() => _friendStatus = 'none');
+    await loadUser();
   }
 
   Future<void> _acceptMahramFromProfile() async {
@@ -774,9 +882,9 @@ class _ProfilePageState extends State<ProfilePage> {
         if (!mounted) return;
         setState(() => _friendStatus = updated);
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('mahram_accepted'.tr())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('mahram_accepted'.tr())));
       } else {
         if (mounted) setState(() => _friendStatus = 'none');
 
@@ -788,15 +896,17 @@ class _ProfilePageState extends State<ProfilePage> {
         if (!mounted) return;
         setState(() => _friendStatus = updated);
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('mahram_declined'.tr())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('mahram_declined'.tr())));
       }
+
+      await loadUser();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('something_went_wrong'.tr())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('something_went_wrong'.tr())));
     }
   }
 
@@ -807,6 +917,8 @@ class _ProfilePageState extends State<ProfilePage> {
     );
     if (!mounted) return;
     setState(() => _friendStatus = updated);
+
+    await loadUser();
   }
 
   bool _isOppositeGender({
@@ -991,12 +1103,14 @@ class _ProfilePageState extends State<ProfilePage> {
       debugPrint(
         '✅ Marriage inquiry created: $inquiryId | initiatedBy=$initiatedBy',
       );
+
+      await loadUser();
     } catch (e, st) {
       debugPrint('❌ _startMarriageInquiry failed: $e\n$st');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('something_went_wrong'.tr())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('something_went_wrong'.tr())));
     }
   }
 
@@ -1031,12 +1145,14 @@ class _ProfilePageState extends State<ProfilePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('mahram_selected_waiting_confirmation'.tr())),
       );
+
+      await loadUser();
     } catch (e, st) {
       debugPrint('❌ womanAcceptAndSelectMahramForInquiry failed: $e\n$st');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('something_went_wrong'.tr())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('something_went_wrong'.tr())));
     }
   }
 
@@ -1193,6 +1309,8 @@ class _ProfilePageState extends State<ProfilePage> {
     );
     if (!mounted) return;
     setState(() => _friendStatus = updated);
+
+    await loadUser();
   }
 
   Future<void> _confirmAndDeleteMahram({
@@ -1227,15 +1345,17 @@ class _ProfilePageState extends State<ProfilePage> {
     await dbProvider.deleteMahramRelationship(targetUserId);
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('mahram_removed'.tr())),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('mahram_removed'.tr())));
 
     final updated = await databaseProvider.getCombinedRelationshipStatus(
       widget.userId,
     );
     if (!mounted) return;
     setState(() => _friendStatus = updated);
+
+    await loadUser();
   }
 
   /// FRIENDS SECTION – horizontal row of friends
@@ -1266,7 +1386,9 @@ class _ProfilePageState extends State<ProfilePage> {
               elevation: 0,
               scrolledUnderElevation: 0,
             ),
-            body: isOwn ? const FriendsPage() : FriendsPage(userId: widget.userId),
+            body: isOwn
+                ? const FriendsPage()
+                : FriendsPage(userId: widget.userId),
           ),
         ),
       );
@@ -1419,13 +1541,15 @@ class _ProfilePageState extends State<ProfilePage> {
 
           // Show 11 friends + 1 "+X" tile if needed
           final bool hasMore = allFriends.length > maxTiles;
-          final int friendTilesCount = hasMore ? (maxTiles - 1) : allFriends.length;
+          final int friendTilesCount =
+          hasMore ? (maxTiles - 1) : allFriends.length;
 
           final visibleFriends = allFriends.take(friendTilesCount).toList();
           final int remainingCount = allFriends.length - friendTilesCount;
 
           // Total tiles in the horizontal row
-          final int itemCount = hasMore ? friendTilesCount + 1 : friendTilesCount;
+          final int itemCount =
+          hasMore ? friendTilesCount + 1 : friendTilesCount;
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1808,20 +1932,26 @@ class _ProfilePageState extends State<ProfilePage> {
     } else if (_isRestrictedForMe) {
       final cs = Theme.of(context).colorScheme;
 
+      final bool isBlocked =
+          _restrictedVisibility == 'blocked' || _isBlockedForMe;
       final bool isNobody = _restrictedVisibility == 'nobody';
       final bool isFriends = _restrictedVisibility == 'friends';
 
-      final String title = isNobody
+      final String title = isBlocked
+          ? "You can't view this profile".tr()
+          : (isNobody
           ? "This profile is hidden".tr()
           : (isFriends
           ? "Friends only profile".tr()
-          : "This profile is restricted".tr());
+          : "This profile is restricted".tr()));
 
-      final String subtitle = isNobody
+      final String subtitle = isBlocked
+          ? "You are blocked by this user.".tr()
+          : (isNobody
           ? "Only the owner can view this profile.".tr()
           : (isFriends
           ? "Only friends can view this profile.".tr()
-          : "You cannot view this profile.".tr());
+          : "You cannot view this profile.".tr()));
 
       bodyChild = Center(
         child: Padding(
@@ -1829,7 +1959,11 @@ class _ProfilePageState extends State<ProfilePage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.lock_outline, size: 44, color: cs.primary),
+              Icon(
+                isBlocked ? Icons.block_outlined : Icons.lock_outline,
+                size: 44,
+                color: cs.primary,
+              ),
               const SizedBox(height: 12),
               Text(
                 title,
@@ -1985,15 +2119,27 @@ class _ProfilePageState extends State<ProfilePage> {
                     child: MyFriendButton(
                       friendStatus: effectiveFriendStatus,
                       isBusy: _isFriendActionBusy,
+
+                      // ✅ ADD FRIEND (with visibility-nobody guard)
                       onAddFriend: (effectiveFriendStatus == 'request' ||
                           _isFriendActionBusy)
                           ? null
-                          : () => _runOptimisticFriendAction(
-                        optimisticStatus: 'pending_sent',
-                        action: () => databaseProvider.sendFriendRequest(
-                          widget.userId,
-                        ),
-                      ),
+                          : () async {
+                        // If MY profile visibility is "nobody", block sending friend request.
+                        final me =
+                        await databaseProvider.getUserProfile(currentUserId);
+                        if (_myVisibilityIsNobody(me)) {
+                          _showCannotSendFriendRequestVisibilityNobody();
+                          return;
+                        }
+
+                        await _runOptimisticFriendAction(
+                          optimisticStatus: 'pending_sent',
+                          action: () =>
+                              databaseProvider.sendFriendRequest(widget.userId),
+                        );
+                      },
+
                       onCancelRequest: () async {
                         if (_isFriendActionBusy) return;
 
@@ -2004,9 +2150,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           if (id == null) {
                             if (!mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('something_went_wrong'.tr()),
-                              ),
+                              SnackBar(content: Text('something_went_wrong'.tr())),
                             );
                             return;
                           }
@@ -2026,9 +2170,8 @@ class _ProfilePageState extends State<ProfilePage> {
                         if (_friendStatus == 'pending_mahram_sent') {
                           await _runOptimisticFriendAction(
                             optimisticStatus: 'none',
-                            action: () => databaseProvider.cancelMahramRequest(
-                              widget.userId,
-                            ),
+                            action: () =>
+                                databaseProvider.cancelMahramRequest(widget.userId),
                           );
                           return;
                         }
@@ -2053,9 +2196,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           if (id == null) {
                             if (!mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('something_went_wrong'.tr()),
-                              ),
+                              SnackBar(content: Text('something_went_wrong'.tr())),
                             );
                             return;
                           }
@@ -2092,6 +2233,8 @@ class _ProfilePageState extends State<ProfilePage> {
                               _friendStatus = updated;
                               _isFriendActionBusy = false;
                             });
+
+                            await loadUser();
                           } catch (e, st) {
                             debugPrint('❌ inquiry accept failed: $e\n$st');
                             if (!mounted) return;
@@ -2099,9 +2242,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               _isFriendActionBusy = false;
                             });
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('something_went_wrong'.tr()),
-                              ),
+                              SnackBar(content: Text('something_went_wrong'.tr())),
                             );
                           }
                           return;
@@ -2120,9 +2261,8 @@ class _ProfilePageState extends State<ProfilePage> {
                         if (_friendStatus == 'pending_received') {
                           await _runOptimisticFriendAction(
                             optimisticStatus: 'accepted',
-                            action: () => databaseProvider.acceptFriendRequest(
-                              widget.userId,
-                            ),
+                            action: () =>
+                                databaseProvider.acceptFriendRequest(widget.userId),
                           );
                           return;
                         }
@@ -2136,9 +2276,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           if (id == null) {
                             if (!mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('something_went_wrong'.tr()),
-                              ),
+                              SnackBar(content: Text('something_went_wrong'.tr())),
                             );
                             return;
                           }
@@ -2148,8 +2286,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           await _runOptimisticFriendAction(
                             optimisticStatus: 'none',
                             action: () async {
-                              if (prevStatus ==
-                                  'inquiry_pending_received_woman') {
+                              if (prevStatus == 'inquiry_pending_received_woman') {
                                 await databaseProvider.womanDeclineInquiry(
                                   inquiryId: id,
                                 );
@@ -2175,9 +2312,8 @@ class _ProfilePageState extends State<ProfilePage> {
                         if (_friendStatus == 'pending_mahram_received') {
                           await _runOptimisticFriendAction(
                             optimisticStatus: 'none',
-                            action: () => databaseProvider.declineMahramRequest(
-                              widget.userId,
-                            ),
+                            action: () =>
+                                databaseProvider.declineMahramRequest(widget.userId),
                           );
                           return;
                         }
@@ -2186,14 +2322,14 @@ class _ProfilePageState extends State<ProfilePage> {
                         if (_friendStatus == 'pending_received') {
                           await _runOptimisticFriendAction(
                             optimisticStatus: 'none',
-                            action: () => databaseProvider.declineFriendRequest(
-                              widget.userId,
-                            ),
+                            action: () =>
+                                databaseProvider.declineFriendRequest(widget.userId),
                           );
                           return;
                         }
                       },
-                      onUnfriend: _isFriendActionBusy ? null : _unfriendFromProfile,
+                      onUnfriend:
+                      _isFriendActionBusy ? null : _unfriendFromProfile,
                       onOpenRequestSheet: (effectiveFriendStatus == 'request')
                           ? () => _showOppositeGenderRequestSheet(
                         targetUserId: widget.userId,

@@ -280,6 +280,14 @@
   "Visible to: Friends": "مرئي لـ: الأصدقاء",
   "Visible to: Nobody": "مرئي لـ: لا أحد",
   "mahram_selected_waiting_confirmation": "تم اختيار المحرم. في انتظار التأكيد.",
+  "onboarding_inquire_for_marriage_title": "الاستفسار عن الزواج",
+  "onboarding_inquire_for_marriage_subtitle": "عبّر عن نيتك باحترام واشرك العائلات بالطريقة الصحيحة",
+  "cannot_send_friend_request_visibility_nobody": "لا يمكنك إرسال طلبات صداقة عندما تكون خصوصية الملف الشخصي مضبوطة على «لا أحد». غيّر إعداد الخصوصية ثم حاول مرة أخرى.",
+  "search_users": "البحث عن المستخدمين",
+  "No friends to show yet.": "لا يوجد أصدقاء لعرضهم حتى الآن.",
+
+  "You can't view this profile": "لا يمكنك عرض هذا الملف الشخصي",
+  "You are blocked by this user.": "لقد تم حظرك من قبل هذا المستخدم.",
 
 
   "New password": "كلمة المرور الجديدة",

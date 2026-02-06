@@ -1,3 +1,5 @@
+// lib/pages/follow_list_page.dart
+
 /*
 FOLLOW LIST PAGE
 
@@ -13,6 +15,8 @@ import 'package:provider/provider.dart';
 import '../components/my_user_tile.dart';
 import '../models/user_profile.dart';
 import '../services/database/database_provider.dart';
+import '../helper/navigate_pages.dart';
+import '../services/auth/auth_service.dart';
 
 class FollowListPage extends StatefulWidget {
   final String userId;
@@ -53,23 +57,37 @@ class _FollowListPageState extends State<FollowListPage> {
   Widget _buildUserList(List<UserProfile> userList, String emptyMessage) {
     return userList.isEmpty
         ?
-          // empty message if there are no users
-          Center(child: Text(emptyMessage))
+    // empty message if there are no users
+    Center(child: Text(emptyMessage))
         :
-          // user list
-          ListView.builder(
-            itemCount: userList.length,
-            itemBuilder: (context, index) {
-              final user = userList[index];
-              return MyUserTile(user: user);
-            },
-          );
+    // user list
+    ListView.builder(
+      itemCount: userList.length,
+      itemBuilder: (context, index) {
+        final user = userList[index];
+
+        return MyUserTile(
+          user: user,
+          onTap: () {
+            final currentUserId = AuthService().getCurrentUserId();
+
+            // ✅ If the tapped user is me → jump to MainLayout Profile tab
+            if (user.id == currentUserId) {
+              goToOwnProfileTab(context);
+              return;
+            }
+
+            // otherwise → normal profile navigation
+            goUserPage(context, user.id);
+          },
+        );
+      },
+    );
   }
 
   // BUILD UI
   @override
   Widget build(BuildContext context) {
-
     // listen to followers & following
     final followers = listeningProvider.getListOfFollowerProfiles(
       widget.userId,

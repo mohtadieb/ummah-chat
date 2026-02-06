@@ -675,6 +675,9 @@ class DatabaseProvider extends ChangeNotifier {
     try {
       await _db.blockUserInDatabase(userId);
 
+      // ✅ also remove from friends
+      await _db.unfriendUserInDatabase(userId);
+
       await loadBlockedUsers();
       await loadAllPosts();
     } catch (e) {
@@ -689,9 +692,26 @@ class DatabaseProvider extends ChangeNotifier {
     await loadAllPosts();
   }
 
+  Future<bool> isViewerBlockedByUser({
+    required String profileOwnerId,
+    required String viewerId,
+  }) async {
+    return _db.isViewerBlockedByUserInDatabase(
+      profileOwnerId: profileOwnerId,
+      viewerId: viewerId,
+    );
+  }
+
+
+
   Future<void> reportUser(String postId, String userId) async {
     await _db.reportUserInDatabase(postId, userId);
   }
+
+  Future<void> reportUserFromChat(String reportedUserId) async {
+    await _db.reportUserFromChatInDatabase(reportedUserId);
+  }
+
 
   /* ==================== FRIENDS ==================== */
 

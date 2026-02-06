@@ -39,8 +39,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
       subtitleKey: 'onboarding_stories_subtitle',
       assetPath: 'assets/images/onboarding_stories_communities.png',
     ),
+    _OnboardingData(
+      titleKey: 'onboarding_inquire_for_marriage_title',
+      subtitleKey: 'onboarding_inquire_for_marriage_subtitle',
+      assetPath: 'assets/images/onboarding_inquire_for_marriage.png',
+    ),
   ];
-
   void _goNext() {
     if (_currentIndex < _pages.length - 1) {
       _controller.nextPage(

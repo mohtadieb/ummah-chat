@@ -101,7 +101,7 @@ class _SearchPageState extends State<SearchPage> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
             child: MySearchBar(
               controller: _searchController,
-              hintText: 'Search users'.tr(),
+              hintText: 'search_users'.tr(),
               onChanged: (value) {
                 _onSearchChanged(value);
               },

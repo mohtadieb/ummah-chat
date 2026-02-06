@@ -762,6 +762,19 @@ class DatabaseService {
     }
   }
 
+  Future<void> reportUserFromChatInDatabase(String reportedUserId) async {
+    final currentUserId = AuthService().getCurrentUserId();
+    if (currentUserId.isEmpty) return;
+
+    await _db.from('reports').insert({
+      'reporter_id': currentUserId,
+      'reported_user_id': reportedUserId,
+      'source': 'chat',
+      'created_at': DateTime.now().toIso8601String(),
+    });
+  }
+
+
   /// Block user in database
   Future<void> blockUserInDatabase(String userId) async {
     try {
@@ -834,6 +847,31 @@ class DatabaseService {
       return [];
     }
   }
+
+  /// Returns true if `profileOwnerId` blocked `viewerId`.
+  /// i.e. viewer should NOT see profileOwner's profile.
+  Future<bool> isViewerBlockedByUserInDatabase({
+    required String profileOwnerId,
+    required String viewerId,
+  }) async {
+    try {
+      // Select a column that exists. We only need "any row exists".
+      final row = await _db
+          .from('blocks')
+          .select('blocker_id')
+          .eq('blocker_id', profileOwnerId)
+          .eq('blocked_id', viewerId)
+          .maybeSingle();
+
+      return row != null;
+    } catch (e, st) {
+      debugPrint('❌ isViewerBlockedByUserInDatabase: $e\n$st');
+      return false;
+    }
+  }
+
+
+
 
   /// EXTRA: remove mutual likes when blocking
   Future<void> removeLikesBetweenUsers(

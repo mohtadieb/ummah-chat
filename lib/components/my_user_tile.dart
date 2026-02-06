@@ -1,3 +1,4 @@
+// lib/components/my_user_tile.dart
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import '../models/user_profile.dart';
@@ -8,10 +9,15 @@ class MyUserTile extends StatelessWidget {
   final UserProfile user;
   final String? customTitle;
 
+  /// ✅ NEW: optional custom tap handler
+  /// If null, defaults to opening ProfilePage(userId: user.id)
+  final VoidCallback? onTap;
+
   const MyUserTile({
     super.key,
     required this.user,
     this.customTitle,
+    this.onTap,
   });
 
   String _getInitials() {
@@ -35,7 +41,8 @@ class MyUserTile extends StatelessWidget {
     }
 
     return MyCardTile(
-      onTap: goToProfile,
+      // ✅ if provided, use custom onTap, otherwise default to goToProfile
+      onTap: onTap ?? goToProfile,
       child: Row(
         children: [
           // 👤 Avatar — tap handled by MyCardTile.onTap
@@ -46,8 +53,7 @@ class MyUserTile extends StatelessWidget {
           )
               : CircleAvatar(
             radius: 22,
-            backgroundColor:
-            colorScheme.primary.withValues(alpha: 0.12),
+            backgroundColor: colorScheme.primary.withValues(alpha: 0.12),
             child: Text(
               _getInitials(),
               style: TextStyle(
@@ -75,7 +81,8 @@ class MyUserTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 3),
-                Text('@${user.username}',
+                Text(
+                  '@${user.username}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
