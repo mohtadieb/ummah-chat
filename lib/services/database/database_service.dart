@@ -1076,6 +1076,19 @@ class DatabaseService {
     }
   }
 
+  /// ✅ True if me & otherUserId are currently connected (friends OR mahram).
+  /// Uses existing getFriendshipStatusFromDatabase so we don't duplicate queries.
+  Future<bool> areWeConnectedInDatabase(String otherUserId) async {
+    final other = otherUserId.trim();
+    if (other.isEmpty) return false;
+
+    final status = await getFriendshipStatusFromDatabase(other);
+
+    // accepted friend OR accepted mahram = "connected"
+    return status == 'accepted' || status == 'mahram';
+  }
+
+
   /// Send a friend request from current user to [targetUserId]
   ///
   /// - Does nothing if any friendship row already exists between the two users.
@@ -1341,21 +1354,20 @@ class DatabaseService {
     if (currentUserId == otherUserId) return;
 
     try {
-      // 1️⃣ Remove the accepted friendship in either direction
-      await _db
-          .from('friendships')
-          .delete()
-          .eq('status', 'accepted')
-          .or(
-            'and(requester_id.eq.$currentUserId,addressee_id.eq.$otherUserId),'
-            'and(requester_id.eq.$otherUserId,addressee_id.eq.$currentUserId)',
-          );
+      // ✅ Correct for supabase_flutter where rpc() only accepts 1 positional argument
+      await _db.rpc('unfriend_and_cleanup_dm', params: {
+        'other_user_id': otherUserId,
+      });
 
-      print('✅ Unfriended $otherUserId');
+
+
+      print('✅ Unfriended $otherUserId + deleted DM chat room (messages should cascade)');
     } catch (e) {
       print('❌ Error unfriending user $otherUserId: $e');
     }
   }
+
+
 
   /// ✅ Get accepted friend IDs for [userId]
   /// Returns the "other" user for each accepted friendship.

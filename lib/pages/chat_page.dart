@@ -41,6 +41,8 @@ class ChatPage extends StatefulWidget {
   final String friendName;
   final String? initialDraftMessage;
   final bool sendDraftOnOpen;
+  final bool allowCreateRoom;
+
 
   const ChatPage({
     super.key,
@@ -48,6 +50,8 @@ class ChatPage extends StatefulWidget {
     required this.friendName,
     this.initialDraftMessage,
     this.sendDraftOnOpen = false,
+    this.allowCreateRoom = true, // ✅ default keeps current behavior
+
   });
 
   @override
@@ -67,6 +71,9 @@ class _ChatPageState extends State<ChatPage> {
   late final String _currentUserId;
 
   String? _chatRoomId;
+
+  bool _canChat = true;
+
 
   // 👤 Friend profile (for Online / Last seen)
   UserProfile? _friendProfile;
@@ -186,18 +193,59 @@ class _ChatPageState extends State<ChatPage> {
   Future<void> _initChatRoom() async {
     if (_currentUserId.isEmpty) return;
 
-    final chatRoomId = await _chatProvider.getOrCreateChatRoomId(
-      _currentUserId,
-      widget.friendId,
-    );
+    final db = context.read<DatabaseProvider>();
+
+    // ✅ 1) Check if we are still connected (friends OR mahram)
+    final connected = await db.areWeConnected(widget.friendId);
 
     if (!mounted) return;
 
+    // If not connected: never create rooms (prevents ghost rooms)
+    if (!connected) {
+      setState(() {
+        _canChat = false;
+        _chatRoomId = null;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('You are no longer connected.'.tr())),
+      );
+
+      Navigator.of(context).pop();
+      return;
+    }
+
+    // ✅ 2) Only now proceed with existing/create logic
+    String? chatRoomId;
+
+    if (widget.allowCreateRoom) {
+      chatRoomId = await _chatProvider.getOrCreateChatRoomId(
+        _currentUserId,
+        widget.friendId,
+      );
+    } else {
+      chatRoomId = await _chatProvider.getExistingChatRoomId(
+        _currentUserId,
+        widget.friendId,
+      );
+    }
+
+    if (!mounted) return;
+
+    if (chatRoomId == null || chatRoomId.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Chat no longer exists.'.tr())),
+      );
+      Navigator.of(context).pop();
+      return;
+    }
+
     setState(() {
       _chatRoomId = chatRoomId;
+      _canChat = true;
     });
 
-    // ✅ UI-only suppression: hide notif while this DM is open
+    // ✅ UI-only suppression
     _notifService.setActiveChatRoomId(chatRoomId);
     _notifService.setActiveDmFriendId(widget.friendId);
 
@@ -209,18 +257,13 @@ class _ChatPageState extends State<ChatPage> {
 
     await _chatProvider.listenToRoom(chatRoomId);
 
-    // ============================================================
-    // ✅ PHASE 1 (Step 3): auto-send draft marker AFTER room is ready
-    // ============================================================
+    // draft send behavior (kept)
     if (widget.sendDraftOnOpen == true &&
         widget.initialDraftMessage != null &&
         widget.initialDraftMessage!.trim().isNotEmpty) {
       final marker = widget.initialDraftMessage!.trim();
-
-      // Optional: show it in the input briefly (nice UX)
       _messageController.text = marker;
 
-      // Send next frame so UI is mounted and room stream is active
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _sendMessage(textOverride: marker);
@@ -230,11 +273,12 @@ class _ChatPageState extends State<ChatPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollDown());
 
     await _chatProvider.markRoomMessagesAsRead(chatRoomId, _currentUserId);
-
     await _chatProvider.updateLastSeen(_currentUserId);
 
     _subscribeToFriendTyping(chatRoomId);
   }
+
+
 
   void _subscribeToFriendTyping(String chatRoomId) {
     _friendTypingSub?.cancel();
@@ -670,22 +714,78 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  Widget _buildFriendAvatar({double size = 34}) {
-    final url = (_friendProfile?.profilePhotoUrl ?? '').trim();
+  String _getInitialsFromName(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return '';
+    final parts = trimmed.split(' ').where((p) => p.trim().isNotEmpty).toList();
+    if (parts.isEmpty) return '';
+    if (parts.length == 1) return parts.first[0].toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
 
-    return CircleAvatar(
-      radius: size / 2,
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-      backgroundImage: url.isNotEmpty ? NetworkImage(url) : null,
-      child: url.isEmpty
-          ? Icon(
-        Icons.person,
-        size: size * 0.55,
-        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.55),
-      )
-          : null,
+  Widget _buildFriendAvatar({double size = 34}) {
+    final cs = Theme.of(context).colorScheme;
+
+    final url = (_friendProfile?.profilePhotoUrl ?? '').trim();
+    final displayName = (_friendProfile?.name ?? widget.friendName).trim();
+    final initials = _getInitialsFromName(displayName);
+    final isOnline = _friendProfile?.isOnline ?? false;
+
+    final radius = size / 2;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      splashColor: cs.primary.withValues(alpha: 0.10),
+      highlightColor: cs.primary.withValues(alpha: 0.05),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => ProfilePage(userId: widget.friendId)),
+        );
+      },
+      child: Stack(
+        children: [
+          url.isNotEmpty
+              ? CircleAvatar(
+            radius: radius,
+            backgroundImage: NetworkImage(url),
+            onBackgroundImageError: (_, __) {},
+          )
+              : CircleAvatar(
+            radius: radius,
+            backgroundColor: cs.primary.withValues(alpha: 0.12),
+            child: Text(
+              initials,
+              style: TextStyle(
+                color: cs.primary,
+                fontWeight: FontWeight.w600,
+                fontSize: size * 0.40,
+              ),
+            ),
+          ),
+
+          if (isOnline)
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Container(
+                width: size * 0.32,
+                height: size * 0.32,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF12B981),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: cs.surface,
+                    width: 2,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
+
 
   Widget _buildReplyPreviewBar(MessageModel msg) {
     final isMine = msg.senderId == _currentUserId;

@@ -1096,52 +1096,47 @@ class _NotificationPageState extends State<NotificationPage> {
               }
 
               // 5) Chat message → open DM
-              if (isChatMessage &&
-                  chatFriendId != null &&
-                  chatFriendId!.isNotEmpty) {
+              if (isChatMessage && chatFriendId != null && chatFriendId!.isNotEmpty) {
                 if (!mounted) return;
 
-                final profile = await DatabaseService().getUserFromDatabase(
-                  chatFriendId!,
-                );
+                final friendId = chatFriendId!.trim();
+                if (friendId.isEmpty) return;
+
+                // ✅ 1) PRE-CHECK connection before navigating (prevents "flash then pop")
+                final isConnected = await dbProvider.areWeConnected(friendId);
+                if (!mounted) return;
+
+                if (!isConnected) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('You are no longer connected.'.tr())),
+                  );
+                  return; // ✅ stop here, don't navigate
+                }
+
+                // ✅ 2) Load profile for display name (kept your logic)
+                final profile = await DatabaseService().getUserFromDatabase(friendId);
 
                 final displayName = (profile?.name ?? '').trim().isNotEmpty
                     ? profile!.name
                     : ((profile?.username ?? '').trim().isNotEmpty
-                          ? profile!.username
-                          : ((chatFriendName ?? '').trim().isNotEmpty
-                                ? chatFriendName!
-                                : 'Chat'.tr()));
+                    ? profile!.username
+                    : ((chatFriendName ?? '').trim().isNotEmpty
+                    ? chatFriendName!
+                    : 'Chat'.tr()));
 
                 if (!mounted) return;
 
+                // ✅ 3) Navigate WITHOUT creating rooms
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => ChatPage(
-                      friendId: chatFriendId!,
+                      friendId: friendId,
                       friendName: displayName,
+                      allowCreateRoom: false, // ✅ critical: never create from notification
                     ),
                   ),
                 );
-
-                if (!mounted) return;
-
-                final currentUserId = AuthService().getCurrentUserId();
-                if (currentUserId.isNotEmpty) {
-                  final chatProvider = Provider.of<ChatProvider>(
-                    context,
-                    listen: false,
-                  );
-                  final chatRoomId = await chatProvider.getOrCreateChatRoomId(
-                    currentUserId,
-                    chatFriendId!,
-                  );
-                  await chatProvider.markRoomMessagesAsRead(
-                    chatRoomId,
-                    currentUserId,
-                  );
-                }
                 return;
               }
 

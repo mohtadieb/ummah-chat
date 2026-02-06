@@ -496,6 +496,11 @@ class ChatProvider with ChangeNotifier {
     );
   }
 
+  Future<String?> getExistingChatRoomId(String userA, String userB) {
+    return _chatService.getExistingChatRoomIdInDatabase(userA, userB);
+  }
+
+
 
   // ---------------------------------------------------------------------------
   // LIFECYCLE

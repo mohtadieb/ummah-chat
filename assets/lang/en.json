@@ -662,6 +662,8 @@
   "picker_load_failed": "Failed to load",
   "picker_unsupported": "Unsupported file type",
   "picker_max_assets": "You can select up to {count}",
+  "You are no longer connected.": "You are no longer connected.",
+
   "story_adam": {
     "appBarTitle": "Prophet Adam (as)",
     "chipLabel": "Prophet Adam (as)",

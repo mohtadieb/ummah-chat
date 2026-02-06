@@ -619,11 +619,18 @@ serve(async (req: Request) => {
     }
 
     if (!fcmToken) {
+      // ✅ Not an error: user may be logged out, disabled notifications, never opened app, etc.
       return new Response(
-        JSON.stringify({ error: "Missing fcm_token / no token for target user" }),
-        { status: 400 },
+        JSON.stringify({
+          ok: true,
+          skipped: true,
+          reason: "no_fcm_token",
+          target_user_id: targetUserId ?? null,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
       );
     }
+
 
     // -------------------------
     // Build localized title/body

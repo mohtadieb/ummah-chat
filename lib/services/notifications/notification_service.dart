@@ -455,7 +455,7 @@ class NotificationService {
     if (targetUserId.isEmpty) return;
     if (notifType.trim().isEmpty) return;
 
-    // Clean args: remove empty keys
+    // Clean args: remove empty values
     final cleanArgs = <String, String>{};
     args.forEach((k, v) {
       final vv = v.trim();
@@ -467,17 +467,32 @@ class NotificationService {
         'send_push',
         body: {
           'target_user_id': targetUserId,
-          'notif_type': notifType,
+          'notif_type': notifType.trim(),
           'args': cleanArgs,
           'data': data ?? <String, String>{},
         },
       );
 
       debugPrint('✅ send_push response: ${response.data}');
+    } on FunctionException catch (e, st) {
+      // ✅ If function returns our "skipped" payload or old 400 message, treat as normal.
+      final details = e.details?.toString() ?? '';
+
+      // Old behavior (400)
+      final isMissingToken400 =
+          e.status == 400 && details.contains('Missing fcm_token');
+
+      if (isMissingToken400) {
+        debugPrint('ℹ️ send_push skipped (no token for $targetUserId)');
+        return;
+      }
+
+      debugPrint('❌ send_push FunctionException: $e\n$st');
     } catch (e, st) {
       debugPrint('❌ send_push error: $e\n$st');
     }
   }
+
 
   // -------------------------
   // Helpers: infer type + preview from your existing DB body formats

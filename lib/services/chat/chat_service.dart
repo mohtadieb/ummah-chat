@@ -1323,6 +1323,21 @@ class ChatService {
     return publicUrl;
   }
 
+  Future<String?> getExistingChatRoomIdInDatabase(String userA, String userB) async {
+    final row = await _supabase
+        .from('chat_rooms')
+        .select('id')
+        .eq('is_group', false)
+        .or(
+      'and(user1_id.eq.$userA,user2_id.eq.$userB),'
+          'and(user1_id.eq.$userB,user2_id.eq.$userA)',
+    )
+        .maybeSingle();
+
+    return row?['id'] as String?;
+  }
+
+
 
 
   // =======================================================================

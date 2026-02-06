@@ -356,6 +356,9 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> loadUser({bool showGlobalLoader = true}) async {
+    // Keep a reference so we don't blank the UI when doing a silent refresh
+    final previousUser = user;
+
     if (mounted && showGlobalLoader) {
       setState(() {
         _isLoading = true;
@@ -364,7 +367,7 @@ class _ProfilePageState extends State<ProfilePage> {
         _isBlockedForMe = false;
       });
     } else if (mounted) {
-      // No global spinner, but still reset gate flags so the UI can update cleanly.
+      // Silent refresh: don't touch _isLoading and DO NOT clear user
       setState(() {
         _isRestrictedForMe = false;
         _restrictedVisibility = '';
@@ -374,17 +377,19 @@ class _ProfilePageState extends State<ProfilePage> {
 
     const int maxAttempts = 8;
 
-    user = null;
-
+    UserProfile? fetchedUser;
     for (int attempt = 0; attempt < maxAttempts; attempt++) {
-      user = await databaseProvider.getUserProfile(widget.userId);
-      if (user != null) break;
+      fetchedUser = await databaseProvider.getUserProfile(widget.userId);
+      if (fetchedUser != null) break;
       await Future.delayed(const Duration(milliseconds: 200));
     }
 
     if (!mounted) return;
 
-    if (user == null) {
+    // ❗ KEY FIX: if silent refresh fails, keep showing previous user (no "profile not found")
+    if (fetchedUser == null) {
+      user = previousUser;
+
       if (showGlobalLoader) {
         setState(() {
           _isLoading = false;
@@ -401,6 +406,9 @@ class _ProfilePageState extends State<ProfilePage> {
       }
       return;
     }
+
+    // Only now replace user
+    user = fetchedUser;
 
     // ✅ always load my gender (used for opposite gender logic / request sheet)
     final me = await databaseProvider.getUserProfile(currentUserId);
@@ -439,7 +447,6 @@ class _ProfilePageState extends State<ProfilePage> {
       );
 
       if (blockedByOwner || blockedFallback) {
-        // keep _friendStatus consistent for UI
         setState(() {
           _friendStatus = earlyCombinedStatus;
           _isBlockedForMe = true;
@@ -467,19 +474,15 @@ class _ProfilePageState extends State<ProfilePage> {
         if (ui != null) {
           _friendStatus = ui;
         } else {
-          _friendStatus = await databaseProvider.getFriendshipStatus(
-            widget.userId,
-          );
+          _friendStatus = await databaseProvider.getFriendshipStatus(widget.userId);
         }
       } else {
-        _friendStatus = await databaseProvider.getCombinedRelationshipStatus(
-          widget.userId,
-        );
+        _friendStatus =
+        await databaseProvider.getCombinedRelationshipStatus(widget.userId);
       }
     } else {
-      _friendStatus = await databaseProvider.getCombinedRelationshipStatus(
-        widget.userId,
-      );
+      _friendStatus =
+      await databaseProvider.getCombinedRelationshipStatus(widget.userId);
     }
 
     if (!mounted) return;
@@ -500,12 +503,10 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() {
       _isBlockedForMe = isBlockedNow;
       _isRestrictedForMe = restrictedNow;
-      _restrictedVisibility = restrictedNow
-          ? (isBlockedNow ? 'blocked' : visibilityRaw)
-          : '';
+      _restrictedVisibility =
+      restrictedNow ? (isBlockedNow ? 'blocked' : visibilityRaw) : '';
     });
 
-    // ✅ If restricted, stop here
     if (restrictedNow) {
       if (showGlobalLoader) setState(() => _isLoading = false);
       return;
@@ -519,13 +520,13 @@ class _ProfilePageState extends State<ProfilePage> {
 
     _isFollowing = databaseProvider.isFollowing(widget.userId);
 
-    _completedStoryIds = await databaseProvider.getCompletedStoriesForUser(
-      widget.userId,
-    );
+    _completedStoryIds =
+    await databaseProvider.getCompletedStoriesForUser(widget.userId);
     if (!mounted) return;
 
     if (showGlobalLoader) setState(() => _isLoading = false);
   }
+
 
   void _showEditBioBox() {
     bioTextController.text = user?.bio ?? '';
@@ -745,14 +746,9 @@ class _ProfilePageState extends State<ProfilePage> {
         _isFriendActionBusy = false;
       });
 
-      // ✅ IMPORTANT: don't show full-page loader after button actions
-      // Only re-check the profile gate silently (needed for friends-only profiles)
-      final visibilityRaw = (user?.profileVisibility ?? '').trim().toLowerCase();
-      final bool mightBeGated = !_isOwnProfile && visibilityRaw == 'friends';
+      // Re-check gate silently (safe now; won't blank user)
+      await loadUser(showGlobalLoader: false);
 
-      if (mightBeGated) {
-        await loadUser(showGlobalLoader: false);
-      }
     } catch (e, st) {
       debugPrint('❌ optimistic friend action failed: $e\n$st');
       if (!mounted) return;

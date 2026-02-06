@@ -747,6 +747,13 @@ class DatabaseProvider extends ChangeNotifier {
   Future<String> getFriendshipStatus(String otherUserId) =>
       _db.getFriendshipStatusFromDatabase(otherUserId);
 
+  /// True if we are "connected" (friends OR mahram).
+  /// Used by ChatPage to decide if chat actions are allowed.
+  Future<bool> areWeConnected(String otherUserId) async {
+    return _db.areWeConnectedInDatabase(otherUserId);
+  }
+
+
   /* ==================== FRIEND IDS (For You ranking) ==================== */
 
   Set<String> _friendIds = {};
