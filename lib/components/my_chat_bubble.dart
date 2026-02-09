@@ -1,18 +1,18 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../pages/fullscreen_image_page.dart';
 import 'my_chat_video_bubble.dart';
 import '../helper/post_share.dart';
 import '../pages/post_page.dart';
 
+// ✅ NEW: for reply shared-post preview
+import '../models/post.dart';
+import '../models/post_media.dart';
+import '../services/database/database_provider.dart';
 
-enum ChatBubbleShape {
-  single,
-  first,
-  middle,
-  last,
-}
+enum ChatBubbleShape { single, first, middle, last }
 
 /// A simple chat bubble that adapts to the app's current theme.
 ///
@@ -27,6 +27,7 @@ enum ChatBubbleShape {
 /// - 🆕 Shows an uploading indicator for pending video messages
 /// - 🆕 Supports soft-delete ("This message was deleted")
 /// - 🆕 Supports reply preview (small quoted box)
+/// - ✅ Reply preview can show thumbnail for image replies and mini shared-post preview
 class MyChatBubble extends StatelessWidget {
   final String message;
   final bool isCurrentUser;
@@ -78,10 +79,22 @@ class MyChatBubble extends StatelessWidget {
   /// If null, a fallback color based on theme will be used.
   final Color? senderColor;
 
-  /// 🆕 Reply preview fields
+  /// 🆕 Reply preview fields (existing)
   final String? replyAuthorName;
   final String? replySnippet;
   final bool replyHasMedia;
+
+  /// ✅ NEW: richer reply preview support
+  /// If present, show a thumbnail in the reply quote.
+  final String? replyImageUrl;
+
+  /// If present, show a mini shared-post preview in the reply quote.
+  final String? replyPostId;
+
+  /// Convenience flag: replied message was a PostShare marker.
+  final bool replyIsPostShare;
+
+  final VoidCallback? onReplyTap;
 
   const MyChatBubble({
     super.key,
@@ -96,23 +109,30 @@ class MyChatBubble extends StatelessWidget {
     this.isLikedByMe = false,
     this.likeCount = 0,
     this.isUploading = false,
-    this.isDeleted = false, // 🆕 default
+    this.isDeleted = false,
     this.onDoubleTap,
     this.onLongPress,
     this.onLikeTap,
     this.senderName,
     this.senderColor,
-    this.shape = ChatBubbleShape.single, // 🆕 default
+    this.shape = ChatBubbleShape.single,
     this.replyAuthorName,
     this.replySnippet,
     this.replyHasMedia = false,
+
+    // ✅ NEW
+    this.replyImageUrl,
+    this.replyPostId,
+    this.replyIsPostShare = false,
+
+    this.onReplyTap,
   });
 
   String _formatTime(DateTime time) {
     final local = time.toLocal();
     final h = local.hour.toString().padLeft(2, '0');
     final m = local.minute.toString().padLeft(2, '0');
-    return '$h:$m'; // WhatsApp-style short time
+    return '$h:$m';
   }
 
   @override
@@ -123,22 +143,24 @@ class MyChatBubble extends StatelessWidget {
     final List<String> effectiveImageUrls = imageUrls.isNotEmpty
         ? imageUrls
         : (imageUrl != null && imageUrl!.trim().isNotEmpty
-        ? [imageUrl!]
-        : <String>[]);
+              ? [imageUrl!]
+              : <String>[]);
 
-    // ✅ Phase 1: detect internal post share marker
-    final bool isPostShare = !isDeleted && PostShare.isPostShareMessage(message);
-    final String? sharedPostId = isPostShare ? PostShare.extractPostId(message) : null;
-
+    // ✅ detect internal post share marker (current message)
+    final bool isPostShare =
+        !isDeleted && PostShare.isPostShareMessage(message);
+    final String? sharedPostId = isPostShare
+        ? PostShare.extractPostId(message)
+        : null;
 
     // If deleted: never show images / videos / text content.
-    final bool hasImages =
-        !isDeleted && effectiveImageUrls.isNotEmpty;
+    final bool hasImages = !isDeleted && effectiveImageUrls.isNotEmpty;
     final bool hasVideo =
         !isDeleted && videoUrl != null && videoUrl!.trim().isNotEmpty;
-    final bool hasText = !isDeleted && !isPostShare && message.trim().isNotEmpty;
+    final bool hasText =
+        !isDeleted && !isPostShare && message.trim().isNotEmpty;
 
-    // 🟢 Sender (current user) bubble style
+    // 🟢 Sender bubble style
     final senderBg = const Color(0xFF467E55);
     final senderText = Colors.white;
 
@@ -168,14 +190,9 @@ class MyChatBubble extends StatelessWidget {
       }
     }
 
-    // ❤️ Heart icon – same style for you vs others
-    const heartIcon = Icon(
-      Icons.favorite,
-      size: 12,
-      color: Colors.pinkAccent,
-    );
+    // ❤️ Like badge
+    const heartIcon = Icon(Icons.favorite, size: 12, color: Colors.pinkAccent);
 
-    // ❤️ Like badge: only if NOT deleted
     Widget? likeBadge;
     if (!isDeleted && likeCount > 0) {
       if (likeCount == 1) {
@@ -205,11 +222,10 @@ class MyChatBubble extends StatelessWidget {
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOutBack,
           child: Container(
-            padding:
-            const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(20), // pill shape
+              borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.06),
@@ -225,7 +241,7 @@ class MyChatBubble extends StatelessWidget {
                 const SizedBox(width: 4),
                 Text(
                   likeCount.toString(),
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
                     color: Colors.black87,
@@ -239,18 +255,16 @@ class MyChatBubble extends StatelessWidget {
     }
 
     final showSenderName =
-        !isCurrentUser &&
-            senderName != null &&
-            senderName!.trim().isNotEmpty;
+        !isCurrentUser && senderName != null && senderName!.trim().isNotEmpty;
 
     // ---------- IMAGE HELPERS ----------
 
     Widget _buildSingleImage(
-        BuildContext context,
-        String url, {
-          int initialIndex = 0,
-          List<String>? allUrls,
-        }) {
+      BuildContext context,
+      String url, {
+      int initialIndex = 0,
+      List<String>? allUrls,
+    }) {
       return GestureDetector(
         onTap: () {
           Navigator.of(context).push(
@@ -275,7 +289,7 @@ class MyChatBubble extends StatelessWidget {
                   child: CircularProgressIndicator(
                     value: progress.expectedTotalBytes != null
                         ? progress.cumulativeBytesLoaded /
-                        (progress.expectedTotalBytes ?? 1)
+                              (progress.expectedTotalBytes ?? 1)
                         : null,
                   ),
                 ),
@@ -309,8 +323,7 @@ class MyChatBubble extends StatelessWidget {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: effectiveImageUrls.length,
-          gridDelegate:
-          const SliverGridDelegateWithFixedCrossAxisCount(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
             mainAxisSpacing: 2,
             crossAxisSpacing: 2,
@@ -334,8 +347,7 @@ class MyChatBubble extends StatelessWidget {
                 loadingBuilder: (context, child, progress) {
                   if (progress == null) return child;
                   return const Center(
-                    child:
-                    CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(strokeWidth: 2),
                   );
                 },
                 errorBuilder: (context, error, stack) {
@@ -352,31 +364,137 @@ class MyChatBubble extends StatelessWidget {
       );
     }
 
+    // ---------- REPLY PREVIEW HELPERS ----------
+
+    Widget _replyThumbShell({required Widget child}) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: SizedBox(width: 34, height: 34, child: child),
+      );
+    }
+
+    Widget? _buildReplyThumb(BuildContext context) {
+      // ✅ image reply thumb
+      final img = (replyImageUrl ?? '').trim();
+      if (img.isNotEmpty) {
+        return _replyThumbShell(
+          child: Image.network(
+            img,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(
+              color: Colors.black.withValues(alpha: 0.08),
+              alignment: Alignment.center,
+              child: const Icon(Icons.broken_image_outlined, size: 16),
+            ),
+          ),
+        );
+      }
+
+      // ✅ shared post reply thumb (fetch first image)
+      if (replyIsPostShare && (replyPostId ?? '').trim().isNotEmpty) {
+        final postId = replyPostId!.trim();
+        final db = context.read<DatabaseProvider>();
+
+        return FutureBuilder<List<PostMedia>>(
+          future: db.getPostMediaCached(postId),
+          builder: (context, snap) {
+            final media = snap.data ?? const <PostMedia>[];
+            final firstImage = media
+                .where((m) => m.type == 'image')
+                .map((m) => m.url.trim())
+                .where((u) => u.isNotEmpty)
+                .cast<String?>()
+                .toList()
+                .firstWhere((u) => u != null, orElse: () => null);
+
+            if (firstImage != null && firstImage.trim().isNotEmpty) {
+              return _replyThumbShell(
+                child: Image.network(
+                  firstImage.trim(),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.article_outlined, size: 16),
+                  ),
+                ),
+              );
+            }
+
+            return _replyThumbShell(
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.08),
+                alignment: Alignment.center,
+                child: const Icon(Icons.article_outlined, size: 16),
+              ),
+            );
+          },
+        );
+      }
+
+      // nothing
+      return null;
+    }
+
+    Widget _buildReplySharedPostLine(BuildContext context) {
+      final postId = (replyPostId ?? '').trim();
+      if (!replyIsPostShare || postId.isEmpty) {
+        return Text(
+          (replySnippet ?? '').trim(),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 12,
+            fontStyle: replyHasMedia ? FontStyle.italic : null,
+            color: textColor.withValues(alpha: 0.9),
+          ),
+        );
+      }
+
+      final db = context.read<DatabaseProvider>();
+
+      return FutureBuilder<Post?>(
+        future: db.getPostById(postId),
+        builder: (context, snap) {
+          final caption = (snap.data?.message ?? '').trim();
+
+          final line = caption.isNotEmpty ? caption : 'Shared post'.tr();
+
+          return Text(
+            line,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              fontStyle: FontStyle.italic,
+              color: textColor.withValues(alpha: 0.9),
+            ),
+          );
+        },
+      );
+    }
+
     final deletedText = isCurrentUser
         ? 'You deleted this message'.tr()
         : 'This message was deleted'.tr();
 
-    // ---------- FULL BUBBLE ----------
-
     // Less vertical spacing when messages are merged in a chain
     final double verticalMargin =
-    (shape == ChatBubbleShape.single ||
-        shape == ChatBubbleShape.first)
+        (shape == ChatBubbleShape.single || shape == ChatBubbleShape.first)
         ? 6
         : 2;
 
-    Radius r18 = const Radius.circular(18);
-    Radius r10 = const Radius.circular(10);
-    Radius r4 = const Radius.circular(4);
+    const Radius r18 = Radius.circular(18);
+    const Radius r10 = Radius.circular(10);
+    const Radius r4 = Radius.circular(4);
 
     // Tail is on the side of the sender (current user = right, others = left)
-    Radius topLeft;
-    Radius topRight;
-    Radius bottomLeft;
-    Radius bottomRight;
+    late Radius topLeft;
+    late Radius topRight;
+    late Radius bottomLeft;
+    late Radius bottomRight;
 
     if (isCurrentUser) {
-      // Right side tail (bottomRight = 4)
       switch (shape) {
         case ChatBubbleShape.single:
           topLeft = r18;
@@ -404,7 +522,6 @@ class MyChatBubble extends StatelessWidget {
           break;
       }
     } else {
-      // Left side tail (bottomLeft = 4)
       switch (shape) {
         case ChatBubbleShape.single:
           topLeft = r18;
@@ -433,15 +550,16 @@ class MyChatBubble extends StatelessWidget {
       }
     }
 
+    final shouldShowReplyPreview =
+        !isDeleted &&
+        ((replyAuthorName != null && replyAuthorName!.trim().isNotEmpty) ||
+            (replySnippet != null && replySnippet!.trim().isNotEmpty) ||
+            ((replyImageUrl ?? '').trim().isNotEmpty) ||
+            (replyIsPostShare && (replyPostId ?? '').trim().isNotEmpty));
+
     final bubble = Container(
-      margin: EdgeInsets.symmetric(
-        vertical: verticalMargin,
-        horizontal: 8,
-      ),
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 6,
-      ),
+      margin: EdgeInsets.symmetric(vertical: verticalMargin, horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       constraints: BoxConstraints(
         maxWidth: MediaQuery.of(context).size.width * 0.75,
       ),
@@ -454,7 +572,6 @@ class MyChatBubble extends StatelessWidget {
           bottomRight: bottomRight,
         ),
       ),
-
       child: Column(
         crossAxisAlignment: isCurrentUser
             ? CrossAxisAlignment.end
@@ -467,67 +584,90 @@ class MyChatBubble extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: senderColor ??
-                    colors.primary.withValues(alpha: 0.95),
+                color: senderColor ?? colors.primary.withValues(alpha: 0.95),
               ),
             ),
             const SizedBox(height: 2),
           ],
 
-          // 🆕 Reply preview (quote box)
-          if (!isDeleted &&
-              (replyAuthorName != null &&
-                  replyAuthorName!.trim().isNotEmpty ||
-                  (replySnippet != null &&
-                      replySnippet!.trim().isNotEmpty))) ...[
-            Container(
-              margin: const EdgeInsets.only(bottom: 6),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 6,
-              ),
-              decoration: BoxDecoration(
-                color: isCurrentUser
-                    ? Colors.black.withValues(alpha: 0.10)
-                    : Colors.black.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(8),
-                border: Border(
-                  left: BorderSide(
-                    color: const Color(0xFF128C7E),
-                    width: 3,
+          // 🆕 Reply preview (quote box) — now tappable
+          if (!isDeleted && shouldShowReplyPreview) ...[
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onReplyTap,
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isCurrentUser
+                      ? Colors.black.withValues(alpha: 0.10)
+                      : Colors.black.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border(
+                    left: BorderSide(color: const Color(0xFF128C7E), width: 3),
                   ),
                 ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (replyAuthorName != null &&
-                      replyAuthorName!.trim().isNotEmpty)
-                    Text(
-                      replyAuthorName!,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF128C7E),
-                      ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Thumb (image or shared post)
+                    Builder(
+                      builder: (context) {
+                        final thumb = _buildReplyThumb(context);
+                        if (thumb == null) return const SizedBox(width: 0);
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8, top: 2),
+                          child: thumb,
+                        );
+                      },
                     ),
-                  if (replySnippet != null &&
-                      replySnippet!.trim().isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      replySnippet!,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontStyle:
-                        replyHasMedia ? FontStyle.italic : null,
-                        color: textColor.withValues(alpha: 0.9),
+
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (replyAuthorName != null &&
+                              replyAuthorName!.trim().isNotEmpty)
+                            const SizedBox(height: 1),
+                          if (replyAuthorName != null &&
+                              replyAuthorName!.trim().isNotEmpty)
+                            const Text(''),
+                          if (replyAuthorName != null &&
+                              replyAuthorName!.trim().isNotEmpty)
+                            Text(
+                              replyAuthorName!,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF128C7E),
+                              ),
+                            ),
+                          const SizedBox(height: 2),
+
+                          // If replying to a shared post, show its caption/title.
+                          if (replyIsPostShare &&
+                              (replyPostId ?? '').trim().isNotEmpty)
+                            _buildReplySharedPostLine(context)
+                          else if (replySnippet != null &&
+                              replySnippet!.trim().isNotEmpty)
+                            Text(
+                              replySnippet!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontStyle: replyHasMedia
+                                    ? FontStyle.italic
+                                    : null,
+                                color: textColor.withValues(alpha: 0.9),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ],
-                ],
+                ),
               ),
             ),
           ],
@@ -543,7 +683,7 @@ class MyChatBubble extends StatelessWidget {
             ),
             const SizedBox(height: 4),
           ] else ...[
-            // 🎥 Video preview (tap → fullscreen overlay)
+            // 🎥 Video
             if (hasVideo) ...[
               MyChatVideoBubble(
                 videoUrl: videoUrl!,
@@ -554,13 +694,13 @@ class MyChatBubble extends StatelessWidget {
               if (hasImages || hasText) const SizedBox(height: 6),
             ],
 
-            // 🖼 Images (single or grid)
+            // 🖼 Images
             if (hasImages) ...[
               _buildImageGrid(context),
               if (hasText) const SizedBox(height: 6),
             ],
 
-            // 🆕 Internal shared post card (Phase 1)
+            // 🆕 Internal shared post card (current message)
             if (!isDeleted && isPostShare && sharedPostId != null) ...[
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
@@ -615,16 +755,11 @@ class MyChatBubble extends StatelessWidget {
               const SizedBox(height: 6),
             ],
 
-
             // Caption / text
             if (hasText) ...[
               Text(
                 message,
-                style: TextStyle(
-                  color: textColor,
-                  fontSize: 16,
-                  height: 1.3,
-                ),
+                style: TextStyle(color: textColor, fontSize: 16, height: 1.3),
               ),
               const SizedBox(height: 4),
             ],
@@ -644,11 +779,7 @@ class MyChatBubble extends StatelessWidget {
               ),
               if (isCurrentUser && tickIcon != null) ...[
                 const SizedBox(width: 4),
-                Icon(
-                  tickIcon,
-                  size: 14,
-                  color: tickColor,
-                ),
+                Icon(tickIcon, size: 14, color: tickColor),
               ],
             ],
           ),
@@ -657,8 +788,7 @@ class MyChatBubble extends StatelessWidget {
     );
 
     return Align(
-      alignment:
-      isCurrentUser ? Alignment.centerRight : Alignment.centerLeft,
+      alignment: isCurrentUser ? Alignment.centerRight : Alignment.centerLeft,
       child: GestureDetector(
         onDoubleTap: onDoubleTap,
         onLongPress: onLongPress,

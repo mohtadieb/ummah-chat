@@ -32,12 +32,16 @@ import 'profile_page.dart';
 import 'post_page.dart';
 import 'package:image_picker/image_picker.dart';
 
-
-
 // ✅ NEW: for jumping to your own profile tab in MainLayout
 import '../services/navigation/bottom_nav_provider.dart';
 
-enum _GroupMenuAction { viewMembers, addMembers, changeGroupPhoto, leaveGroup, deleteGroup }
+enum _GroupMenuAction {
+  viewMembers,
+  addMembers,
+  changeGroupPhoto,
+  leaveGroup,
+  deleteGroup
+}
 
 class GroupChatPage extends StatefulWidget {
   final String chatRoomId;
@@ -127,6 +131,36 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
   String? _groupAvatarUrl;
 
+  // ---------------------------------------------------------------------------
+  // ✅ NEW: reply jump state (same as ChatPage)
+  // ---------------------------------------------------------------------------
+
+  final Map<String, GlobalKey> _renderedBubbleKeys = {};
+  Map<String, String> _replyTargetToRenderedBubbleId = {};
+
+  void _scrollToRenderedBubble(String renderedId) {
+    final key = _renderedBubbleKeys[renderedId];
+    final ctx = key?.currentContext;
+    if (ctx == null) return;
+
+    Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+      alignment: 0.15,
+    );
+  }
+
+  void _handleReplyTap(String replyToMessageId) {
+    final renderedId = _replyTargetToRenderedBubbleId[replyToMessageId];
+    if (renderedId == null || renderedId.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Original message not found'.tr())),
+      );
+      return;
+    }
+    _scrollToRenderedBubble(renderedId);
+  }
 
   @override
   void initState() {
@@ -518,8 +552,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
     );
   }
 
-
-
   Future<void> _confirmLeaveGroup() async {
     if (_currentUserId.isEmpty) return;
 
@@ -691,7 +723,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
       );
     }
   }
-
 
   // ---------------------------------------------------------------------------
   // Scroll
@@ -1160,7 +1191,11 @@ class _GroupChatPageState extends State<GroupChatPage> {
     final author = _displayNameForSender(msg.senderId);
 
     String label;
-    if (msg.message.trim().isNotEmpty) {
+
+    // ✅ FIX: shared post detection
+    if (PostShare.isPostShareMessage(msg.message)) {
+      label = 'Shared post'.tr();
+    } else if (msg.message.trim().isNotEmpty) {
       label = msg.message.trim();
     } else if ((msg.imageUrl ?? '').trim().isNotEmpty) {
       label = 'Photo'.tr();
@@ -1178,6 +1213,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
       onCancel: _cancelReplyToGroupMessage,
     );
   }
+
 
   // ---------------------------------------------------------------------------
   // Build
@@ -1460,6 +1496,16 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
                     final groups = MessageGrouping.build(messages);
 
+                    // ✅ NEW: map every message id -> rendered bubble id (group renders by last.id)
+                    final map = <String, String>{};
+                    for (final g in groups) {
+                      final renderedId = g.last.id;
+                      for (final m in g.messages) {
+                        map[m.id] = renderedId;
+                      }
+                    }
+                    _replyTargetToRenderedBubbleId = map;
+
                     final messageIndexToGroupIndex = List<int>.filled(
                       messages.length,
                       0,
@@ -1600,29 +1646,39 @@ class _GroupChatPageState extends State<GroupChatPage> {
                         String? replySnippet;
                         bool replyHasMedia = false;
 
-                        if (repliedTo != null) {
-                          replyAuthorName = _displayNameForSender(
-                            repliedTo.senderId,
-                          );
+                        String? replyImageUrl;
+                        String? replyPostId;
+                        bool replyIsPostShare = false;
 
-                          if (repliedTo.message.trim().isNotEmpty) {
-                            replySnippet = repliedTo.message.trim();
+                        if (repliedTo != null) {
+                          replyAuthorName =
+                              _displayNameForSender(repliedTo.senderId);
+
+                          if (PostShare.isPostShareMessage(repliedTo.message)) {
+                            replyIsPostShare = true;
+                            replyHasMedia = true;
+                            replyPostId =
+                                PostShare.extractPostId(repliedTo.message);
+                            replySnippet = 'Shared post'.tr();
                           } else if ((repliedTo.imageUrl ?? '')
                               .trim()
                               .isNotEmpty) {
-                            replySnippet = 'Photo'.tr();
                             replyHasMedia = true;
+                            replyImageUrl = repliedTo.imageUrl!.trim();
+                            replySnippet = 'Photo'.tr();
                           } else if ((repliedTo.videoUrl ?? '')
                               .trim()
                               .isNotEmpty) {
-                            replySnippet = 'Video'.tr();
                             replyHasMedia = true;
+                            replySnippet = 'Video'.tr();
                           } else if ((repliedTo.audioUrl ?? '')
                               .trim()
                               .isNotEmpty ||
                               repliedTo.isAudio) {
-                            replySnippet = 'Voice message'.tr();
                             replyHasMedia = true;
+                            replySnippet = 'Voice message'.tr();
+                          } else if (repliedTo.message.trim().isNotEmpty) {
+                            replySnippet = repliedTo.message.trim();
                           } else {
                             replySnippet = 'Message'.tr();
                           }
@@ -1648,7 +1704,8 @@ class _GroupChatPageState extends State<GroupChatPage> {
                               if (showUnreadSeparator)
                                 buildUnreadBubble(
                                   context: context,
-                                  unreadCount: _initialUnreadCount ?? unreadCount,
+                                  unreadCount:
+                                  _initialUnreadCount ?? unreadCount,
                                 ),
 
                               // ✅ Centered system bubble
@@ -1677,7 +1734,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
                                     child: Text(
                                       text,
                                       textAlign: TextAlign.center,
-                                      style: TextStyle(
+                                      style: const TextStyle(
                                         fontSize: 13,
                                         fontStyle: FontStyle.italic,
                                         color: Colors.white,
@@ -1769,9 +1826,27 @@ class _GroupChatPageState extends State<GroupChatPage> {
                             },
                             senderName: isCurrentUser ? null : senderName,
                             senderColor: isCurrentUser ? null : senderColor,
+
+                            // ✅ Reply preview fields
                             replyAuthorName: replyAuthorName,
                             replySnippet: replySnippet,
                             replyHasMedia: replyHasMedia,
+
+                            // ✅ NEW: tap reply quote to jump
+                            onReplyTap: (lastMsg.replyToMessageId != null &&
+                                lastMsg.replyToMessageId!
+                                    .trim()
+                                    .isNotEmpty)
+                                ? () => _handleReplyTap(
+                              lastMsg.replyToMessageId!.trim(),
+                            )
+                                : null,
+
+                            // NOTE:
+                            // Keep these only if your current MyChatBubble supports them.
+                            replyImageUrl: replyImageUrl,
+                            replyPostId: replyPostId,
+                            replyIsPostShare: replyIsPostShare,
                           );
                         }
 
@@ -1793,28 +1868,38 @@ class _GroupChatPageState extends State<GroupChatPage> {
                           child: innerBubble,
                         );
 
-                        return Column(
-                          children: [
-                            if (showDayDivider)
-                              buildDayBubble(context: context, date: msgDate),
-                            if (showUnreadSeparator)
-                              buildUnreadBubble(
-                                context: context,
-                                unreadCount: _initialUnreadCount ?? unreadCount,
+                        // ✅ NEW: attach key to the rendered group bubble
+                        final bubbleKey = _renderedBubbleKeys.putIfAbsent(
+                          lastMsg.id,
+                              () => GlobalKey(),
+                        );
+
+                        return KeyedSubtree(
+                          key: bubbleKey,
+                          child: Column(
+                            children: [
+                              if (showDayDivider)
+                                buildDayBubble(context: context, date: msgDate),
+                              if (showUnreadSeparator)
+                                buildUnreadBubble(
+                                  context: context,
+                                  unreadCount:
+                                  _initialUnreadCount ?? unreadCount,
+                                ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 2,
+                                  horizontal: 8,
+                                ),
+                                child: Align(
+                                  alignment: isCurrentUser
+                                      ? Alignment.centerRight
+                                      : Alignment.centerLeft,
+                                  child: selectableBubble,
+                                ),
                               ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 2,
-                                horizontal: 8,
-                              ),
-                              child: Align(
-                                alignment: isCurrentUser
-                                    ? Alignment.centerRight
-                                    : Alignment.centerLeft,
-                                child: selectableBubble,
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         );
                       },
                     );
@@ -2015,25 +2100,13 @@ class _SharedPostBubble extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            if (imageUrls.isNotEmpty)
+            if (imageUrls.isNotEmpty) ...[
               _SharedPostImageGrid(
                 imageUrls: imageUrls.take(4).toList(),
                 borderRadius: 12,
-              )
-            else
-              Container(
-                height: 120,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                alignment: Alignment.center,
-                child: Icon(
-                  Icons.image_outlined,
-                  color: fg.withValues(alpha: 0.85),
-                ),
               ),
+              const SizedBox(height: 8),
+            ],
             const SizedBox(height: 8),
             Text(
               subtitle,

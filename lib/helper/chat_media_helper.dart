@@ -65,8 +65,10 @@ class ChatMediaHelper {
       pickerConfig: AssetPickerConfig(
         maxAssets: maxAssets,
         requestType: RequestType.common, // images + videos
+        textDelegate: const _AppAssetPickerTextDelegate(), // ✅ FIX
       ),
     );
+
 
     return assets ?? <AssetEntity>[];
   }
@@ -1056,4 +1058,51 @@ class ChatMediaHelper {
       await VideoCompress.deleteAllCache();
     }
   }
+}
+/// ✅ App-driven picker strings (EasyLocalization)
+/// Prevents any fallback-to-Chinese behavior in wechat_assets_picker.
+class _AppAssetPickerTextDelegate extends AssetPickerTextDelegate {
+  const _AppAssetPickerTextDelegate();
+
+  // Bottom bar
+  @override
+  String get preview => 'picker_preview'.tr();
+
+  @override
+  String get confirm => 'picker_confirm'.tr();
+
+  // Common actions
+  @override
+  String get cancel => 'picker_cancel'.tr();
+
+  @override
+  String get edit => 'picker_edit'.tr();
+
+  @override
+  String get original => 'picker_original'.tr();
+
+  @override
+  String get select => 'picker_select'.tr();
+
+  // Album / path selection
+  @override
+  String get allAlbums => 'picker_all_albums'.tr();
+
+  @override
+  String get recent => 'picker_recent'.tr();
+
+  // Empty / errors
+  @override
+  String get emptyList => 'picker_empty_list'.tr();
+
+  @override
+  String get loadFailed => 'picker_load_failed'.tr();
+
+  @override
+  String get unSupportedAssetType => 'picker_unsupported'.tr();
+
+  // Selection limits
+  @override
+  String maximumAssetsCount(int count) =>
+      'picker_max_assets'.tr(namedArgs: {'count': '$count'});
 }

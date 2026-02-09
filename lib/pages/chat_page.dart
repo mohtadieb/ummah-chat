@@ -35,14 +35,12 @@ import '../services/notifications/notification_service.dart';
 
 enum _ChatMenuAction { report, block }
 
-
 class ChatPage extends StatefulWidget {
   final String friendId;
   final String friendName;
   final String? initialDraftMessage;
   final bool sendDraftOnOpen;
   final bool allowCreateRoom;
-
 
   const ChatPage({
     super.key,
@@ -51,7 +49,6 @@ class ChatPage extends StatefulWidget {
     this.initialDraftMessage,
     this.sendDraftOnOpen = false,
     this.allowCreateRoom = true, // ✅ default keeps current behavior
-
   });
 
   @override
@@ -74,6 +71,9 @@ class _ChatPageState extends State<ChatPage> {
 
   bool _canChat = true;
 
+  // ✅ NEW: keys + reply jump mapping
+  final Map<String, GlobalKey> _renderedBubbleKeys = {};
+  Map<String, String> _replyTargetToRenderedBubbleId = {};
 
   // 👤 Friend profile (for Online / Last seen)
   UserProfile? _friendProfile;
@@ -187,6 +187,34 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   // ---------------------------------------------------------------------------
+  // ✅ NEW: Reply jump helpers (tappable reply quote)
+  // ---------------------------------------------------------------------------
+
+  void _scrollToRenderedBubble(String renderedId) {
+    final key = _renderedBubbleKeys[renderedId];
+    final ctx = key?.currentContext;
+    if (ctx == null) return;
+
+    Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+      alignment: 0.15,
+    );
+  }
+
+  void _handleReplyTap(String replyToMessageId) {
+    final renderedId = _replyTargetToRenderedBubbleId[replyToMessageId];
+    if (renderedId == null || renderedId.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Original message not found'.tr())),
+      );
+      return;
+    }
+    _scrollToRenderedBubble(renderedId);
+  }
+
+  // ---------------------------------------------------------------------------
   // Chat room init + typing
   // ---------------------------------------------------------------------------
 
@@ -277,8 +305,6 @@ class _ChatPageState extends State<ChatPage> {
 
     _subscribeToFriendTyping(chatRoomId);
   }
-
-
 
   void _subscribeToFriendTyping(String chatRoomId) {
     _friendTypingSub?.cancel();
@@ -740,7 +766,9 @@ class _ChatPageState extends State<ChatPage> {
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => ProfilePage(userId: widget.friendId)),
+          MaterialPageRoute(
+            builder: (_) => ProfilePage(userId: widget.friendId),
+          ),
         );
       },
       child: Stack(
@@ -763,7 +791,6 @@ class _ChatPageState extends State<ChatPage> {
               ),
             ),
           ),
-
           if (isOnline)
             Positioned(
               right: 0,
@@ -786,13 +813,16 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-
   Widget _buildReplyPreviewBar(MessageModel msg) {
     final isMine = msg.senderId == _currentUserId;
     final author = isMine ? 'You'.tr() : widget.friendName;
 
     String label;
-    if (msg.message.trim().isNotEmpty) {
+
+    // ✅ FIX: shared post detection
+    if (PostShare.isPostShareMessage(msg.message)) {
+      label = 'Shared post'.tr();
+    } else if (msg.message.trim().isNotEmpty) {
       label = msg.message.trim();
     } else if ((msg.imageUrl ?? '').trim().isNotEmpty) {
       label = 'Photo'.tr();
@@ -810,6 +840,7 @@ class _ChatPageState extends State<ChatPage> {
       onCancel: _cancelReply,
     );
   }
+
 
   Future<void> _confirmDeleteMessage(String messageId) async {
     final colorScheme = Theme.of(context).colorScheme;
@@ -833,7 +864,10 @@ class _ChatPageState extends State<ChatPage> {
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: Text('Delete'.tr(), style: const TextStyle(color: Colors.red)),
+              child: Text(
+                'Delete'.tr(),
+                style: const TextStyle(color: Colors.red),
+              ),
             ),
           ],
         );
@@ -1022,7 +1056,6 @@ class _ChatPageState extends State<ChatPage> {
                 ),
               ],
             ),
-
           ],
         ),
         body: SafeArea(
@@ -1034,7 +1067,8 @@ class _ChatPageState extends State<ChatPage> {
                     ? const Center(child: CircularProgressIndicator())
                     : Consumer<ChatProvider>(
                   builder: (context, provider, _) {
-                    final rawMessages = provider.getMessages(_chatRoomId!);
+                    final rawMessages =
+                    provider.getMessages(_chatRoomId!);
 
                     if (rawMessages.isEmpty) {
                       return Center(child: Text("No messages yet".tr()));
@@ -1043,7 +1077,9 @@ class _ChatPageState extends State<ChatPage> {
                     final messages = rawMessages
                         .map((m) => MessageModel.fromMap(m))
                         .toList()
-                      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+                      ..sort(
+                            (a, b) => a.createdAt.compareTo(b.createdAt),
+                      );
 
                     int unreadCount = 0;
                     int? firstUnreadIndexFromStart;
@@ -1058,6 +1094,16 @@ class _ChatPageState extends State<ChatPage> {
                     }
 
                     final groups = MessageGrouping.build(messages);
+
+                    // ✅ NEW: build mapping from every message id -> rendered bubble id
+                    final map = <String, String>{};
+                    for (final g in groups) {
+                      final renderedId = g.last.id; // you render the group using lastMsg
+                      for (final m in g.messages) {
+                        map[m.id] = renderedId;
+                      }
+                    }
+                    _replyTargetToRenderedBubbleId = map;
 
                     final messageIndexToGroupIndex =
                     List<int>.filled(messages.length, 0);
@@ -1136,7 +1182,8 @@ class _ChatPageState extends State<ChatPage> {
                             : null;
 
                         final likedBy = lastMsg.likedBy;
-                        final isLikedByMe = likedBy.contains(_currentUserId);
+                        final isLikedByMe =
+                        likedBy.contains(_currentUserId);
                         final likeCount = likedBy.length;
 
                         final msgDate = firstMsg.createdAt;
@@ -1168,24 +1215,40 @@ class _ChatPageState extends State<ChatPage> {
                         String? replySnippet;
                         bool replyHasMedia = false;
 
+                        String? replyImageUrl;
+                        String? replyPostId;
+                        bool replyIsPostShare = false;
+
                         if (repliedTo != null) {
                           final isMineReply =
                               repliedTo.senderId == _currentUserId;
                           replyAuthorName =
                           isMineReply ? 'You'.tr() : widget.friendName;
 
-                          if (repliedTo.message.trim().isNotEmpty) {
-                            replySnippet = repliedTo.message.trim();
-                          } else if ((repliedTo.imageUrl ?? '').trim().isNotEmpty) {
+                          if (PostShare.isPostShareMessage(repliedTo.message)) {
+                            replyIsPostShare = true;
+                            replyHasMedia = true;
+                            replyPostId = PostShare.extractPostId(repliedTo.message);
+                            replySnippet = 'Shared post'.tr();
+                          } else if ((repliedTo.imageUrl ?? '')
+                              .trim()
+                              .isNotEmpty) {
+                            replyHasMedia = true;
+                            replyImageUrl = repliedTo.imageUrl!.trim();
                             replySnippet = 'Photo'.tr();
+                          } else if ((repliedTo.videoUrl ?? '')
+                              .trim()
+                              .isNotEmpty) {
                             replyHasMedia = true;
-                          } else if ((repliedTo.videoUrl ?? '').trim().isNotEmpty) {
                             replySnippet = 'Video'.tr();
-                            replyHasMedia = true;
-                          } else if ((repliedTo.audioUrl ?? '').trim().isNotEmpty ||
+                          } else if ((repliedTo.audioUrl ?? '')
+                              .trim()
+                              .isNotEmpty ||
                               repliedTo.isAudio) {
-                            replySnippet = 'Voice message'.tr();
                             replyHasMedia = true;
+                            replySnippet = 'Voice message'.tr();
+                          } else if (repliedTo.message.trim().isNotEmpty) {
+                            replySnippet = repliedTo.message.trim();
                           } else {
                             replySnippet = 'Message'.tr();
                           }
@@ -1230,7 +1293,8 @@ class _ChatPageState extends State<ChatPage> {
                             key: ValueKey(lastMsg.id),
                             message: lastMsg.message,
                             imageUrls: imageUrls,
-                            imageUrl: imageUrls.isNotEmpty ? imageUrls.first : null,
+                            imageUrl:
+                            imageUrls.isNotEmpty ? imageUrls.first : null,
                             videoUrl: effectiveVideoUrl,
                             isCurrentUser: isCurrentUser,
                             createdAt: lastMsg.createdAt,
@@ -1240,7 +1304,9 @@ class _ChatPageState extends State<ChatPage> {
                             likeCount: likeCount,
                             isUploading: lastMsg.isUploading,
                             isDeleted: lastMsg.isDeleted,
-                            senderName: isCurrentUser ? 'You'.tr() : widget.friendName,
+                            senderName: isCurrentUser
+                                ? 'You'.tr()
+                                : widget.friendName,
                             onDoubleTap: () async {
                               if (_isSelectionMode) return;
                               if (_currentUserId.isEmpty) return;
@@ -1250,7 +1316,8 @@ class _ChatPageState extends State<ChatPage> {
                                 userId: _currentUserId,
                               );
                             },
-                            onLongPress: !_isSelectionMode && !lastMsg.isDeleted
+                            onLongPress:
+                            !_isSelectionMode && !lastMsg.isDeleted
                                 ? () => _handleBubbleLongPress(
                               lastMsg,
                               isCurrentUser,
@@ -1264,9 +1331,29 @@ class _ChatPageState extends State<ChatPage> {
                                 likedBy.map((e) => e.toString()).toList(),
                               );
                             },
+
+                            // ✅ Reply preview fields (unchanged)
                             replyAuthorName: replyAuthorName,
                             replySnippet: replySnippet,
                             replyHasMedia: replyHasMedia,
+
+                            // ✅ NEW: tap the reply quote to jump
+                            onReplyTap: (lastMsg.replyToMessageId != null &&
+                                lastMsg.replyToMessageId!
+                                    .trim()
+                                    .isNotEmpty)
+                                ? () => _handleReplyTap(
+                              lastMsg.replyToMessageId!.trim(),
+                            )
+                                : null,
+
+                            // NOTE:
+                            // Your current MyChatBubble you pasted does NOT have these
+                            // fields yet. Keep them here only if your current file
+                            // already supports them. Otherwise remove these 3 lines.
+                            replyImageUrl: replyImageUrl,
+                            replyPostId: replyPostId,
+                            replyIsPostShare: replyIsPostShare,
                           );
                         }
 
@@ -1275,8 +1362,10 @@ class _ChatPageState extends State<ChatPage> {
 
                         final selectableBubble = MySelectableBubble(
                           isSelected: isSelected,
-                          onLongPress: () =>
-                              _handleBubbleLongPress(lastMsg, isCurrentUser),
+                          onLongPress: () => _handleBubbleLongPress(
+                            lastMsg,
+                            isCurrentUser,
+                          ),
                           onTap: () {
                             if (_isSelectionMode &&
                                 lastMsg.senderId == _currentUserId) {
@@ -1286,28 +1375,38 @@ class _ChatPageState extends State<ChatPage> {
                           child: innerBubble,
                         );
 
-                        return Column(
-                          children: [
-                            if (showDayDivider)
-                              buildDayBubble(context: context, date: msgDate),
-                            if (showUnreadSeparator)
-                              buildUnreadBubble(
-                                context: context,
-                                unreadCount: _initialUnreadCount ?? unreadCount,
+                        // ✅ NEW: attach a key to the rendered bubble (group bubble)
+                        final bubbleKey = _renderedBubbleKeys.putIfAbsent(
+                          lastMsg.id,
+                              () => GlobalKey(),
+                        );
+
+                        return KeyedSubtree(
+                          key: bubbleKey,
+                          child: Column(
+                            children: [
+                              if (showDayDivider)
+                                buildDayBubble(context: context, date: msgDate),
+                              if (showUnreadSeparator)
+                                buildUnreadBubble(
+                                  context: context,
+                                  unreadCount:
+                                  _initialUnreadCount ?? unreadCount,
+                                ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 2,
+                                  horizontal: 8,
+                                ),
+                                child: Align(
+                                  alignment: isCurrentUser
+                                      ? Alignment.centerRight
+                                      : Alignment.centerLeft,
+                                  child: selectableBubble,
+                                ),
                               ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 2,
-                                horizontal: 8,
-                              ),
-                              child: Align(
-                                alignment: isCurrentUser
-                                    ? Alignment.centerRight
-                                    : Alignment.centerLeft,
-                                child: selectableBubble,
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         );
                       },
                     );
@@ -1367,7 +1466,9 @@ class _ChatPageState extends State<ChatPage> {
                         isRecording: _voiceRecorder.isRecording,
                         recordingLabel: _voiceRecorder.isRecording
                             ? 'recording_label'.tr(
-                          namedArgs: {"time": _voiceRecorder.formattedDuration},
+                          namedArgs: {
+                            "time": _voiceRecorder.formattedDuration,
+                          },
                         )
                             : null,
                         onMicLongPressStart: _handleMicLongPressStart,
@@ -1506,34 +1607,23 @@ class _SharedPostBubble extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            if (imageUrls.isNotEmpty)
+            if (imageUrls.isNotEmpty) ...[
               _SharedPostImageGrid(
                 imageUrls: imageUrls.take(4).toList(),
                 borderRadius: 12,
-              )
-            else
-              Container(
-                height: 120,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                alignment: Alignment.center,
-                child: Icon(
-                  Icons.image_outlined,
-                  color: fg.withValues(alpha: 0.85),
-                ),
               ),
+              const SizedBox(height: 8),
+            ],
             const SizedBox(height: 8),
             Text(
               subtitle,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
+                fontSize: imageUrls.isEmpty ? 14 : 13,
                 color: fg.withValues(alpha: 0.95),
                 fontWeight: FontWeight.w600,
-                height: 1.25,
+                height: 1.35,
               ),
             ),
           ],
