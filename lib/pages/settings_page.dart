@@ -116,6 +116,8 @@ class _SettingsPageState extends State<SettingsPage> {
         return 'Nederlands';
       case 'ar':
         return 'العربية';
+      case 'fr':
+        return 'Français';
       default:
         return locale.languageCode;
     }

@@ -663,6 +663,7 @@
   "picker_unsupported": "Unsupported file type",
   "picker_max_assets": "You can select up to {count}",
   "You are no longer connected.": "You are no longer connected.",
+  "Admin": "Admin",
 
   "story_adam": {
     "appBarTitle": "Prophet Adam (as)",

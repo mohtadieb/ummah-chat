@@ -132,6 +132,8 @@ class _RegisterPageState extends State<RegisterPage> {
           return 'NL';
         case 'ar':
           return 'العربية';
+        case 'fr':
+          return 'FR';
         default:
           return current.languageCode.toUpperCase();
       }
@@ -147,6 +149,7 @@ class _RegisterPageState extends State<RegisterPage> {
         PopupMenuItem(value: Locale('en'), child: Text('English')),
         PopupMenuItem(value: Locale('nl'), child: Text('Nederlands')),
         PopupMenuItem(value: Locale('ar'), child: Text('العربية')),
+        PopupMenuItem(value: Locale('fr'), child: Text('Français')), // ✅ add this
       ],
       child: Row(
         mainAxisSize: MainAxisSize.min,

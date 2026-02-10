@@ -323,6 +323,7 @@
   "onboarding_inquire_for_marriage_subtitle": "Toon je intentie op een respectvolle manier en betrek families op de juiste wijze",
   "search_users": "Zoek gebruikers",
   "You are no longer connected.": "Jullie zijn niet langer verbonden.",
+  "Admin": "Beheerder",
 
 
   "cannot_send_friend_request_visibility_nobody": "Je kunt geen vriendschapsverzoeken sturen zolang je profielzichtbaarheid op ‘Niemand’ staat. Pas je zichtbaarheid aan en probeer het opnieuw.",
@@ -713,6 +714,22 @@
   "picker_load_failed": "Laden mislukt",
   "picker_unsupported": "Niet-ondersteund bestandstype",
   "picker_max_assets": "Je kunt maximaal {count} selecteren",
+
+  "legal": {
+    "by_registering_prefix": "Door je te registreren ga je akkoord met onze ",
+    "by_continuing_prefix": "Door verder te gaan ga je akkoord met onze ",
+    "and": " en ",
+    "dot": "."
+  },
+
+
+  "Skip": "Overslaan",
+  "Next": "Volgende",
+  "Get started": "Aan de slag",
+
+  "Forgot password?": "Wachtwoord vergeten?",
+  "Reset Password": "Wachtwoord resetten",
+
   "story_adam": {
     "appBarTitle": "Profeet Adam (as)",
     "chipLabel": "Profeet Adam (as)",
@@ -1181,6 +1198,7 @@
       "o4": "Dat rijkdom het belangrijkste teken is van Allah’s liefde"
     }
   },
+
   "story_idris": {
     "appBarTitle": "Profeet Idris (as)",
     "chipLabel": "Profeet Idris (as)",
@@ -3338,21 +3356,6 @@
       "title": "10. Contact",
       "body": "[support e-mailadres invullen]"
     }
-  },
-
-  "legal": {
-    "by_registering_prefix": "Door je te registreren ga je akkoord met onze ",
-    "by_continuing_prefix": "Door verder te gaan ga je akkoord met onze ",
-    "and": " en ",
-    "dot": "."
-  },
-
-
-  "Skip": "Overslaan",
-  "Next": "Volgende",
-  "Get started": "Aan de slag",
-
-  "Forgot password?": "Wachtwoord vergeten?",
-  "Reset Password": "Wachtwoord resetten"
+  }
 
 }

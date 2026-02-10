@@ -86,7 +86,7 @@ Future<void> main() async {
   await Supabase.initialize(
     url: 'https://njotewktazwhoprvhsvj.supabase.co',
     anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qb3Rld2t0YXp3aG9wcnZoc3ZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4MzY1NjgsImV4cCI6MjA3NzQxMjU2OH0.SDr9TdrMIm-6LXdaaAMMhFDujt-PAgqyreebWPtV9NQ',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qb3Rld2t0YXp3aG9wcnZoc3ZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4MzY1NjgsImV4cCI6MjA3NzQxMjU2OH0.SDr9TdrMIm-6LXdaaAMMhFDujt-PAgqyreebWPtV9NQ',
     authOptions: const FlutterAuthClientOptions(
       authFlowType: AuthFlowType.pkce,
     ),
@@ -94,11 +94,19 @@ Future<void> main() async {
 
   runApp(
     EasyLocalization(
-      supportedLocales: const [Locale('en'), Locale('nl'), Locale('ar')],
-      path: 'assets/lang',
+      supportedLocales: const [
+        Locale('en'),
+        Locale('nl'),
+        Locale('ar'),
+        Locale('fr'), // ✅ French added
+      ],
+      path: 'assets/lang', // ✅ must match your assets folder + pubspec.yaml
       fallbackLocale: const Locale('en'),
-      saveLocale: true,
+      saveLocale: true, // ✅ persists AFTER user chooses a language
       useOnlyLangCode: true,
+
+      // ✅ IMPORTANT for autodetect:
+      // do NOT set startLocale here.
       child: MultiProvider(
         providers: [
           ChangeNotifierProvider(create: (_) => ThemeProvider()),
@@ -172,7 +180,7 @@ class _MyAppState extends State<MyApp> {
     super.initState();
     setupPushNotifications();
 
-    // ✅ Add this:
+    // ✅ Reset password deep links
     _startResetPasswordDeepLinkListener();
   }
 
@@ -192,26 +200,32 @@ class _MyAppState extends State<MyApp> {
       supportedLocales: context.supportedLocales,
       locale: context.locale,
 
+      // ✅ Device language on first launch:
+      // EasyLocalization will pick device locale if no saved locale exists.
+      // This callback just improves matching.
       localeResolutionCallback: (deviceLocale, supportedLocales) {
-        if (deviceLocale == null) return const Locale('en');
+        // Prefer fallback from EasyLocalization config if device locale is null
+        const fallback = Locale('en');
 
-        // 1) Try exact match
+        if (deviceLocale == null) return fallback;
+
+        // 1) Exact match (language + country if provided)
         for (final l in supportedLocales) {
           final countryOk =
               (l.countryCode == null) ||
-              (l.countryCode == deviceLocale.countryCode);
+                  (l.countryCode == deviceLocale.countryCode);
           if (l.languageCode == deviceLocale.languageCode && countryOk) {
             return l;
           }
         }
 
-        // 2) Try language-only match
+        // 2) Language-only match
         for (final l in supportedLocales) {
           if (l.languageCode == deviceLocale.languageCode) return l;
         }
 
-        // 3) Fallback to English
-        return const Locale('en');
+        // 3) Fallback
+        return fallback;
       },
 
       initialRoute: '/',
@@ -237,9 +251,8 @@ class _MyAppState extends State<MyApp> {
             // for comment notifications, we highlight the comments area
             scrollToComments: true,
             highlightComments: true,
-            highlightCommentId: highlightCommentId.isNotEmpty
-                ? highlightCommentId
-                : null,
+            highlightCommentId:
+            highlightCommentId.isNotEmpty ? highlightCommentId : null,
           );
         },
       },

@@ -95,6 +95,9 @@ class _GroupChatPageState extends State<GroupChatPage> {
   List<UserProfile> _members = [];
   final Map<String, UserProfile> _userCache = {};
 
+  // ✅ NEW: track admins for badge in members sheet
+  final Set<String> _adminIds = {};
+
   final Map<String, Color> _senderColorCache = {};
 
   int _lastMessageCount = 0;
@@ -417,10 +420,17 @@ class _GroupChatPageState extends State<GroupChatPage> {
       final List<UserProfile> profiles = [];
       bool isAdmin = false;
 
+      // ✅ NEW
+      final Set<String> adminIds = {};
+
       for (final row in links) {
         final String userId = row['user_id']?.toString() ?? '';
         final String role = row['role']?.toString() ?? '';
         if (userId.isEmpty) continue;
+
+        if (role == 'admin') {
+          adminIds.add(userId);
+        }
 
         if (userId == _currentUserId && role == 'admin') {
           isAdmin = true;
@@ -437,8 +447,20 @@ class _GroupChatPageState extends State<GroupChatPage> {
         }
       }
 
+      // ✅ Optional: admins first
+      profiles.sort((a, b) {
+        final aIsAdmin = adminIds.contains(a.id);
+        final bIsAdmin = adminIds.contains(b.id);
+        if (aIsAdmin && !bIsAdmin) return -1;
+        if (!aIsAdmin && bIsAdmin) return 1;
+        return 0;
+      });
+
       setState(() {
         _members = profiles;
+        _adminIds
+          ..clear()
+          ..addAll(adminIds);
         _isCurrentUserAdmin = isAdmin;
         _isLoadingMembers = false;
       });
@@ -460,7 +482,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) {
+      builder: (sheetCtx) {
         if (_isLoadingMembers) {
           return const SizedBox(
             height: 200,
@@ -487,35 +509,82 @@ class _GroupChatPageState extends State<GroupChatPage> {
             itemBuilder: (_, index) {
               final user = _members[index];
               final name = user.name.isNotEmpty ? user.name : user.username;
+              final isAdmin = _adminIds.contains(user.id);
 
-              return ListTile(
-                onTap: () => _openProfileFromMembers(user), // ✅ UPDATED
-                leading: CircleAvatar(
-                  radius: 20,
-                  backgroundColor: colorScheme.primary.withValues(alpha: 0.12),
-                  child: Text(
-                    name.isNotEmpty ? name[0].toUpperCase() : '?',
-                    style: TextStyle(
-                      color: colorScheme.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
+              // ✅ Community-style row + badge
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  // close sheet first
+                  Navigator.of(sheetCtx).pop();
+
+                  // then navigate next frame
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted) return;
+                    _openProfileFromMembers(user);
+                  });
+                },
+                child: IgnorePointer(
+                  ignoring: true,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: CircleAvatar(
+                            radius: 20,
+                            backgroundColor:
+                            colorScheme.primary.withValues(alpha: 0.12),
+                            child: Text(
+                              name.isNotEmpty ? name[0].toUpperCase() : '?',
+                              style: TextStyle(
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          title: Text(
+                            name,
+                            style: TextStyle(
+                              color: colorScheme.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          subtitle: user.username.isNotEmpty
+                              ? Text(
+                            '@${user.username}',
+                            style: TextStyle(
+                              color: colorScheme.primary
+                                  .withValues(alpha: 0.7),
+                            ),
+                          )
+                              : null,
+                        ),
+                      ),
+                      if (isAdmin)
+                        Container(
+                          margin: const EdgeInsets.only(left: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(999),
+                            color:
+                            colorScheme.primary.withValues(alpha: 0.10),
+                          ),
+                          child: Text(
+                            'Admin'.tr(), // optionally: 'group_admin'.tr()
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                title: Text(
-                  name,
-                  style: TextStyle(
-                    color: colorScheme.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                subtitle: user.username.isNotEmpty
-                    ? Text(
-                  '@${user.username}',
-                  style: TextStyle(
-                    color: colorScheme.primary.withValues(alpha: 0.7),
-                  ),
-                )
-                    : null,
               );
             },
           ),
@@ -1214,7 +1283,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
     );
   }
 
-
   // ---------------------------------------------------------------------------
   // Build
   // ---------------------------------------------------------------------------
@@ -1323,7 +1391,8 @@ class _GroupChatPageState extends State<GroupChatPage> {
                       subtitleText,
                       style: TextStyle(
                         fontSize: 12,
-                        color: colorScheme.primary.withValues(alpha: 0.7),
+                        color:
+                        colorScheme.primary.withValues(alpha: 0.7),
                       ),
                     ),
                   ],
@@ -1370,16 +1439,14 @@ class _GroupChatPageState extends State<GroupChatPage> {
               itemBuilder: (context) {
                 final items = <PopupMenuEntry<_GroupMenuAction>>[];
 
+                // 1) Everyone
                 items.add(
                   PopupMenuItem(
                     value: _GroupMenuAction.viewMembers,
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.group_outlined,
-                          size: 20,
-                          color: colorScheme.primary,
-                        ),
+                        Icon(Icons.group_outlined,
+                            size: 20, color: colorScheme.primary),
                         const SizedBox(width: 12),
                         Text('View members'.tr()),
                       ],
@@ -1387,17 +1454,15 @@ class _GroupChatPageState extends State<GroupChatPage> {
                   ),
                 );
 
+                // 2) Admin-only (safe actions)
                 if (_isCurrentUserAdmin) {
                   items.add(
                     PopupMenuItem(
                       value: _GroupMenuAction.addMembers,
                       child: Row(
                         children: [
-                          Icon(
-                            Icons.person_add_alt_1,
-                            size: 20,
-                            color: colorScheme.primary,
-                          ),
+                          Icon(Icons.person_add_alt_1,
+                              size: 20, color: colorScheme.primary),
                           const SizedBox(width: 12),
                           Text('Add members'.tr()),
                         ],
@@ -1410,28 +1475,40 @@ class _GroupChatPageState extends State<GroupChatPage> {
                       value: _GroupMenuAction.changeGroupPhoto,
                       child: Row(
                         children: [
-                          Icon(
-                            Icons.photo_camera_back_outlined,
-                            size: 20,
-                            color: colorScheme.primary,
-                          ),
+                          Icon(Icons.photo_camera_back_outlined,
+                              size: 20, color: colorScheme.primary),
                           const SizedBox(width: 12),
                           Text('Change group photo'.tr()),
                         ],
                       ),
                     ),
                   );
+                }
 
+                // 3) Leave (everyone) — BEFORE delete
+                items.add(
+                  PopupMenuItem(
+                    value: _GroupMenuAction.leaveGroup,
+                    child: Row(
+                      children: [
+                        Icon(Icons.logout,
+                            size: 20, color: Colors.red.shade600),
+                        const SizedBox(width: 12),
+                        Text('Leave group'.tr()),
+                      ],
+                    ),
+                  ),
+                );
+
+                // 4) Delete (admin only) — LAST
+                if (_isCurrentUserAdmin) {
                   items.add(
                     PopupMenuItem(
                       value: _GroupMenuAction.deleteGroup,
                       child: Row(
                         children: [
-                          Icon(
-                            Icons.delete_forever_outlined,
-                            size: 20,
-                            color: Colors.red.shade600,
-                          ),
+                          Icon(Icons.delete_forever_outlined,
+                              size: 20, color: Colors.red.shade600),
                           const SizedBox(width: 12),
                           Text('Delete group'.tr()),
                         ],
@@ -1439,25 +1516,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
                     ),
                   );
                 }
-
-                items.add(const PopupMenuDivider());
-
-                items.add(
-                  PopupMenuItem(
-                    value: _GroupMenuAction.leaveGroup,
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.logout,
-                          size: 20,
-                          color: Colors.red.shade600,
-                        ),
-                        const SizedBox(width: 12),
-                        Text('Leave group'.tr()),
-                      ],
-                    ),
-                  ),
-                );
 
                 return items;
               },
@@ -1583,14 +1641,11 @@ class _GroupChatPageState extends State<GroupChatPage> {
                         final bool isCurrentUser =
                             firstMsg.senderId == _currentUserId;
 
-                        final String senderName = _displayNameForSender(
-                          firstMsg.senderId,
-                        );
+                        final String senderName =
+                        _displayNameForSender(firstMsg.senderId);
 
-                        final Color senderColor = _colorForSender(
-                          firstMsg.senderId,
-                          colorScheme,
-                        );
+                        final Color senderColor =
+                        _colorForSender(firstMsg.senderId, colorScheme);
 
                         final imageUrls = group.messages
                             .map((m) => m.imageUrl)
@@ -1671,9 +1726,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
                               .isNotEmpty) {
                             replyHasMedia = true;
                             replySnippet = 'Video'.tr();
-                          } else if ((repliedTo.audioUrl ?? '')
-                              .trim()
-                              .isNotEmpty ||
+                          } else if ((repliedTo.audioUrl ?? '').trim().isNotEmpty ||
                               repliedTo.isAudio) {
                             replyHasMedia = true;
                             replySnippet = 'Voice message'.tr();
@@ -1695,7 +1748,8 @@ class _GroupChatPageState extends State<GroupChatPage> {
                               ? parts.sublist(1).join(':').trim()
                               : '';
 
-                          final text = key.isNotEmpty ? key.tr() : lastMsg.message;
+                          final text =
+                          key.isNotEmpty ? key.tr() : lastMsg.message;
 
                           return Column(
                             children: [
@@ -1707,7 +1761,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
                                   unreadCount:
                                   _initialUnreadCount ?? unreadCount,
                                 ),
-
                               // ✅ Centered system bubble
                               Padding(
                                 padding: const EdgeInsets.symmetric(
@@ -1721,14 +1774,12 @@ class _GroupChatPageState extends State<GroupChatPage> {
                                       vertical: 10,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: colorScheme.secondary.withValues(
-                                        alpha: 0.8,
-                                      ),
+                                      color: colorScheme.secondary
+                                          .withValues(alpha: 0.8),
                                       borderRadius: BorderRadius.circular(14),
                                       border: Border.all(
-                                        color: colorScheme.primary.withValues(
-                                          alpha: 0.12,
-                                        ),
+                                        color: colorScheme.primary
+                                            .withValues(alpha: 0.12),
                                       ),
                                     ),
                                     child: Text(
