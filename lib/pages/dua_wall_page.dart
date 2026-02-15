@@ -519,8 +519,8 @@ class _DuaWallPageState extends State<DuaWallPage> {
                       ),
 
                       // ❤️ Ameen counter bottom-right inside the card
-                      Positioned(
-                        right: 12,
+                      PositionedDirectional(
+                        end: 12, // ✅ flips automatically in RTL
                         bottom: 8,
                         child: Text(
                           dua.ameenCount == 0
@@ -544,9 +544,9 @@ class _DuaWallPageState extends State<DuaWallPage> {
 
                 // DELETE ICON (only for your own duas)
                 if (isMine)
-                  Positioned(
+                  PositionedDirectional(
                     top: 4,
-                    right: 4,
+                    end: 4,
                     child: IconButton(
                       icon: const Icon(
                         Icons.delete_outline,

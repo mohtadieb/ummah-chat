@@ -1272,16 +1272,12 @@ class DatabaseService {
         .stream(primaryKey: ['id'])
         .eq('status', 'accepted')
         .asyncMap((rows) async {
-          // 🔍 see what comes in
-          debugPrint('🔔 friendships stream rows: ${rows.length}');
 
           // ✅ Filter to only rows involving the current user
           final filtered = rows.where((row) {
             return row['requester_id'] == userId ||
                 row['addressee_id'] == userId;
           }).toList();
-
-          debugPrint('🔍 filtered friendships for $userId: ${filtered.length}');
 
           // ✅ Determine the "other" user in each friendship
           final friendIds = filtered
@@ -1300,9 +1296,6 @@ class DatabaseService {
             if (profile != null) profiles.add(profile);
           }
 
-          debugPrint(
-            '✅ friendsStreamFromDatabase returning ${profiles.length} profiles',
-          );
           return profiles;
         });
   }

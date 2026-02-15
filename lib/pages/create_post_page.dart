@@ -464,22 +464,6 @@ class _CreatePostPageState extends State<CreatePostPage> {
                               label: 'Crop'.tr(),
                               onTap: _cropCurrentAsset,
                             ),
-                            const SizedBox(width: 8),
-                            _ToolChip(
-                              icon: Icons.tune_rounded,
-                              label: 'Filters'.tr(),
-                              onTap: () {
-                                // TODO: hook filters later
-                              },
-                            ),
-                            const SizedBox(width: 8),
-                            _ToolChip(
-                              icon: Icons.photo_library_rounded,
-                              label: 'Cover'.tr(),
-                              onTap: () {
-                                // TODO: cover frame picker later
-                              },
-                            ),
                           ],
                         ),
                       ),
