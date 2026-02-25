@@ -185,12 +185,18 @@ class _ProfilePageState extends State<ProfilePage> {
     'assets/images/man_normal_hair.png',
     'assets/images/man_hair_beard.png',
     'assets/images/man_beard_headwear.png',
+    'assets/images/man_normal_hair_old.png',
+    'assets/images/main_hair_beard_old.png',
+    'assets/images/man_beard_headwear_old.png',
   ];
 
   static const List<String> _femaleAvatars = [
     'assets/images/woman_loose_hair.png',
     'assets/images/woman_hijab.png',
     'assets/images/woman_niqab.png',
+    'assets/images/woman_loose_hair_old.png',
+    'assets/images/woman_hijab_old.png',
+    'assets/images/woman_niqab_old.png',
   ];
 
   List<String> _avatarsForGender(String? genderRaw) {
