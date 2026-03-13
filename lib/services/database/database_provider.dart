@@ -143,6 +143,9 @@ class DatabaseProvider extends ChangeNotifier {
       // ✅ Load friend IDs (needed for For You) WITHOUT notifying mid-load
       await loadFriendIds(notify: false);
 
+      // ✅ Load my mahram ids for avatar badges / relationship UI
+      await loadMyMahramIds(notify: false);
+
       // ✅ Load likes map for For You (friends + following likes)
       final postIds = _posts
           .take(200)
@@ -753,6 +756,14 @@ class DatabaseProvider extends ChangeNotifier {
     return _db.areWeConnectedInDatabase(otherUserId);
   }
 
+  Stream<List<UserProfile>> connectionsStream() {
+    return _db.connectionsStreamFromDatabase();
+  }
+
+  Stream<List<UserProfile>> connectionsStreamForUser(String userId) {
+    return _db.connectionsStreamForUserFromDatabase(userId);
+  }
+
 
   /* ==================== FRIEND IDS (For You ranking) ==================== */
 
@@ -946,6 +957,26 @@ class DatabaseProvider extends ChangeNotifier {
 
   // ✅ MAHRAM FLOW (Provider wrappers)
 
+  final Set<String> _myMahramIds = {};
+
+  Set<String> get myMahramIds => _myMahramIds;
+
+  bool isMahramUser(String userId) => _myMahramIds.contains(userId);
+
+  Future<void> loadMyMahramIds({bool notify = true}) async {
+    try {
+      final mahrams = await _db.getMyMahramsInDatabase();
+
+      _myMahramIds
+        ..clear()
+        ..addAll(mahrams.map((u) => u.id));
+
+      if (notify) notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading my mahram ids: $e');
+    }
+  }
+
   Future<void> sendMahramRequest(String targetUserId) async {
     await _db.sendMahramRequestInDatabase(targetUserId);
   }
@@ -967,6 +998,10 @@ class DatabaseProvider extends ChangeNotifier {
   }
 
   Future<List<UserProfile>> getMyMahrams() => _db.getMyMahramsInDatabase();
+
+  Future<List<UserProfile>> getMahramsForUser(String userId) async {
+    return _db.getMahramsForUserInDatabase(userId);
+  }
 
   // =========================================================
   // MARRIAGE INQUIRIES (DatabaseProvider)
@@ -1556,6 +1591,7 @@ class DatabaseProvider extends ChangeNotifier {
     // Friends / FOAF cache
     _friendIds.clear();
     _friendsOfFriendsIds.clear();
+    _myMahramIds.clear();
 
     // Search results
     _searchResults.clear();

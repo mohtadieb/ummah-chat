@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import '../models/user_profile.dart';
 import 'my_card_tile.dart';
+import 'my_profile_avatar.dart';
 
 class MyFriendTile extends StatelessWidget {
   final UserProfile user;
@@ -25,6 +26,8 @@ class MyFriendTile extends StatelessWidget {
   /// Optional: last message time label (e.g. "14:32", "Mon", "19/11")
   final String? lastMessageTimeLabel;
 
+  final bool isMahram;
+
   const MyFriendTile({
     super.key,
     required this.user,
@@ -35,6 +38,7 @@ class MyFriendTile extends StatelessWidget {
     this.unreadCount = 0,
     this.lastMessagePreview,
     this.lastMessageTimeLabel,
+    this.isMahram = false,
   });
 
   String _getInitials() {
@@ -59,43 +63,18 @@ class MyFriendTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(999),
             splashColor: colorScheme.primary.withValues(alpha: 0.10),
             highlightColor: colorScheme.primary.withValues(alpha: 0.05),
-            child: Stack(
-              children: [
-                user.profilePhotoUrl.isNotEmpty
-                    ? CircleAvatar(
-                  radius: 22,
-                  backgroundImage: NetworkImage(user.profilePhotoUrl),
-                )
-                    : CircleAvatar(
-                  radius: 22,
-                  backgroundColor:
-                  colorScheme.primary.withValues(alpha: 0.12),
-                  child: Text(
-                    _getInitials(),
-                    style: TextStyle(
-                      color: colorScheme.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+            child: MyProfileAvatar(
+              imageUrl: user.profilePhotoUrl,
+              radius: 22,
+              isOnline: isOnline,
+              isMahram: isMahram,
+              fallbackChild: Text(
+                _getInitials(),
+                style: TextStyle(
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.w600,
                 ),
-                if (isOnline)
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      width: 11,
-                      height: 11,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF12B981),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: colorScheme.surface,
-                          width: 2,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
+              ),
             ),
           ),
 

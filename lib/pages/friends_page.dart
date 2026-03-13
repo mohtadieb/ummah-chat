@@ -46,6 +46,7 @@ class _FriendsPageState extends State<FriendsPage> {
 
   Widget _buildFriendsList(BuildContext context) {
     final dbProvider = Provider.of<DatabaseProvider>(context, listen: false);
+    final dbProviderListening = Provider.of<DatabaseProvider>(context, listen: true);
     final auth = AuthService();
     final currentUserId = auth.getCurrentUserId();
     final colorScheme = Theme.of(context).colorScheme;
@@ -69,7 +70,7 @@ class _FriendsPageState extends State<FriendsPage> {
     // ✅ Other user: no unread/last-message streams
     if (_isOtherUserView) {
       return StreamBuilder<List<UserProfile>>(
-        stream: dbProvider.friendsStreamForUser(targetUserId),
+        stream: dbProvider.connectionsStreamForUser(targetUserId),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return Center(
@@ -217,6 +218,7 @@ class _FriendsPageState extends State<FriendsPage> {
                       return MyFriendTile(
                         key: ValueKey(u.id),
                         user: u,
+                        isMahram: false,
                         customTitle: u.name,
                         isOnline: u.isOnline,
                         unreadCount: 0,
@@ -280,7 +282,7 @@ class _FriendsPageState extends State<FriendsPage> {
                 lastMsgSnapshot.data ?? const <String, LastMessageInfo>{};
 
             return StreamBuilder<List<UserProfile>>(
-              stream: dbProvider.friendsStream(),
+              stream: dbProvider.connectionsStream(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return Center(
@@ -482,6 +484,7 @@ class _FriendsPageState extends State<FriendsPage> {
                             return MyFriendTile(
                               key: ValueKey(user.id),
                               user: user,
+                              isMahram: dbProviderListening.isMahramUser(user.id),
                               customTitle: user.name,
                               isOnline: user.isOnline,
                               unreadCount: unreadCount,

@@ -126,6 +126,40 @@ class DatabaseService {
     }
   }
 
+  /// Get multiple users from database in one query
+  Future<List<UserProfile>> getUsersByIdsFromDatabase(List<String> userIds) async {
+    if (userIds.isEmpty) return [];
+
+    try {
+      final res = await _db
+          .from('profiles')
+          .select()
+          .inFilter('id', userIds);
+
+      if (res is! List) return [];
+
+      final profiles = res
+          .map((row) => UserProfile.fromMap(Map<String, dynamic>.from(row)))
+          .toList();
+
+      // Keep same order as incoming ids
+      final orderMap = <String, int>{
+        for (int i = 0; i < userIds.length; i++) userIds[i]: i,
+      };
+
+      profiles.sort((a, b) {
+        final ai = orderMap[a.id] ?? 999999;
+        final bi = orderMap[b.id] ?? 999999;
+        return ai.compareTo(bi);
+      });
+
+      return profiles;
+    } catch (e, st) {
+      debugPrint('❌ Error getUsersByIdsFromDatabase: $e\n$st');
+      return [];
+    }
+  }
+
   Future<String?> uploadProfilePhotoToDatabase(
     Uint8List bytes,
     String userId,
@@ -1271,39 +1305,50 @@ class DatabaseService {
         .from('friendships')
         .stream(primaryKey: ['id'])
         .eq('status', 'accepted')
-        .asyncMap((rows) async {
+        .asyncMap((_) async {
+      try {
+        final res = await _db
+            .from('friendships')
+            .select('requester_id, addressee_id, relation_type')
+            .eq('status', 'accepted')
+            .or('requester_id.eq.$userId,addressee_id.eq.$userId');
 
-          // ✅ Filter to only rows involving the current user
-          final filtered = rows.where((row) {
-            return row['requester_id'] == userId ||
-                row['addressee_id'] == userId;
-          }).toList();
+        if (res is! List) return <UserProfile>[];
 
-          // ✅ Determine the "other" user in each friendship
-          final friendIds = filtered
-              .map<String>((row) {
-                final requester = row['requester_id'] as String;
-                final addressee = row['addressee_id'] as String;
-                return requester == userId ? addressee : requester;
-              })
-              .toSet()
-              .toList(); // ensure unique
+        final filtered = res.where((row) {
+          final relationType =
+              row['relation_type']?.toString().trim().toLowerCase() ?? '';
+          return relationType == 'friend';
+        }).toList();
 
-          // ✅ Fetch UserProfile objects for each friend
-          final profiles = <UserProfile>[];
-          for (final fid in friendIds) {
-            final profile = await getUserFromDatabase(fid);
-            if (profile != null) profiles.add(profile);
-          }
+        final friendIds = filtered
+            .map<String>((row) {
+          final requester = row['requester_id']?.toString() ?? '';
+          final addressee = row['addressee_id']?.toString() ?? '';
+          return requester == userId ? addressee : requester;
+        })
+            .where((id) => id.isNotEmpty)
+            .toSet()
+            .toList();
 
-          return profiles;
-        });
+        final profiles = await getUsersByIdsFromDatabase(friendIds);
+
+        debugPrint(
+          'friendsStreamFromDatabase FIXED | userId=$userId | queried=${res.length} | filtered=${filtered.length} | profiles=${profiles.length}',
+        );
+
+        return profiles;
+      } catch (e, st) {
+        debugPrint('❌ friendsStreamFromDatabase error: $e\n$st');
+        return <UserProfile>[];
+      }
+    });
   }
 
   // 🔄 New: realtime friends stream for ANY user (not just current user)
   Stream<List<UserProfile>> friendsStreamForUserFromDatabase(
-    String profileUserId,
-  ) {
+      String profileUserId,
+      ) {
     if (profileUserId.isEmpty) {
       return const Stream.empty();
     }
@@ -1312,33 +1357,44 @@ class DatabaseService {
         .from('friendships')
         .stream(primaryKey: ['id'])
         .eq('status', 'accepted')
-        .asyncMap((rows) async {
-          // Only friendships where this profile user is involved
-          final filtered = rows.where((row) {
-            final requester = row['requester_id']?.toString();
-            final addressee = row['addressee_id']?.toString();
-            return requester == profileUserId || addressee == profileUserId;
-          }).toList();
+        .asyncMap((_) async {
+      try {
+        final res = await _db
+            .from('friendships')
+            .select('requester_id, addressee_id, relation_type')
+            .eq('status', 'accepted')
+            .or('requester_id.eq.$profileUserId,addressee_id.eq.$profileUserId');
 
-          // Determine "the other person" in each friendship
-          final friendIds = filtered
-              .map<String>((row) {
-                final requester = row['requester_id'] as String;
-                final addressee = row['addressee_id'] as String;
-                return requester == profileUserId ? addressee : requester;
-              })
-              .toSet()
-              .toList(); // unique
+        if (res is! List) return <UserProfile>[];
 
-          // Load profiles for each friend
-          final profiles = <UserProfile>[];
-          for (final fid in friendIds) {
-            final profile = await getUserFromDatabase(fid);
-            if (profile != null) profiles.add(profile);
-          }
+        final filtered = res.where((row) {
+          final relationType =
+              row['relation_type']?.toString().trim().toLowerCase() ?? '';
+          return relationType == 'friend';
+        }).toList();
 
-          return profiles;
-        });
+        final friendIds = filtered
+            .map<String>((row) {
+          final requester = row['requester_id']?.toString() ?? '';
+          final addressee = row['addressee_id']?.toString() ?? '';
+          return requester == profileUserId ? addressee : requester;
+        })
+            .where((id) => id.isNotEmpty)
+            .toSet()
+            .toList();
+
+        final profiles = await getUsersByIdsFromDatabase(friendIds);
+
+        debugPrint(
+          'friendsStreamForUserFromDatabase FIXED | profileUserId=$profileUserId | queried=${res.length} | filtered=${filtered.length} | profiles=${profiles.length}',
+        );
+
+        return profiles;
+      } catch (e, st) {
+        debugPrint('❌ friendsStreamForUserFromDatabase error: $e\n$st');
+        return <UserProfile>[];
+      }
+    });
   }
 
   Future<void> unfriendUserInDatabase(String otherUserId) async {
@@ -1372,6 +1428,7 @@ class DatabaseService {
           .from('friendships')
           .select('requester_id, addressee_id')
           .eq('status', 'accepted')
+          .eq('relation_type', 'friend')
           .or('requester_id.eq.$userId,addressee_id.eq.$userId');
 
       if (res is! List) return [];
@@ -1418,12 +1475,14 @@ class DatabaseService {
           .from('friendships')
           .select('requester_id, addressee_id')
           .eq('status', 'accepted')
+          .eq('relation_type', 'friend')
           .inFilter('requester_id', friendList);
 
       final resB = await _db
           .from('friendships')
           .select('requester_id, addressee_id')
           .eq('status', 'accepted')
+          .eq('relation_type', 'friend')
           .inFilter('addressee_id', friendList);
 
       final rows = <dynamic>[
@@ -1454,6 +1513,108 @@ class DatabaseService {
     }
   }
 
+  // 🔄 Realtime accepted connections stream (friends + mahrams) for CURRENT user
+  Stream<List<UserProfile>> connectionsStreamFromDatabase() {
+    final userId = _auth.currentUser?.id;
+    if (userId == null || userId.isEmpty) {
+      return const Stream.empty();
+    }
+
+    return _db
+        .from('friendships')
+        .stream(primaryKey: ['id'])
+        .eq('status', 'accepted')
+        .asyncMap((_) async {
+      try {
+        final res = await _db
+            .from('friendships')
+            .select('requester_id, addressee_id, relation_type')
+            .eq('status', 'accepted')
+            .or('requester_id.eq.$userId,addressee_id.eq.$userId');
+
+        if (res is! List) return <UserProfile>[];
+
+        final filtered = res.where((row) {
+          final relationType =
+              row['relation_type']?.toString().trim().toLowerCase() ?? '';
+          return relationType == 'friend' || relationType == 'mahram';
+        }).toList();
+
+        final userIds = filtered
+            .map<String>((row) {
+          final requester = row['requester_id']?.toString() ?? '';
+          final addressee = row['addressee_id']?.toString() ?? '';
+          return requester == userId ? addressee : requester;
+        })
+            .where((id) => id.isNotEmpty)
+            .toSet()
+            .toList();
+
+        final profiles = await getUsersByIdsFromDatabase(userIds);
+
+        debugPrint(
+          'connectionsStreamFromDatabase FIXED | userId=$userId | queried=${res.length} | filtered=${filtered.length} | profiles=${profiles.length}',
+        );
+
+        return profiles;
+      } catch (e, st) {
+        debugPrint('❌ connectionsStreamFromDatabase error: $e\n$st');
+        return <UserProfile>[];
+      }
+    });
+  }
+
+  // 🔄 Realtime accepted connections stream (friends + mahrams) for ANY user
+  Stream<List<UserProfile>> connectionsStreamForUserFromDatabase(
+      String profileUserId,
+      ) {
+    if (profileUserId.isEmpty) {
+      return const Stream.empty();
+    }
+
+    return _db
+        .from('friendships')
+        .stream(primaryKey: ['id'])
+        .eq('status', 'accepted')
+        .asyncMap((_) async {
+      try {
+        final res = await _db
+            .from('friendships')
+            .select('requester_id, addressee_id, relation_type')
+            .eq('status', 'accepted')
+            .or('requester_id.eq.$profileUserId,addressee_id.eq.$profileUserId');
+
+        if (res is! List) return <UserProfile>[];
+
+        final filtered = res.where((row) {
+          final relationType =
+              row['relation_type']?.toString().trim().toLowerCase() ?? '';
+          return relationType == 'friend' || relationType == 'mahram';
+        }).toList();
+
+        final userIds = filtered
+            .map<String>((row) {
+          final requester = row['requester_id']?.toString() ?? '';
+          final addressee = row['addressee_id']?.toString() ?? '';
+          return requester == profileUserId ? addressee : requester;
+        })
+            .where((id) => id.isNotEmpty)
+            .toSet()
+            .toList();
+
+        final profiles = await getUsersByIdsFromDatabase(userIds);
+
+        debugPrint(
+          'connectionsStreamForUserFromDatabase FIXED | profileUserId=$profileUserId | queried=${res.length} | filtered=${filtered.length} | profiles=${profiles.length}',
+        );
+
+        return profiles;
+      } catch (e, st) {
+        debugPrint('❌ connectionsStreamForUserFromDatabase error: $e\n$st');
+        return <UserProfile>[];
+      }
+    });
+  }
   /* ==================== MAHRAM ==================== */
 
   /// Send a MAHRAM request (mimics friend request 1:1, but relation_type='mahram')
@@ -1670,6 +1831,36 @@ class DatabaseService {
 
     return (profiles as List)
         .map((p) => UserProfile.fromMap(Map<String, dynamic>.from(p as Map)))
+        .toList();
+  }
+
+  Future<List<UserProfile>> getMahramsForUserInDatabase(String userId) async {
+    final rows = await _db
+        .from('friendships')
+        .select('requester_id, addressee_id, status, relation_type')
+        .eq('status', 'accepted')
+        .eq('relation_type', 'mahram')
+        .or('requester_id.eq.$userId,addressee_id.eq.$userId');
+
+    final Set<String> ids = {};
+
+    for (final row in rows) {
+      final requesterId = row['requester_id']?.toString();
+      final addresseeId = row['addressee_id']?.toString();
+
+      if (requesterId != null && requesterId != userId) ids.add(requesterId);
+      if (addresseeId != null && addresseeId != userId) ids.add(addresseeId);
+    }
+
+    if (ids.isEmpty) return [];
+
+    final profiles = await _db
+        .from('profiles')
+        .select()
+        .inFilter('id', ids.toList());
+
+    return profiles
+        .map<UserProfile>((json) => UserProfile.fromMap(json))
         .toList();
   }
 

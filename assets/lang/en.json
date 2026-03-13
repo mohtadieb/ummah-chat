@@ -664,7 +664,9 @@
   "picker_max_assets": "You can select up to {count}",
   "You are no longer connected.": "You are no longer connected.",
   "Admin": "Admin",
-
+  "{name}'s mahrams": "{name}'s mahrams",
+  "No mahrams to show yet.": "No mahrams to show yet.",
+  "Add mahrams to see them here.": "Add mahrams to see them here.",
   "story_adam": {
     "appBarTitle": "Prophet Adam (as)",
     "chipLabel": "Prophet Adam (as)",

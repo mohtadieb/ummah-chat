@@ -676,6 +676,10 @@
   "Forgot password?": "Mot de passe oublié ?",
   "Reset Password": "Réinitialiser le mot de passe",
 
+  "{name}'s mahrams": "Mahram de {name}",
+  "No mahrams to show yet.": "Aucun mahram à afficher pour le moment.",
+  "Add mahrams to see them here.": "Ajoutez des mahrams pour les voir ici.",
+
   "story_adam": {
     "appBarTitle": "Prophète Adam (as)",
     "chipLabel": "Prophète Adam (as)",

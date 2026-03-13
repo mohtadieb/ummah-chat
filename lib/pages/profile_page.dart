@@ -16,6 +16,7 @@ import '../components/my_follow_button.dart';
 import '../components/my_friend_button.dart';
 import '../components/my_input_alert_box.dart';
 import '../components/my_post_tile.dart';
+import '../components/my_profile_avatar.dart';
 import '../components/my_profile_stats.dart';
 import '../helper/navigate_pages.dart';
 import '../models/post.dart';
@@ -987,21 +988,12 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                     child: Row(
                       children: [
-                        CircleAvatar(
+                        MyProfileAvatar(
+                          imageUrl: p.profilePhotoUrl,
                           radius: 24,
-                          backgroundColor: cs.primary.withValues(
-                            alpha: 0.15,
-                          ),
-                          backgroundImage: p.profilePhotoUrl.isNotEmpty
-                              ? NetworkImage(p.profilePhotoUrl)
-                              : null,
-                          child: p.profilePhotoUrl.isEmpty
-                              ? Icon(
-                            Icons.person,
-                            size: 26,
-                            color: cs.primary,
-                          )
-                              : null,
+                          isOnline: p.isOnline,
+                          isMahram: true,
+                          fallbackIcon: Icons.person,
                         ),
                         const SizedBox(width: 14),
                         Expanded(
@@ -1360,6 +1352,404 @@ class _ProfilePageState extends State<ProfilePage> {
     await loadUser();
   }
 
+  /// MAHRAMS SECTION – horizontal row of mahrams
+  Widget _buildMahramsSection(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isOwn = _isOwnProfile;
+
+    Future<List<UserProfile>> loadMahrams() {
+      if (isOwn) {
+        return databaseProvider.getMyMahrams();
+      }
+      return databaseProvider.getMahramsForUser(widget.userId);
+    }
+
+    void openMahramsFullScreen(List<UserProfile> allMahrams) {
+      final displayName = (user?.name ?? '').trim();
+      final firstName = displayName.isEmpty
+          ? ''
+          : displayName.split(RegExp(r'\s+')).first;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (ctx) => Scaffold(
+            backgroundColor: Theme.of(ctx).colorScheme.surface,
+            appBar: AppBar(
+              title: Text(
+                isOwn
+                    ? "Mahram".tr()
+                    : "mahrams_of".tr(namedArgs: {'name': firstName}),
+              ),
+              centerTitle: true,
+              backgroundColor: Theme.of(ctx).colorScheme.surface,
+              foregroundColor: Theme.of(ctx).colorScheme.primary,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+            ),
+            body: allMahrams.isEmpty
+                ? Center(
+              child: Text(
+                isOwn
+                    ? "No mahrams to show yet.".tr()
+                    : "No mahrams to show.".tr(),
+                style: TextStyle(
+                  color: Theme.of(ctx).colorScheme.primary,
+                ),
+              ),
+            )
+                : ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: allMahrams.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                final mahram = allMahrams[index];
+
+                return InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () {
+                    if (mahram.id == currentUserId) {
+                      _goToMyProfileInMainLayout();
+                    } else {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ProfilePage(userId: mahram.id),
+                        ),
+                      );
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        MyProfileAvatar(
+                          imageUrl: mahram.profilePhotoUrl,
+                          radius: 24,
+                          isOnline: mahram.isOnline,
+                          isMahram: true,
+                          fallbackIcon: Icons.verified_user_outlined,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            mahram.name,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: colorScheme.primary,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 18.0, left: 20, right: 20),
+      child: FutureBuilder<List<UserProfile>>(
+        future: loadMahrams(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) return const SizedBox.shrink();
+
+          final rawMahrams = snapshot.data ?? [];
+          final allMahrams = isOwn
+              ? rawMahrams.where((u) => u.id != currentUserId).toList()
+              : rawMahrams;
+
+          final totalMahrams = allMahrams.length;
+
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      "Mahram".tr(),
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colorScheme.secondary,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '-',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 72,
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: colorScheme.secondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }
+
+          if (totalMahrams == 0) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      "Mahram".tr(),
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colorScheme.secondary,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '0',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  isOwn
+                      ? "Add mahrams to see them here.".tr()
+                      : "No mahrams to show yet.".tr(),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colorScheme.primary.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            );
+          }
+
+          const int maxTiles = 12;
+          final bool hasMore = allMahrams.length > maxTiles;
+          final int mahramTilesCount =
+          hasMore ? (maxTiles - 1) : allMahrams.length;
+
+          final visibleMahrams = allMahrams.take(mahramTilesCount).toList();
+          final int remainingCount = allMahrams.length - mahramTilesCount;
+          final int itemCount =
+          hasMore ? mahramTilesCount + 1 : mahramTilesCount;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    "Mahram".tr(),
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colorScheme.secondary,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '$totalMahrams',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => openMahramsFullScreen(allMahrams),
+                    child: Text(
+                      "View all".tr(),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 90,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: itemCount,
+                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                  itemBuilder: (context, index) {
+                    if (hasMore && index == itemCount - 1) {
+                      return GestureDetector(
+                        onTap: () => openMahramsFullScreen(allMahrams),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 52,
+                              height: 52,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: colorScheme.primary.withValues(
+                                  alpha: 0.10,
+                                ),
+                                border: Border.all(
+                                  color: colorScheme.primary.withValues(
+                                    alpha: 0.35,
+                                  ),
+                                  width: 1,
+                                ),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                '+$remainingCount',
+                                style: TextStyle(
+                                  color: colorScheme.primary,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            SizedBox(
+                              width: 70,
+                              child: Text(
+                                "More".tr(),
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: colorScheme.primary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    final mahram = visibleMahrams[index];
+
+                    return GestureDetector(
+                      onTap: () {
+                        if (mahram.id == currentUserId) {
+                          _goToMyProfileInMainLayout();
+                        } else {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ProfilePage(userId: mahram.id),
+                            ),
+                          );
+                        }
+                      },
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          MyProfileAvatar(
+                            imageUrl: mahram.profilePhotoUrl,
+                            radius: 26,
+                            isOnline: mahram.isOnline,
+                            isMahram: true,
+                            fallbackIcon: Icons.verified_user_outlined,
+                          ),
+                          const SizedBox(height: 6),
+                          SizedBox(
+                            width: 70,
+                            child: Text(
+                              mahram.name,
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   /// FRIENDS SECTION – horizontal row of friends
   Widget _buildFriendsSection(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -1677,40 +2067,12 @@ class _ProfilePageState extends State<ProfilePage> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Stack(
-                            children: [
-                              CircleAvatar(
-                                radius: 26,
-                                backgroundColor: colorScheme.secondary,
-                                backgroundImage: friend.profilePhotoUrl.isNotEmpty
-                                    ? NetworkImage(friend.profilePhotoUrl)
-                                    : null,
-                                child: friend.profilePhotoUrl.isEmpty
-                                    ? Icon(
-                                  Icons.person,
-                                  color: colorScheme.primary,
-                                  size: 26,
-                                )
-                                    : null,
-                              ),
-                              if (friend.isOnline)
-                                Positioned(
-                                  right: 2,
-                                  bottom: 2,
-                                  child: Container(
-                                    width: 10,
-                                    height: 10,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: Colors.green,
-                                      border: Border.all(
-                                        color: colorScheme.surface,
-                                        width: 1.4,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
+                          MyProfileAvatar(
+                            imageUrl: friend.profilePhotoUrl,
+                            radius: 26,
+                            isOnline: friend.isOnline,
+                            isMahram: false,
+                            fallbackIcon: Icons.person,
                           ),
                           const SizedBox(height: 6),
                           SizedBox(
@@ -2375,6 +2737,7 @@ class _ProfilePageState extends State<ProfilePage> {
           const SizedBox(height: 7),
           _buildEditAboutMeButton(),
           _buildAboutMeSection(),
+          _buildMahramsSection(context),
           _buildFriendsSection(context),
 
           // Stories progress + medals (UPDATED: hide if 0 completed)

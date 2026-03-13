@@ -722,6 +722,10 @@
     "dot": "."
   },
 
+  "{name}'s mahrams": "Mahram van {name}",
+  "No mahrams to show yet.": "Nog geen mahrams om te tonen.",
+  "Add mahrams to see them here.": "Voeg mahrams toe om ze hier te zien.",
+
 
   "Skip": "Overslaan",
   "Next": "Volgende",
