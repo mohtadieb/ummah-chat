@@ -683,6 +683,27 @@
   "mahrams_of": "Mahrams of {name}",
   "Mahrams": "Mahrams",
 
+  "No chats yet": "No chats yet",
+  "Add friends or mahrams to start chatting.": "Add friends or mahrams to start chatting.",
+  "Search chats": "Search chats",
+  "Your chats": "Your chats",
+  "No chats match your search": "No chats match your search",
+  "You must be logged in to view mahrams": "You must be logged in to view mahrams",
+  "Error loading mahrams": "Error loading mahrams",
+  "No mahrams yet": "No mahrams yet",
+  "Search mahrams": "Search mahrams",
+  "No mahrams match your search": "No mahrams match your search",
+  "Your mahrams": "Your mahrams",
+  "Add mahrams to start chatting.": "Add mahrams to start chatting.",
+  "You earned a new badge!": "You earned a new badge!",
+  "Badge unlocked": "Badge unlocked",
+  "No communities found": "No communities found",
+  "Try a different search term.": "Try a different search term.",
+  "Loading posts...": "Loading posts...",
+  "empty_bio": "No bio yet.",
+
+
+
   "story_adam": {
     "appBarTitle": "Prophet Adam (as)",
     "chipLabel": "Prophet Adam (as)",

@@ -694,6 +694,27 @@
   "mahrams_of": "محارم {name}",
   "Mahrams": "Mahram",
 
+  "No chats yet": "Aucune discussion pour le moment",
+  "Add friends or mahrams to start chatting.": "Ajoutez des amis ou des mahrams pour commencer à discuter.",
+  "Search chats": "Rechercher des discussions",
+  "Your chats": "Vos discussions",
+  "No chats match your search": "Aucune discussion ne correspond à votre recherche",
+
+  "You must be logged in to view mahrams": "Vous devez être connecté pour voir les mahrams",
+  "Error loading mahrams": "Erreur lors du chargement des mahrams",
+  "No mahrams yet": "Pas encore de mahrams",
+  "Search mahrams": "Rechercher des mahrams",
+  "No mahrams match your search": "Aucun mahram ne correspond à votre recherche",
+  "Your mahrams": "Vos mahrams",
+  "Add mahrams to start chatting.": "Ajoutez des mahrams pour commencer à discuter.",
+
+  "You earned a new badge!": "Vous avez gagné un nouveau badge !",
+  "Badge unlocked": "Badge débloqué",
+  "No communities found": "Aucune communauté trouvée",
+  "Try a different search term.": "Essayez un autre terme de recherche.",
+  "Loading posts...": "Chargement des publications...",
+  "empty_bio": "Pas encore de bio.",
+
 
 
 

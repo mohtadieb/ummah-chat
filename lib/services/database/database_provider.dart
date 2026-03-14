@@ -70,11 +70,13 @@ class DatabaseProvider extends ChangeNotifier {
   /// Update core profile (name + country + gender)
   Future<void> updateCoreProfile({
     required String name,
+    required String username,
     required String country,
     required String gender,
   }) async {
     await _db.updateUserCoreProfileInDatabase(
       name: name,
+      username: username,
       country: country,
       gender: gender,
     );
@@ -1002,6 +1004,16 @@ class DatabaseProvider extends ChangeNotifier {
   Future<List<UserProfile>> getMahramsForUser(String userId) async {
     return _db.getMahramsForUserInDatabase(userId);
   }
+
+  Stream<List<UserProfile>> mahramsStream() {
+    return _db.mahramsStreamFromDatabase();
+  }
+
+  Stream<List<UserProfile>> mahramsStreamForUser(String userId) {
+    return _db.mahramsStreamForUserFromDatabase(userId);
+  }
+
+
 
   // =========================================================
   // MARRIAGE INQUIRIES (DatabaseProvider)

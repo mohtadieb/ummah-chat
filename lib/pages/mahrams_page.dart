@@ -1,4 +1,4 @@
-// lib/pages/friends_page.dart
+// lib/pages/mahrams_page.dart
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -8,34 +8,24 @@ import 'package:ummah_chat/services/auth/auth_service.dart';
 
 import '../components/my_friend_tile.dart';
 import '../components/my_search_bar.dart';
-import '../helper/last_message_time_formatter.dart';
 import '../helper/navigate_pages.dart';
+import '../helper/last_message_time_formatter.dart';
 import '../services/chat/chat_provider.dart';
 import '../services/chat/chat_service.dart';
 import '../services/database/database_provider.dart';
 import '../services/notifications/notification_service.dart';
 import 'chat_page.dart';
 
-class FriendsPage extends StatefulWidget {
-  /// ✅ If null -> show CURRENT user's list
-  /// ✅ If provided -> show THAT user's friends-only list
+class MahramsPage extends StatefulWidget {
   final String? userId;
 
-  /// ✅ Only used for the current-user chat tab:
-  /// show friends + mahrams together.
-  final bool includeMahrams;
-
-  const FriendsPage({
-    super.key,
-    this.userId,
-    this.includeMahrams = false,
-  });
+  const MahramsPage({super.key, this.userId});
 
   @override
-  State<FriendsPage> createState() => _FriendsPageState();
+  State<MahramsPage> createState() => _MahramsPageState();
 }
 
-class _FriendsPageState extends State<FriendsPage> {
+class _MahramsPageState extends State<MahramsPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -49,10 +39,10 @@ class _FriendsPageState extends State<FriendsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return _buildFriendsList(context);
+    return _buildMahramsList(context);
   }
 
-  Widget _buildFriendsList(BuildContext context) {
+  Widget _buildMahramsList(BuildContext context) {
     final dbProvider = Provider.of<DatabaseProvider>(context, listen: false);
     final auth = AuthService();
     final currentUserId = auth.getCurrentUserId();
@@ -65,21 +55,20 @@ class _FriendsPageState extends State<FriendsPage> {
     if (targetUserId.isEmpty) {
       return Center(
         child: Text(
-          'You must be logged in to view friends'.tr(),
+          'You must be logged in to view mahrams'.tr(),
           style: TextStyle(color: colorScheme.primary),
         ),
       );
     }
 
-    // ✅ Other user profile lists always stay friends-only
     if (_isOtherUserView) {
       return StreamBuilder<List<UserProfile>>(
-        stream: dbProvider.friendsStreamForUser(targetUserId),
+        stream: dbProvider.mahramsStreamForUser(targetUserId),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return Center(
               child: Text(
-                "Error loading friends".tr(),
+                "Error loading mahrams".tr(),
                 style: TextStyle(color: colorScheme.primary),
               ),
             );
@@ -89,9 +78,9 @@ class _FriendsPageState extends State<FriendsPage> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final allFriends = snapshot.data ?? [];
+          final allMahrams = snapshot.data ?? [];
 
-          if (allFriends.isEmpty) {
+          if (allMahrams.isEmpty) {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 32.0),
@@ -99,13 +88,13 @@ class _FriendsPageState extends State<FriendsPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      Icons.group_outlined,
+                      Icons.verified_user_outlined,
                       size: 52,
                       color: colorScheme.primary.withValues(alpha: 0.6),
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      "No friends yet".tr(),
+                      "No mahrams yet".tr(),
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
@@ -114,7 +103,7 @@ class _FriendsPageState extends State<FriendsPage> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      "No friends to show yet.".tr(),
+                      "No mahrams to show yet.".tr(),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 13,
@@ -127,20 +116,20 @@ class _FriendsPageState extends State<FriendsPage> {
             );
           }
 
-          List<UserProfile> filteredFriends = allFriends;
+          List<UserProfile> filteredMahrams = allMahrams;
           if (_searchQuery.trim().isNotEmpty) {
             final q = _searchQuery.toLowerCase();
-            filteredFriends = allFriends.where((u) {
+            filteredMahrams = allMahrams.where((u) {
               final name = u.name.toLowerCase();
               final username = u.username.toLowerCase();
               return name.contains(q) || username.contains(q);
             }).toList();
           }
 
-          filteredFriends.sort((a, b) => a.username.compareTo(b.username));
+          filteredMahrams.sort((a, b) => a.username.compareTo(b.username));
 
           final noMatches =
-              _searchQuery.trim().isNotEmpty && filteredFriends.isEmpty;
+              _searchQuery.trim().isNotEmpty && filteredMahrams.isEmpty;
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -149,7 +138,7 @@ class _FriendsPageState extends State<FriendsPage> {
                 padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 4.0),
                 child: MySearchBar(
                   controller: _searchController,
-                  hintText: 'Search friends'.tr(),
+                  hintText: 'Search mahrams'.tr(),
                   onChanged: (value) {
                     setState(() => _searchQuery = value);
                   },
@@ -165,7 +154,7 @@ class _FriendsPageState extends State<FriendsPage> {
                 child: Row(
                   children: [
                     Text(
-                      "Friends".tr(),
+                      "Mahrams".tr(),
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -183,7 +172,7 @@ class _FriendsPageState extends State<FriendsPage> {
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        '${allFriends.length}',
+                        '${allMahrams.length}',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
@@ -199,7 +188,7 @@ class _FriendsPageState extends State<FriendsPage> {
                 child: noMatches
                     ? Center(
                   child: Text(
-                    'No friends match your search'.tr(),
+                    'No mahrams match your search'.tr(),
                     style: TextStyle(
                       color: colorScheme.primary.withValues(alpha: 0.8),
                     ),
@@ -213,14 +202,14 @@ class _FriendsPageState extends State<FriendsPage> {
                     padding: EdgeInsets.only(
                       bottom: MediaQuery.of(context).padding.bottom + 96,
                     ),
-                    itemCount: filteredFriends.length,
+                    itemCount: filteredMahrams.length,
                     itemBuilder: (context, index) {
-                      final u = filteredFriends[index];
+                      final u = filteredMahrams[index];
 
                       return MyFriendTile(
                         key: ValueKey(u.id),
                         user: u,
-                        isMahram: false,
+                        isMahram: true,
                         customTitle: u.name,
                         isOnline: u.isOnline,
                         unreadCount: 0,
@@ -269,27 +258,24 @@ class _FriendsPageState extends State<FriendsPage> {
       );
     }
 
-    // ✅ Own list: optionally include mahrams for the main chat tab
     return StreamBuilder<Map<String, int>>(
       stream: chatProvider.unreadCountsPollingStream(currentUserId),
       builder: (context, unreadSnapshot) {
-        final unreadByFriend = unreadSnapshot.data ?? const <String, int>{};
+        final unreadByUser = unreadSnapshot.data ?? const <String, int>{};
 
         return StreamBuilder<Map<String, LastMessageInfo>>(
           stream: chatProvider.lastMessagesByFriendPollingStream(currentUserId),
           builder: (context, lastMsgSnapshot) {
-            final lastMessageByFriend =
+            final lastMessageByUser =
                 lastMsgSnapshot.data ?? const <String, LastMessageInfo>{};
 
             return StreamBuilder<List<UserProfile>>(
-              stream: widget.includeMahrams
-                  ? dbProvider.connectionsStream()
-                  : dbProvider.friendsStream(),
+              stream: dbProvider.mahramsStream(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return Center(
                     child: Text(
-                      "Error loading friends".tr(),
+                      "Error loading mahrams".tr(),
                       style: TextStyle(color: colorScheme.primary),
                     ),
                   );
@@ -299,11 +285,11 @@ class _FriendsPageState extends State<FriendsPage> {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                final allFriends = (snapshot.data ?? [])
+                final allMahrams = (snapshot.data ?? [])
                     .where((u) => u.id != currentUserId)
                     .toList();
 
-                if (allFriends.isEmpty) {
+                if (allMahrams.isEmpty) {
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 32.0),
@@ -311,15 +297,13 @@ class _FriendsPageState extends State<FriendsPage> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            Icons.group_outlined,
+                            Icons.verified_user_outlined,
                             size: 52,
                             color: colorScheme.primary.withValues(alpha: 0.6),
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            widget.includeMahrams
-                                ? "No chats yet".tr()
-                                : "No friends yet".tr(),
+                            "No mahrams yet".tr(),
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
@@ -328,11 +312,7 @@ class _FriendsPageState extends State<FriendsPage> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            widget.includeMahrams
-                                ? "Add friends or mahrams to start chatting."
-                                .tr()
-                                : "Add people as friends or accept friend requests to start chatting."
-                                .tr(),
+                            "Add mahrams to start chatting.".tr(),
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 13,
@@ -345,19 +325,19 @@ class _FriendsPageState extends State<FriendsPage> {
                   );
                 }
 
-                List<UserProfile> filteredFriends = allFriends;
+                List<UserProfile> filteredMahrams = allMahrams;
                 if (_searchQuery.trim().isNotEmpty) {
                   final q = _searchQuery.toLowerCase();
-                  filteredFriends = allFriends.where((u) {
+                  filteredMahrams = allMahrams.where((u) {
                     final name = u.name.toLowerCase();
                     final username = u.username.toLowerCase();
                     return name.contains(q) || username.contains(q);
                   }).toList();
                 }
 
-                filteredFriends.sort((a, b) {
-                  final infoA = lastMessageByFriend[a.id];
-                  final infoB = lastMessageByFriend[b.id];
+                filteredMahrams.sort((a, b) {
+                  final infoA = lastMessageByUser[a.id];
+                  final infoB = lastMessageByUser[b.id];
                   final timeA = infoA?.createdAt;
                   final timeB = infoB?.createdAt;
 
@@ -372,7 +352,7 @@ class _FriendsPageState extends State<FriendsPage> {
                 });
 
                 final noMatches =
-                    _searchQuery.trim().isNotEmpty && filteredFriends.isEmpty;
+                    _searchQuery.trim().isNotEmpty && filteredMahrams.isEmpty;
 
                 final String? activeDmFriendId =
                     notificationService.activeDmFriendId;
@@ -384,9 +364,7 @@ class _FriendsPageState extends State<FriendsPage> {
                       padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 4.0),
                       child: MySearchBar(
                         controller: _searchController,
-                        hintText: widget.includeMahrams
-                            ? 'Search chats'.tr()
-                            : 'Search friends'.tr(),
+                        hintText: 'Search mahrams'.tr(),
                         onChanged: (value) {
                           setState(() {
                             _searchQuery = value;
@@ -408,9 +386,7 @@ class _FriendsPageState extends State<FriendsPage> {
                       child: Row(
                         children: [
                           Text(
-                            widget.includeMahrams
-                                ? "Your chats".tr()
-                                : "Your friends".tr(),
+                            "Your mahrams".tr(),
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
@@ -428,7 +404,7 @@ class _FriendsPageState extends State<FriendsPage> {
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
-                              '${allFriends.length}',
+                              '${allMahrams.length}',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
@@ -444,9 +420,7 @@ class _FriendsPageState extends State<FriendsPage> {
                       child: noMatches
                           ? Center(
                         child: Text(
-                          widget.includeMahrams
-                              ? 'No chats match your search'.tr()
-                              : 'No friends match your search'.tr(),
+                          'No mahrams match your search'.tr(),
                           style: TextStyle(
                             color: colorScheme.primary
                                 .withValues(alpha: 0.8),
@@ -460,13 +434,14 @@ class _FriendsPageState extends State<FriendsPage> {
                           physics: const ClampingScrollPhysics(),
                           padding: EdgeInsets.only(
                             bottom:
-                            MediaQuery.of(context).padding.bottom + 96,
+                            MediaQuery.of(context).padding.bottom +
+                                96,
                           ),
-                          itemCount: filteredFriends.length,
+                          itemCount: filteredMahrams.length,
                           itemBuilder: (context, index) {
-                            final user = filteredFriends[index];
-
-                            final rawUnread = unreadByFriend[user.id] ?? 0;
+                            final user = filteredMahrams[index];
+                            final rawUnread =
+                                unreadByUser[user.id] ?? 0;
 
                             final unreadCount =
                             (activeDmFriendId != null &&
@@ -474,7 +449,7 @@ class _FriendsPageState extends State<FriendsPage> {
                                 ? 0
                                 : rawUnread;
 
-                            final lastInfo = lastMessageByFriend[user.id];
+                            final lastInfo = lastMessageByUser[user.id];
                             final lastText = lastInfo?.text;
                             final lastTime = lastInfo?.createdAt;
 
@@ -491,9 +466,7 @@ class _FriendsPageState extends State<FriendsPage> {
                             return MyFriendTile(
                               key: ValueKey(user.id),
                               user: user,
-                              isMahram: widget.includeMahrams
-                                  ? dbProvider.isMahramUser(user.id)
-                                  : false,
+                              isMahram: true,
                               customTitle: user.name,
                               isOnline: user.isOnline,
                               unreadCount: unreadCount,

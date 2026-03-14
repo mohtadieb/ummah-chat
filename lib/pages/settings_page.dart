@@ -146,12 +146,19 @@ class _SettingsPageState extends State<SettingsPage> {
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        title: Text("Settings".tr()),
-        backgroundColor: cs.surface,
-        foregroundColor: cs.primary,
         elevation: 0,
         scrolledUnderElevation: 0,
+        backgroundColor: cs.surface,
         centerTitle: true,
+        title: Text(
+          "Settings".tr(),
+          style: TextStyle(
+            color: cs.primary,
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
+            letterSpacing: -0.2,
+          ),
+        ),
       ),
       body: SafeArea(
         child: ListView(

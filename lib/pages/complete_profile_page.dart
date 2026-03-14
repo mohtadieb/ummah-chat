@@ -8,7 +8,7 @@ import '../components/my_text_field.dart';
 import '../services/database/database_provider.dart';
 
 class CompleteProfilePage extends StatefulWidget {
-  final VoidCallback? onCompleted; // 👈 NEW
+  final VoidCallback? onCompleted;
 
   const CompleteProfilePage({
     super.key,
@@ -22,13 +22,13 @@ class CompleteProfilePage extends StatefulWidget {
 class _CompleteProfilePageState extends State<CompleteProfilePage> {
   final TextEditingController _firstNameController = TextEditingController();
   final TextEditingController _lastNameController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
 
   String? _selectedCountry;
   String? _selectedGender; // 'male' | 'female'
 
   bool _saving = false;
 
-  // Simple country list – you can extend / reorder as you like
   static final List<String> _countries = [
     'Netherlands'.tr(),
     'Belgium'.tr(),
@@ -67,7 +67,19 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
+    _usernameController.dispose();
     super.dispose();
+  }
+
+  String _normalizeUsername(String input) {
+    var value = input.trim().toLowerCase();
+
+    if (value.startsWith('@')) {
+      value = value.substring(1);
+    }
+
+    value = value.replaceAll(RegExp(r'\s+'), '');
+    return value;
   }
 
   Future<void> _saveProfile() async {
@@ -75,11 +87,13 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
 
     final firstName = _firstNameController.text.trim();
     final lastName = _lastNameController.text.trim();
+    final username = _normalizeUsername(_usernameController.text);
     final country = _selectedCountry?.trim() ?? '';
-    final gender = _selectedGender; // 'male' / 'female'
+    final gender = _selectedGender;
 
     if (firstName.isEmpty ||
         lastName.isEmpty ||
+        username.isEmpty ||
         country.isEmpty ||
         gender == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -90,17 +104,37 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
       return;
     }
 
+    if (username.length < 3) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Username must be at least 3 characters.'.tr()),
+        ),
+      );
+      return;
+    }
+
+    if (!RegExp(r'^[a-z0-9._]+$').hasMatch(username)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Username may only contain lowercase letters, numbers, dots, and underscores.'
+                .tr(),
+          ),
+        ),
+      );
+      return;
+    }
+
     final fullName = '$firstName $lastName'.trim();
 
     setState(() => _saving = true);
 
     try {
-      final dbProvider =
-      Provider.of<DatabaseProvider>(context, listen: false);
+      final dbProvider = Provider.of<DatabaseProvider>(context, listen: false);
 
-      // 🔹 Save via DatabaseProvider → DatabaseService
       await dbProvider.updateCoreProfile(
         name: fullName,
+        username: username,
         country: country,
         gender: gender,
       );
@@ -111,18 +145,59 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
         SnackBar(content: Text('Profile completed!'.tr())),
       );
 
-      // ✅ Let AuthGate / _ProfileGate handle switching to MainLayout
       widget.onCompleted?.call();
     } catch (e) {
       debugPrint('Error saving profile: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Could not save profile:'.tr() + " $e"))
+          SnackBar(content: Text('${'Could not save profile:'.tr()} $e')),
         );
       }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Widget _buildGenderChip({
+    required BuildContext context,
+    required String value,
+    required String label,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isSelected = _selectedGender == value;
+
+    return ChoiceChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          color: isSelected
+              ? colorScheme.onPrimary
+              : colorScheme.primary,
+          fontWeight: FontWeight.w700,
+          fontSize: 14,
+        ),
+      ),
+      selected: isSelected,
+      onSelected: (_) {
+        setState(() => _selectedGender = value);
+      },
+      showCheckmark: false,
+      selectedColor: colorScheme.primary,
+      backgroundColor: colorScheme.surface,
+      surfaceTintColor: Colors.transparent,
+      side: BorderSide(
+        color: isSelected
+            ? colorScheme.primary
+            : colorScheme.primary.withValues(alpha: 0.30),
+        width: 1.2,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      elevation: isSelected ? 0 : 0,
+      pressElevation: 0,
+    );
   }
 
   @override
@@ -143,7 +218,6 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                     children: [
                       const SizedBox(height: 8),
 
-                      // Logo
                       Image.asset(
                         'assets/images/login_page_image_green.png',
                         width: 220,
@@ -153,7 +227,8 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
 
                       const SizedBox(height: 8),
 
-                      Text("Complete your Ummah Chat profile".tr(),
+                      Text(
+                        "Complete your Ummah Chat profile".tr(),
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: colorScheme.primary,
@@ -162,7 +237,9 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      Text("We use this info to personalise your experience\nand keep interactions respectful.".tr(),
+                      Text(
+                        "We use this info to personalise your experience\nand keep interactions respectful."
+                            .tr(),
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: colorScheme.primary.withValues(alpha: 0.75),
@@ -173,7 +250,6 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
 
                       const SizedBox(height: 24),
 
-                      // First name
                       MyTextField(
                         controller: _firstNameController,
                         hintText: "First name".tr(),
@@ -181,18 +257,37 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                       ),
                       const SizedBox(height: 8),
 
-                      // Last name
                       MyTextField(
                         controller: _lastNameController,
                         hintText: "Last name".tr(),
                         obscureText: false,
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 8),
 
-                      // Country dropdown
+                      MyTextField(
+                        controller: _usernameController,
+                        hintText: "Username".tr(),
+                        obscureText: false,
+                      ),
+                      const SizedBox(height: 6),
+
                       Align(
                         alignment: Alignment.centerLeft,
-                        child: Text("Country *".tr(),
+                        child: Text(
+                          "@username • ${'Only lowercase letters, numbers, dots and underscores'.tr()}",
+                          style: TextStyle(
+                            color: colorScheme.primary.withValues(alpha: 0.65),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          "Country *".tr(),
                           style: TextStyle(
                             color: colorScheme.primary,
                             fontSize: 13,
@@ -218,11 +313,10 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                           child: DropdownButton<String>(
                             isExpanded: true,
                             value: _selectedCountry,
-                            hint: Text("Select your country".tr(),
+                            hint: Text(
+                              "Select your country".tr(),
                               style: TextStyle(
-                                color: colorScheme.primary.withValues(
-                                  alpha: 0.7,
-                                ),
+                                color: colorScheme.primary.withValues(alpha: 0.7),
                                 fontSize: 14,
                               ),
                             ),
@@ -251,10 +345,10 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
 
                       const SizedBox(height: 20),
 
-                      // Gender
                       Align(
                         alignment: Alignment.centerLeft,
-                        child: Text("Gender *".tr(),
+                        child: Text(
+                          "Gender *".tr(),
                           style: TextStyle(
                             color: colorScheme.primary,
                             fontSize: 13,
@@ -263,24 +357,33 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        children: [
-                          ChoiceChip(
-                            label: Text("Male".tr()),
-                            selected: _selectedGender == 'male',
-                            onSelected: (_) {
-                              setState(() => _selectedGender = 'male');
-                            },
+
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Center(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: 120,
+                                child: _buildGenderChip(
+                                  context: context,
+                                  value: 'male',
+                                  label: "Male".tr(),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              SizedBox(
+                                width: 120,
+                                child: _buildGenderChip(
+                                  context: context,
+                                  value: 'female',
+                                  label: "Female".tr(),
+                                ),
+                              ),
+                            ],
                           ),
-                          ChoiceChip(
-                            label: Text("Female".tr()),
-                            selected: _selectedGender == 'female',
-                            onSelected: (_) {
-                              setState(() => _selectedGender = 'female');
-                            },
-                          ),
-                        ],
+                        ),
                       ),
 
                       const SizedBox(height: 28),
@@ -299,7 +402,6 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
           ),
         ),
 
-        // Loading overlay
         if (_saving)
           Container(
             color: const Color.fromRGBO(0, 0, 0, 0.25),
@@ -316,7 +418,8 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                     children: [
                       const CircularProgressIndicator(),
                       const SizedBox(height: 16),
-                      Text("Saving profile...".tr(),
+                      Text(
+                        "Saving profile...".tr(),
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,

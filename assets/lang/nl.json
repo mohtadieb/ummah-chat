@@ -605,6 +605,28 @@
   "mahrams_of": "Mahrams van {name}",
   "Mahrams": "Mahrams",
 
+  "No chats yet": "Nog geen chats",
+  "Add friends or mahrams to start chatting.": "Voeg vrienden of mahrams toe om te beginnen met chatten.",
+  "Search chats": "Zoek chats",
+  "Your chats": "Jouw chats",
+  "No chats match your search": "Geen chats gevonden voor je zoekopdracht",
+
+  "You must be logged in to view mahrams": "Je moet ingelogd zijn om mahrams te bekijken",
+  "Error loading mahrams": "Fout bij het laden van mahrams",
+  "No mahrams yet": "Nog geen mahrams",
+  "Search mahrams": "Zoek mahrams",
+  "No mahrams match your search": "Geen mahrams gevonden voor je zoekopdracht",
+  "Your mahrams": "Jouw mahrams",
+  "Add mahrams to start chatting.": "Voeg mahrams toe om te beginnen met chatten.",
+  "You earned a new badge!": "Je hebt een nieuwe badge verdiend!",
+  "Badge unlocked": "Badge ontgrendeld",
+  "No communities found": "Geen communities gevonden",
+  "Try a different search term.": "Probeer een andere zoekterm.",
+  "Loading posts...": "Berichten laden...",
+  "empty_bio": "Nog geen bio.",
+
+
+
 
 
   "daily_ayah_title": "Dagelijkse Ayah",

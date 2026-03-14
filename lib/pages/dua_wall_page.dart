@@ -9,6 +9,7 @@ import '../components/my_input_alert_box.dart';
 import '../models/dua.dart';
 import '../helper/time_ago_text.dart';
 import '../services/quran/quran_service.dart';
+import 'dart:ui' as ui;
 
 class DuaWallPage extends StatefulWidget {
   const DuaWallPage({super.key});
@@ -217,8 +218,27 @@ class _DuaWallPageState extends State<DuaWallPage> {
                       runSpacing: 8,
                       children: [
                         FilterChip(
-                          label: Text("Show my name".tr()),
+                          label: Text(
+                            "Show my name".tr(),
+                            style: TextStyle(
+                              color: !isAnonymous && !isPrivate
+                                  ? Theme.of(context).colorScheme.onPrimary
+                                  : Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                           selected: !isAnonymous && !isPrivate,
+                          showCheckmark: false,
+                          selectedColor: Theme.of(context).colorScheme.primary,
+                          backgroundColor: Theme.of(context).colorScheme.surface,
+                          side: BorderSide(
+                            color: (!isAnonymous && !isPrivate)
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context).colorScheme.primary.withValues(alpha: 0.28),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           onSelected: (_) {
                             setInnerState(() {
                               isAnonymous = false;
@@ -227,8 +247,27 @@ class _DuaWallPageState extends State<DuaWallPage> {
                           },
                         ),
                         FilterChip(
-                          label: Text("Anonymous".tr()),
+                          label: Text(
+                            "Anonymous".tr(),
+                            style: TextStyle(
+                              color: isAnonymous
+                                  ? Theme.of(context).colorScheme.onPrimary
+                                  : Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                           selected: isAnonymous,
+                          showCheckmark: false,
+                          selectedColor: Theme.of(context).colorScheme.primary,
+                          backgroundColor: Theme.of(context).colorScheme.surface,
+                          side: BorderSide(
+                            color: isAnonymous
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context).colorScheme.primary.withValues(alpha: 0.28),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           onSelected: (value) {
                             setInnerState(() {
                               isAnonymous = value;
@@ -237,8 +276,27 @@ class _DuaWallPageState extends State<DuaWallPage> {
                           },
                         ),
                         FilterChip(
-                          label: Text("Private (only me)".tr()),
+                          label: Text(
+                            "Private (only me)".tr(),
+                            style: TextStyle(
+                              color: isPrivate
+                                  ? Theme.of(context).colorScheme.onPrimary
+                                  : Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                           selected: isPrivate,
+                          showCheckmark: false,
+                          selectedColor: Theme.of(context).colorScheme.primary,
+                          backgroundColor: Theme.of(context).colorScheme.surface,
+                          side: BorderSide(
+                            color: isPrivate
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context).colorScheme.primary.withValues(alpha: 0.28),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           onSelected: (value) {
                             setInnerState(() {
                               isPrivate = value;
@@ -851,12 +909,25 @@ class _DailyAyahBanner extends StatelessWidget {
       return _PremiumAyahShell(
         child: Row(
           children: [
-            SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: cs.primary,
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.14),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.16),
+                ),
+              ),
+              child: Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: cs.onPrimary,
+                  ),
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -866,14 +937,15 @@ class _DailyAyahBanner extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
+                  color: cs.onPrimary,
                 ),
               ),
             ),
             Icon(
-              Icons.swipe_rounded,
+              Icons.auto_stories_rounded,
               size: 18,
-              color: cs.onSurface.withValues(alpha: 0.35),
+              color: cs.onPrimary.withValues(alpha: 0.75),
             ),
           ],
         ),
@@ -885,16 +957,19 @@ class _DailyAyahBanner extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 34,
-              height: 34,
+              width: 42,
+              height: 42,
               decoration: BoxDecoration(
-                color: cs.primary.withValues(alpha: 0.10),
                 shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.14),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.16),
+                ),
               ),
               child: Icon(
                 Icons.menu_book_outlined,
-                color: cs.primary,
-                size: 18,
+                color: cs.onPrimary,
+                size: 20,
               ),
             ),
             const SizedBox(width: 12),
@@ -904,12 +979,16 @@ class _DailyAyahBanner extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
+                  color: cs.onPrimary,
                 ),
               ),
             ),
             TextButton(
               onPressed: onRetry,
+              style: TextButton.styleFrom(
+                foregroundColor: cs.onPrimary,
+              ),
               child: Text('retry'.tr()),
             ),
           ],
@@ -932,16 +1011,26 @@ class _DailyAyahBanner extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 38,
-                height: 38,
+                width: 46,
+                height: 46,
                 decoration: BoxDecoration(
-                  color: cs.primary.withValues(alpha: 0.10),
                   shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.16),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.18),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.10),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: Icon(
                   Icons.auto_stories_rounded,
-                  color: cs.primary,
-                  size: 20,
+                  color: cs.onPrimary,
+                  size: 22,
                 ),
               ),
               const SizedBox(width: 12),
@@ -949,19 +1038,33 @@ class _DailyAyahBanner extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'daily_ayah_title'.tr(),
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: cs.primary,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.16),
+                        ),
+                      ),
+                      child: Text(
+                        'daily_ayah_title'.tr(),
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: cs.onPrimary,
+                          letterSpacing: 0.1,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 8),
                     Text(
                       key,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: cs.onSurface.withValues(alpha: 0.6),
-                        fontWeight: FontWeight.w600,
+                        color: cs.onPrimary.withValues(alpha: 0.78),
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
@@ -971,32 +1074,48 @@ class _DailyAyahBanner extends StatelessWidget {
                 tooltip: isSaved ? 'saved'.tr() : 'save'.tr(),
                 icon: isSaved ? Icons.bookmark : Icons.bookmark_border,
                 onTap: onToggleSave,
+                isPrimaryOnDark: true,
               ),
               const SizedBox(width: 8),
               _AyahActionButton(
                 tooltip: 'share'.tr(),
                 icon: Icons.share_outlined,
                 onTap: onShare,
+                isPrimaryOnDark: true,
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           if (arabic.isNotEmpty)
-            Text(
-              arabic,
-              textAlign: TextAlign.start,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                height: 1.5,
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.14),
+                ),
+              ),
+              child: Text(
+                arabic,
+                textAlign: TextAlign.right,
+                textDirection: ui.TextDirection.rtl,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  height: 1.85,
+                  color: cs.onPrimary,
+                ),
               ),
             ),
-          if (arabic.isNotEmpty && preview.isNotEmpty) const SizedBox(height: 10),
+          if (arabic.isNotEmpty && preview.isNotEmpty) const SizedBox(height: 14),
           if (preview.isNotEmpty)
             Text(
               preview,
               style: theme.textTheme.bodyMedium?.copyWith(
-                height: 1.45,
-                color: cs.onSurface.withValues(alpha: 0.78),
+                height: 1.55,
+                color: cs.onPrimary.withValues(alpha: 0.92),
+                fontWeight: FontWeight.w500,
               ),
             ),
         ],
@@ -1017,27 +1136,61 @@ class _PremiumAyahShell extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
+        borderRadius: BorderRadius.circular(26),
+        gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            cs.surfaceContainerHigh,
-            cs.surfaceContainer,
+            Color(0xFF0F7B63),
+            Color(0xFF159A7A),
+            Color(0xFF1A7F73),
           ],
         ),
         border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: 0.55),
+          color: Colors.white.withValues(alpha: 0.10),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
+            color: const Color(0xFF0F7B63).withValues(alpha: 0.24),
             blurRadius: 24,
-            offset: const Offset(0, 10),
+            offset: const Offset(0, 12),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: child,
+      child: Stack(
+        children: [
+          Positioned(
+            top: -18,
+            right: -12,
+            child: Container(
+              width: 92,
+              height: 92,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.06),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -28,
+            left: -16,
+            child: Container(
+              width: 84,
+              height: 84,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.05),
+              ),
+            ),
+          ),
+          child,
+        ],
+      ),
     );
   }
 }
@@ -1046,31 +1199,47 @@ class _AyahActionButton extends StatelessWidget {
   final String tooltip;
   final IconData icon;
   final VoidCallback onTap;
+  final bool isPrimaryOnDark;
 
   const _AyahActionButton({
     required this.tooltip,
     required this.icon,
     required this.onTap,
+    this.isPrimaryOnDark = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
+    final bgColor = isPrimaryOnDark
+        ? Colors.white.withValues(alpha: 0.14)
+        : cs.primary.withValues(alpha: 0.10);
+
+    final borderColor = isPrimaryOnDark
+        ? Colors.white.withValues(alpha: 0.14)
+        : cs.primary.withValues(alpha: 0.16);
+
+    final iconColor = isPrimaryOnDark ? cs.onPrimary : cs.primary;
+
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: cs.primary.withValues(alpha: 0.10),
+        color: bgColor,
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(14),
-          child: SizedBox(
+          child: Container(
             width: 40,
             height: 40,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: borderColor),
+            ),
             child: Icon(
               icon,
-              color: cs.primary,
+              color: iconColor,
               size: 20,
             ),
           ),

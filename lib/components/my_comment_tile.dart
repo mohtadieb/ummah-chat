@@ -16,9 +16,6 @@ import '../services/auth/auth_service.dart';
 import '../services/database/database_provider.dart';
 import 'my_confirmation_box.dart';
 import '../components/my_input_alert_box.dart';
-import '../services/notifications/notification_service.dart'; // 👈 NEW
-import '../services/navigation/bottom_nav_provider.dart';
-
 
 class MyCommentTile extends StatefulWidget {
   final Comment comment;
@@ -53,66 +50,112 @@ class _MyCommentTileState extends State<MyCommentTile> {
 
   /// Show options for this comment: reply, delete (own), report/block (others)
   void _showOptions(BuildContext context) {
+    final theme = Theme.of(context);
     final currentUserId = AuthService().getCurrentUserId();
     final isOwnComment = widget.comment.userId == currentUserId;
 
     showModalBottomSheet(
       context: context,
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (sheetContext) {
-        return SafeArea(
-          child: Wrap(
-            children: [
-              // REPLY (for everyone)
-              ListTile(
-                leading: const Icon(Icons.reply_outlined),
-                title: Text("Reply".tr()),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _openReplyBox();
-                },
+        final cs = theme.colorScheme;
+
+        Widget actionTile({
+          required IconData icon,
+          required String title,
+          required VoidCallback onTap,
+          Color? iconColor,
+          Color? textColor,
+        }) {
+          return ListTile(
+            leading: Icon(
+              icon,
+              color: iconColor ?? cs.onSurface,
+            ),
+            title: Text(
+              title,
+              style: TextStyle(
+                color: textColor ?? cs.onSurface,
+                fontWeight: FontWeight.w600,
               ),
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            onTap: onTap,
+          );
+        }
 
-              if (isOwnComment) ...[
-                // OWN COMMENT: delete
-                ListTile(
-                  leading: const Icon(Icons.delete),
-                  title: Text("Delete".tr()),
-                  onTap: () async {
-                    Navigator.pop(sheetContext);
-
-                    await databaseProvider.deleteComment(
-                      widget.comment.id,
-                      widget.comment.postId,
-                    );
-                  },
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+            child: Wrap(
+              children: [
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 5,
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(
+                      color: cs.outline.withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
                 ),
-              ] else ...[
-                // NOT OWN COMMENT: report / block
-                ListTile(
-                  leading: const Icon(Icons.report),
-                  title: Text("Report".tr()),
+
+                actionTile(
+                  icon: Icons.reply_rounded,
+                  title: "Reply".tr(),
                   onTap: () {
                     Navigator.pop(sheetContext);
-                    _reportPostConfirmationBox();
+                    _openReplyBox();
                   },
                 ),
-                ListTile(
-                  leading: const Icon(Icons.block),
-                  title: Text("Block".tr()),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _blockUserConfirmationBox();
-                  },
+
+                if (isOwnComment) ...[
+                  actionTile(
+                    icon: Icons.delete_outline_rounded,
+                    title: "Delete".tr(),
+                    iconColor: Colors.redAccent,
+                    textColor: Colors.redAccent,
+                    onTap: () async {
+                      Navigator.pop(sheetContext);
+
+                      await databaseProvider.deleteComment(
+                        widget.comment.id,
+                        widget.comment.postId,
+                      );
+                    },
+                  ),
+                ] else ...[
+                  actionTile(
+                    icon: Icons.outlined_flag_rounded,
+                    title: "Report".tr(),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _reportPostConfirmationBox();
+                    },
+                  ),
+                  actionTile(
+                    icon: Icons.block_rounded,
+                    title: "Block".tr(),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _blockUserConfirmationBox();
+                    },
+                  ),
+                ],
+
+                actionTile(
+                  icon: Icons.close_rounded,
+                  title: "Cancel".tr(),
+                  onTap: () => Navigator.pop(sheetContext),
                 ),
               ],
-
-              // Always show cancel
-              ListTile(
-                leading: const Icon(Icons.cancel),
-                title: Text("Cancel".tr()),
-                onTap: () => Navigator.pop(sheetContext),
-              ),
-            ],
+            ),
           ),
         );
       },
@@ -169,7 +212,6 @@ class _MyCommentTileState extends State<MyCommentTile> {
     }
   }
 
-
   void _handleUserTap() {
     final currentUserId = AuthService().getCurrentUserId();
 
@@ -184,8 +226,6 @@ class _MyCommentTileState extends State<MyCommentTile> {
       widget.onUserTap!();
     }
   }
-
-
 
   void _reportPostConfirmationBox() {
     showDialog(
@@ -226,87 +266,138 @@ class _MyCommentTileState extends State<MyCommentTile> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      color: colorScheme.surface,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Avatar
-          GestureDetector(
-            onTap: _handleUserTap,
-            child: CircleAvatar(
-              radius: 16,
-              backgroundColor: colorScheme.secondary,
-              child: Icon(
-                Icons.person,
-                size: 18,
-                color: colorScheme.primary,
+    final cardColor = colorScheme.surfaceContainerHighest.withValues(alpha: 0.38);
+    final borderColor = colorScheme.outline.withValues(alpha: 0.12);
+    final usernameColor = colorScheme.onSurface;
+    final messageColor = colorScheme.onSurface.withValues(alpha: 0.92);
+    final metaColor = colorScheme.onSurfaceVariant;
+    final iconColor = colorScheme.onSurfaceVariant;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: borderColor),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 14,
+                offset: const Offset(0, 4),
               ),
-            ),
+            ],
           ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Avatar
+              GestureDetector(
+                onTap: _handleUserTap,
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: colorScheme.primary.withValues(alpha: 0.10),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: CircleAvatar(
+                    radius: 18,
+                    backgroundColor: colorScheme.primary.withValues(alpha: 0.12),
+                    backgroundImage: widget.comment.profilePhotoUrl != null &&
+                        widget.comment.profilePhotoUrl!.isNotEmpty
+                        ? NetworkImage(widget.comment.profilePhotoUrl!)
+                        : null,
+                    child: (widget.comment.profilePhotoUrl == null ||
+                        widget.comment.profilePhotoUrl!.isEmpty)
+                        ? Icon(
+                      Icons.person_rounded,
+                      size: 18,
+                      color: colorScheme.primary,
+                    )
+                        : null,
+                  ),
+                ),
+              ),
 
-          const SizedBox(width: 8),
+              const SizedBox(width: 10),
 
-          // Comment content: username + text + time
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // username + comment
-                GestureDetector(
-                  onTap: _handleUserTap,
-                  child: RichText(
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: '${widget.comment.username} ',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: colorScheme.inversePrimary,
+              // Comment content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    GestureDetector(
+                      onTap: _handleUserTap,
+                      child: RichText(
+                        text: TextSpan(
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            height: 1.35,
+                            color: messageColor,
                             fontSize: 14,
                           ),
+                          children: [
+                            TextSpan(
+                              text: '${widget.comment.username}  ',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: usernameColor,
+                                fontSize: 14,
+                              ),
+                            ),
+                            TextSpan(
+                              text: widget.comment.message,
+                              style: TextStyle(
+                                color: messageColor,
+                                fontWeight: FontWeight.w500,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
                         ),
-                        TextSpan(
-                          text: widget.comment.message,
-                          style: TextStyle(
-                            color: colorScheme.inversePrimary,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
+
+                    const SizedBox(height: 8),
+
+                    TimeAgoText(
+                      createdAt: widget.comment.createdAt,
+                      style: TextStyle(
+                        color: metaColor,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
+              ),
 
-                const SizedBox(height: 2),
+              const SizedBox(width: 8),
 
-                // time ago
-                TimeAgoText(
-                  createdAt: widget.comment.createdAt,
-                  style: TextStyle(
-                    color: colorScheme.primary,
-                    fontSize: 11,
-                  ),
+              // More options
+              IconButton(
+                icon: Icon(
+                  Icons.more_horiz_rounded,
+                  color: iconColor,
+                  size: 20,
                 ),
-              ],
-            ),
+                onPressed: () => _showOptions(context),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
           ),
-
-          // More options (3 dots)
-          IconButton(
-            icon: Icon(
-              Icons.more_horiz,
-              color: colorScheme.inversePrimary,
-              size: 20,
-            ),
-            onPressed: () => _showOptions(context),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-          ),
-        ],
+        ),
       ),
     );
   }

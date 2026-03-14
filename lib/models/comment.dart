@@ -1,10 +1,3 @@
-/*
-COMMENT MODEL
-
-This model defines what every comment should have in the Supabase setup.
-It aligns with your `profiles.id` as the foreign key for the commenting user.
-*/
-
 class Comment {
   final String id;
   final String postId;
@@ -13,6 +6,7 @@ class Comment {
   final String username;
   final String message;
   final DateTime createdAt;
+  final String? profilePhotoUrl; // 👈 NEW
 
   Comment({
     required this.id,
@@ -22,9 +16,10 @@ class Comment {
     required this.username,
     required this.message,
     required this.createdAt,
+    this.profilePhotoUrl, // 👈 NEW
   });
 
-  /// ✅ Supabase -> App
+  /// Supabase -> App
   factory Comment.fromMap(Map<String, dynamic> data) {
     return Comment(
       id: data['id']?.toString() ?? '',
@@ -33,13 +28,15 @@ class Comment {
       name: data['name'] ?? '',
       username: data['username'] ?? '',
       message: data['message'] ?? '',
+      profilePhotoUrl: data['profile_photo_url'], // 👈 NEW
       createdAt: data['created_at'] != null
-          ? DateTime.tryParse(data['created_at'].toString())?.toLocal() ?? DateTime.now()
+          ? DateTime.tryParse(data['created_at'].toString())?.toLocal() ??
+          DateTime.now()
           : DateTime.now(),
     );
   }
 
-  /// ✅ App -> Supabase
+  /// App -> Supabase
   Map<String, dynamic> toMap() {
     final map = {
       'post_id': postId,
@@ -48,15 +45,15 @@ class Comment {
       'username': username,
       'message': message,
       'created_at': createdAt.toIso8601String(),
+      'profile_photo_url': profilePhotoUrl, // 👈 NEW
     };
 
-    // ⚙️ Include 'id' only if it's non-empty
     if (id.isNotEmpty) map['id'] = id;
 
     return map;
   }
 
-  /// ✅ Copy with updated fields
+  /// Copy with updated fields
   Comment copyWith({
     String? id,
     String? postId,
@@ -65,6 +62,7 @@ class Comment {
     String? username,
     String? message,
     DateTime? createdAt,
+    String? profilePhotoUrl, // 👈 NEW
   }) {
     return Comment(
       id: id ?? this.id,
@@ -74,6 +72,7 @@ class Comment {
       username: username ?? this.username,
       message: message ?? this.message,
       createdAt: createdAt ?? this.createdAt,
+      profilePhotoUrl: profilePhotoUrl ?? this.profilePhotoUrl,
     );
   }
 }

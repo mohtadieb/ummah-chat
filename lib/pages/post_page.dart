@@ -216,11 +216,17 @@ class _PostPageState extends State<PostPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
 
     if (_loadingPost) {
       return Scaffold(
-        backgroundColor: theme.colorScheme.surface,
-        appBar: AppBar(foregroundColor: theme.colorScheme.primary),
+        backgroundColor: cs.surface,
+        appBar: AppBar(
+          backgroundColor: cs.surface,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          foregroundColor: cs.onSurface,
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -228,12 +234,20 @@ class _PostPageState extends State<PostPage> {
     final post = _post ?? widget.post;
     if (post == null) {
       return Scaffold(
-        backgroundColor: theme.colorScheme.surface,
-        appBar: AppBar(foregroundColor: theme.colorScheme.primary),
+        backgroundColor: cs.surface,
+        appBar: AppBar(
+          backgroundColor: cs.surface,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          foregroundColor: cs.onSurface,
+        ),
         body: Center(
           child: Text(
             "This post is no longer available.".tr(),
-            style: TextStyle(color: theme.colorScheme.primary),
+            style: TextStyle(
+              color: cs.onSurface,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       );
@@ -242,18 +256,31 @@ class _PostPageState extends State<PostPage> {
     // listen to all comments for this post
     final allComments = listeningProvider.getComments(post.id);
 
-    final highlightTint = theme.colorScheme.primary.withValues(alpha: 0.10);
+    final highlightTint = cs.primary.withValues(alpha: 0.10);
 
     // Build a single list (no nested ListView.builder) so scrolling to comment works reliably
     final itemsCount = 2 + allComments.length; // 0=post, 1=header, rest=comments
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: cs.surface,
       appBar: AppBar(
-        foregroundColor: theme.colorScheme.primary,
+        backgroundColor: cs.surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        foregroundColor: cs.onSurface,
+        title: Text(
+          "Post".tr(),
+          style: TextStyle(
+            color: cs.onSurface,
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+          ),
+        ),
       ),
       body: ListView.builder(
         controller: _scrollController,
+        padding: const EdgeInsets.fromLTRB(10, 6, 10, 18),
         itemCount: itemsCount,
         itemBuilder: (context, index) {
           // 0) Post tile
@@ -261,55 +288,101 @@ class _PostPageState extends State<PostPage> {
             return AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeOut,
+              margin: const EdgeInsets.only(bottom: 14),
               decoration: BoxDecoration(
                 color: _highlightPost ? highlightTint : Colors.transparent,
+                borderRadius: BorderRadius.circular(24),
               ),
-              child: MyPostTile(
-                post: post,
-                onUserTap: () => goUserPage(context, post.userId),
-                onPostTap: () {},
-                scaffoldContext: context,
-                isInPostPage: true,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: MyPostTile(
+                  post: post,
+                  onUserTap: () => goUserPage(context, post.userId),
+                  onPostTap: () {},
+                  scaffoldContext: context,
+                  isInPostPage: true,
+                ),
               ),
             );
           }
 
           // 1) Header + empty state wrapper
           if (index == 1) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 12),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                  child: Text(
-                    "Comments".tr(),
-                    style: TextStyle(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest.withValues(alpha: 0.26),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: cs.outline.withValues(alpha: 0.10),
                 ),
-                const SizedBox(height: 4),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeOut,
-                  color: _highlightComments ? highlightTint : Colors.transparent,
-                  child: allComments.isEmpty
-                      ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 30,
+                        height: 30,
+                        decoration: BoxDecoration(
+                          color: cs.primary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.chat_bubble_outline_rounded,
+                          size: 16,
+                          color: cs.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        "Comments".tr(),
+                        style: TextStyle(
+                          color: cs.onSurface,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${allComments.length}',
+                        style: TextStyle(
+                          color: cs.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOut,
+                    padding: _highlightComments
+                        ? const EdgeInsets.all(6)
+                        : EdgeInsets.zero,
+                    decoration: BoxDecoration(
+                      color: _highlightComments ? highlightTint : Colors.transparent,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: allComments.isEmpty
+                        ? Padding(
+                      padding: const EdgeInsets.only(top: 6, bottom: 6),
                       child: Text(
                         "No comments yet".tr(),
                         style: TextStyle(
-                          color: theme.colorScheme.primary,
+                          color: cs.onSurfaceVariant,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                    ),
-                  )
-                      : const SizedBox.shrink(),
-                ),
-              ],
+                    )
+                        : const SizedBox.shrink(),
+                  ),
+                ],
+              ),
             );
           }
 
@@ -321,7 +394,7 @@ class _PostPageState extends State<PostPage> {
 
           return Container(
             key: _commentKeys[comment.id],
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 2),
             child: MyCommentTile(
               comment: comment,
               onUserTap: () => goUserPage(context, comment.userId),

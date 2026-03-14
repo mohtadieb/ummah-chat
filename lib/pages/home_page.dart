@@ -42,6 +42,7 @@ class _HomePageState extends State<HomePage>
 
   List<Post> _frozenForYou = [];
   bool _forYouFrozenReady = false;
+  bool _initialFeedLoading = true;
 
   Set<String> _lastAllPostIds = {};
 
@@ -88,14 +89,21 @@ class _HomePageState extends State<HomePage>
     databaseProvider.addListener(_onDbChanged);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await databaseProvider.reloadPosts();
-      await databaseProvider.getAllCommunities();
-      await _rebuildFrozenForYou();
+      try {
+        await databaseProvider.reloadPosts();
+        await databaseProvider.getAllCommunities();
+        await _rebuildFrozenForYou();
 
-      _lastAllPostIds = databaseProvider.posts
-          .map((p) => p.id)
-          .whereType<String>()
-          .toSet();
+        _lastAllPostIds = databaseProvider.posts
+            .map((p) => p.id)
+            .whereType<String>()
+            .toSet();
+      } finally {
+        if (!mounted) return;
+        setState(() {
+          _initialFeedLoading = false;
+        });
+      }
     });
   }
 
@@ -136,8 +144,6 @@ class _HomePageState extends State<HomePage>
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    // Local override only for feed tiles so text-based posts don’t disappear
-    // into a same-tone background.
     return theme.copyWith(
       colorScheme: cs.copyWith(
         primary: cs.onSurface,
@@ -246,7 +252,19 @@ class _HomePageState extends State<HomePage>
           await _rebuildFrozenForYou();
         }
       },
-      child: list.isEmpty
+      child: _initialFeedLoading
+          ? LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: const _FeedLoadingState(),
+            ),
+          );
+        },
+      )
+          : list.isEmpty
           ? LayoutBuilder(
         builder: (context, constraints) {
           return SingleChildScrollView(
@@ -496,6 +514,43 @@ class _PremiumTabBar extends StatelessWidget {
           ),
         )
             .toList(),
+      ),
+    );
+  }
+}
+
+class _FeedLoadingState extends StatelessWidget {
+  const _FeedLoadingState();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 30,
+              height: 30,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.4,
+                color: cs.primary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Loading posts...'.tr(),
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

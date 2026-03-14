@@ -48,6 +48,7 @@ class SelectStoriesPage extends StatefulWidget {
 
 class _SelectStoriesPageState extends State<SelectStoriesPage> {
   final Color _gold = const Color(0xFFC9A74E);
+  final Color _goldDeep = const Color(0xFF9F7B22);
   late final List<StoryData> _stories;
 
   bool _loaded = false;
@@ -303,26 +304,30 @@ class _SelectStoriesPageState extends State<SelectStoriesPage> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.green.withValues(alpha: 0.08),
+                          color: isMuhammad
+                              ? _gold.withValues(alpha: 0.10)
+                              : Colors.green.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(999),
                           border: Border.all(
-                            color: Colors.green.withValues(alpha: 0.35),
+                            color: isMuhammad
+                                ? _gold.withValues(alpha: 0.38)
+                                : Colors.green.withValues(alpha: 0.35),
                             width: 0.8,
                           ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.check_rounded,
                               size: 14,
-                              color: Colors.green,
+                              color: isMuhammad ? _goldDeep : Colors.green,
                             ),
                             const SizedBox(width: 4),
                             Text(
                               'Completed'.tr(),
                               style: textTheme.bodySmall?.copyWith(
-                                color: Colors.green[800],
+                                color: isMuhammad ? _goldDeep : Colors.green[800],
                                 fontWeight: FontWeight.w700,
                               ),
                             ),

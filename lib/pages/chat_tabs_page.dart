@@ -123,7 +123,7 @@ class _ChatTabsPageState extends State<ChatTabsPage>
                   controller: _tabController,
                   physics: const BouncingScrollPhysics(),
                   children: const [
-                    FriendsPage(),
+                    FriendsPage(includeMahrams: true,),
                     GroupsPage(),
                     CommunitiesPage(),
                   ],

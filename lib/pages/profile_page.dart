@@ -26,6 +26,7 @@ import '../services/navigation/bottom_nav_provider.dart';
 import 'chat_page.dart';
 import 'follow_list_page.dart';
 import 'friends_page.dart';
+import 'mahrams_page.dart';
 
 class _MuhammadPartInfo {
   final String id;
@@ -156,7 +157,7 @@ class _ProfilePageState extends State<ProfilePage> {
     'assets/images/man_hair_beard.png',
     'assets/images/man_beard_headwear.png',
     'assets/images/man_normal_hair_old.png',
-    'assets/images/main_hair_beard_old.png',
+    'assets/images/man_hair_beard_old.png',
     'assets/images/man_beard_headwear_old.png',
   ];
 
@@ -1420,7 +1421,7 @@ class _ProfilePageState extends State<ProfilePage> {
       return databaseProvider.getMahramsForUser(widget.userId);
     }
 
-    void openMahramsFullScreen(List<UserProfile> allMahrams) {
+    void openMahramsFullScreen() {
       final displayName = (user?.name ?? '').trim();
       final firstName = displayName.isEmpty
           ? ''
@@ -1443,94 +1444,9 @@ class _ProfilePageState extends State<ProfilePage> {
               elevation: 0,
               scrolledUnderElevation: 0,
             ),
-            body: allMahrams.isEmpty
-                ? Center(
-              child: Text(
-                isOwn
-                    ? "No mahrams to show yet.".tr()
-                    : "No mahrams to show.".tr(),
-                style: TextStyle(
-                  color: Theme.of(ctx).colorScheme.onSurface,
-                ),
-              ),
-            )
-                : ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: allMahrams.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                final mahram = allMahrams[index];
-
-                return InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: () {
-                    if (mahram.id == currentUserId) {
-                      _goToMyProfileInMainLayout();
-                      return;
-                    }
-
-                    if (isOwn) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ChatPage(
-                            friendId: mahram.id,
-                            friendName: mahram.name,
-                          ),
-                        ),
-                      );
-                    } else {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ProfilePage(userId: mahram.id),
-                        ),
-                      );
-                    }
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Theme.of(ctx)
-                          .colorScheme
-                          .surfaceContainerHighest
-                          .withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      children: [
-                        MyProfileAvatar(
-                          imageUrl: mahram.profilePhotoUrl,
-                          radius: 24,
-                          isOnline: mahram.isOnline,
-                          isMahram: true,
-                          fallbackIcon: Icons.verified_user_outlined,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            mahram.name,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color:
-                              Theme.of(ctx).colorScheme.onSurface,
-                            ),
-                          ),
-                        ),
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          color: Theme.of(ctx).colorScheme.primary,
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+            body: isOwn
+                ? const MahramsPage()
+                : MahramsPage(userId: widget.userId),
           ),
         ),
       );
@@ -1559,7 +1475,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   trailing: totalMahrams > 0
                       ? InkWell(
                     borderRadius: BorderRadius.circular(999),
-                    onTap: () => openMahramsFullScreen(allMahrams),
+                    onTap: openMahramsFullScreen,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
@@ -1649,8 +1565,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           itemBuilder: (context, index) {
                             if (hasMore && index == itemCount - 1) {
                               return GestureDetector(
-                                onTap: () => openMahramsFullScreen(allMahrams),
-                                child: Column(
+                                onTap: openMahramsFullScreen,                                child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Container(
@@ -1702,15 +1617,14 @@ class _ProfilePageState extends State<ProfilePage> {
                               onTap: () {
                                 if (mahram.id == currentUserId) {
                                   _goToMyProfileInMainLayout();
-                                } else {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          ProfilePage(userId: mahram.id),
-                                    ),
-                                  );
+                                  return;
                                 }
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ProfilePage(userId: mahram.id),
+                                  ),
+                                );
                               },
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,

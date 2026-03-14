@@ -645,7 +645,13 @@ class _MyPostTileState extends State<MyPostTile>
               CircleAvatar(
                 radius: 20,
                 backgroundColor: cs.primary.withValues(alpha: 0.12),
-                child: Text(
+                backgroundImage: (widget.post.profilePhotoUrl != null &&
+                    widget.post.profilePhotoUrl!.trim().isNotEmpty)
+                    ? NetworkImage(widget.post.profilePhotoUrl!.trim())
+                    : null,
+                child: (widget.post.profilePhotoUrl == null ||
+                    widget.post.profilePhotoUrl!.trim().isEmpty)
+                    ? Text(
                   widget.post.name.isNotEmpty
                       ? widget.post.name[0].toUpperCase()
                       : '@',
@@ -653,7 +659,8 @@ class _MyPostTileState extends State<MyPostTile>
                     color: cs.primary,
                     fontWeight: FontWeight.w800,
                   ),
-                ),
+                )
+                    : null,
               ),
               const SizedBox(width: 12),
               Column(

@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:ummah_chat/models/notification.dart' as models;
 import 'package:ummah_chat/pages/profile_page.dart';
 import 'package:ummah_chat/pages/chat_page.dart';
-import 'package:ummah_chat/pages/group_chat_page.dart'; // 👈 NEW
+import 'package:ummah_chat/pages/group_chat_page.dart';
 import 'community_posts_page.dart';
 
 import '../helper/navigate_pages.dart';
@@ -18,8 +18,8 @@ import 'package:intl/intl.dart';
 // Providers
 import 'package:provider/provider.dart';
 import '../services/database/database_provider.dart';
-import '../services/auth/auth_service.dart'; // DM / group helpers
-import '../services/chat/chat_provider.dart'; // DM / group helpers
+import '../services/auth/auth_service.dart';
+import '../services/chat/chat_provider.dart';
 
 /// Helper model so we can mix "header rows" (Today, Yesterday, etc.) and real notifications in one list.
 class _NotificationListItem {
@@ -41,16 +41,13 @@ class NotificationPage extends StatefulWidget {
 }
 
 class _NotificationPageState extends State<NotificationPage> {
-  // 👉 Singleton instance
   final NotificationService notificationService = NotificationService();
 
   late StreamSubscription<List<models.Notification>> _sub;
   List<models.Notification> _notifications = [];
   bool _isLoading = true;
 
-  // ✅ Cache names so titles show FULL NAME consistently
-  final Map<String, String> _userNameCache =
-      {}; // userId -> display name (full name preferred)
+  final Map<String, String> _userNameCache = {};
   final Set<String> _nameFetchInFlight = {};
 
   @override
@@ -58,113 +55,98 @@ class _NotificationPageState extends State<NotificationPage> {
     super.initState();
 
     _sub = notificationService.notificationsStream().listen(
-      (data) {
+          (data) {
         setState(() {
           _notifications = data;
           _isLoading = false;
         });
 
-        // ✅ Prefetch names for body-based notifications
         for (final n in data) {
           final body = (n.body ?? '').trim();
 
-          // FOLLOW_USER:<userId>
           if (body.startsWith('FOLLOW_USER:')) {
             final parts = body.split(':');
             if (parts.length > 1) _cacheName(parts[1].trim());
           }
 
-          // FRIEND_REQUEST:<userId>
           if (body.startsWith('FRIEND_REQUEST:')) {
             final parts = body.split(':');
             if (parts.length > 1) _cacheName(parts[1].trim());
           }
 
-          // FRIEND_ACCEPTED:<userId>
           if (body.startsWith('FRIEND_ACCEPTED:')) {
             final parts = body.split(':');
             if (parts.length > 1) _cacheName(parts[1].trim());
           }
 
-          // MAHRAM_REQUEST:<userId>
           if (body.startsWith('MAHRAM_REQUEST:')) {
             final parts = body.split(':');
             if (parts.length > 1) _cacheName(parts[1].trim());
           }
 
-          // MAHRAM_ACCEPTED:<userId>
           if (body.startsWith('MAHRAM_ACCEPTED:')) {
             final parts = body.split(':');
             if (parts.length > 1) _cacheName(parts[1].trim());
           }
 
-          // CHAT_MESSAGE:<senderId>::<senderName>
           if (body.startsWith('CHAT_MESSAGE:')) {
             final rest = body.substring('CHAT_MESSAGE:'.length);
             final parts = rest.split('::');
             if (parts.isNotEmpty) _cacheName(parts[0].trim());
           }
 
-          // ✅ COMMUNITY_INVITE:<communityId>::<communityName>::<inviterId>
           if (body.startsWith('COMMUNITY_INVITE:')) {
             final rest = body.substring('COMMUNITY_INVITE:'.length);
             final parts = rest.split('::');
-            if (parts.length > 2) _cacheName(parts[2].trim()); // ✅ inviterId
+            if (parts.length > 2) _cacheName(parts[2].trim());
           }
 
-          // MARRIAGE_INQUIRY_REQUEST:<inquiryId>::<manId>
           if (body.startsWith('MARRIAGE_INQUIRY_REQUEST:')) {
             final rest = body.substring('MARRIAGE_INQUIRY_REQUEST:'.length);
             final parts = rest.split('::');
             if (parts.length > 1) _cacheName(parts[1].trim());
           }
 
-          // MARRIAGE_INQUIRY_MAHRAM:<inquiryId>::<manId>::<womanId>
           if (body.startsWith('MARRIAGE_INQUIRY_MAHRAM:')) {
             final rest = body.substring('MARRIAGE_INQUIRY_MAHRAM:'.length);
             final parts = rest.split('::');
             if (parts.length > 2) _cacheName(parts[2].trim());
           }
 
-          // MARRIAGE_INQUIRY_MAN_DECISION:<inquiryId>::<womanId>::<mahramId>
           if (body.startsWith('MARRIAGE_INQUIRY_MAN_DECISION:')) {
             final rest = body.substring(
               'MARRIAGE_INQUIRY_MAN_DECISION:'.length,
             );
             final parts = rest.split('::');
-            if (parts.length > 1) _cacheName(parts[1].trim()); // ✅ womanId
+            if (parts.length > 1) _cacheName(parts[1].trim());
           }
 
-          // ✅ UPDATED: MARRIAGE_INQUIRY_ACCEPTED:<inquiryId>::<otherUserId>
           if (body.startsWith('MARRIAGE_INQUIRY_ACCEPTED:')) {
             final rest = body.substring('MARRIAGE_INQUIRY_ACCEPTED:'.length);
             final parts = rest.split('::');
-            if (parts.length > 1) _cacheName(parts[1].trim()); // ✅ otherUserId
+            if (parts.length > 1) _cacheName(parts[1].trim());
           }
 
-          // MARRIAGE_INQUIRY_DECLINED:<inquiryId>::<manId>::...
           if (body.startsWith('MARRIAGE_INQUIRY_DECLINED:')) {
             final rest = body.substring('MARRIAGE_INQUIRY_DECLINED:'.length);
             final parts = rest.split('::');
             if (parts.length > 1) _cacheName(parts[1].trim());
           }
 
-          // MARRIAGE_INQUIRY_MAHRAM_ACCEPTED:<inquiryId>::<manId>
           if (body.startsWith('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED:')) {
             final rest = body.substring(
               'MARRIAGE_INQUIRY_MAHRAM_ACCEPTED:'.length,
             );
             final parts = rest.split('::');
-            if (parts.length > 1) _cacheName(parts[1].trim()); // manId
+            if (parts.length > 1) _cacheName(parts[1].trim());
           }
 
-          // ✅ NEW: MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:<inquiryId>::<manId>
           if (body.startsWith('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:')) {
             final rest = body.substring(
               'MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:'.length,
             );
             final parts = rest.split('::');
-            if (parts.length > 1) _cacheName(parts[1].trim()); // manId
+            if (parts.length > 1) _cacheName(parts[1].trim());
           }
         }
       },
@@ -180,7 +162,6 @@ class _NotificationPageState extends State<NotificationPage> {
     super.dispose();
   }
 
-  // ✅ Single small cache method: prefer FULL NAME, fallback to username
   Future<void> _cacheName(String userId) async {
     final id = userId.trim();
     if (id.isEmpty) return;
@@ -222,8 +203,9 @@ class _NotificationPageState extends State<NotificationPage> {
   }) async {
     if (chatRoomId.trim().isEmpty) return;
 
-    // ✅ NEW: prevent "ghost rooms"
-    final exists = await ChatService().groupRoomExistsInDatabase(chatRoomId.trim());
+    final exists = await ChatService().groupRoomExistsInDatabase(
+      chatRoomId.trim(),
+    );
     if (!exists) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -237,7 +219,6 @@ class _NotificationPageState extends State<NotificationPage> {
     final currentUserId = AuthService().getCurrentUserId();
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
-    // ✅ Fetch context payload for correct title ("Marriage inquiry for X")
     Map<String, dynamic>? ctx;
     try {
       ctx = await chatProvider.fetchChatRoomContext(chatRoomId);
@@ -284,9 +265,6 @@ class _NotificationPageState extends State<NotificationPage> {
     }
   }
 
-
-  // --------- OPTIMISTIC HELPERS ---------
-
   void _optimisticMarkOneAsRead(models.Notification n) async {
     setState(() {
       final idx = _notifications.indexWhere((x) => x.id == n.id);
@@ -312,12 +290,10 @@ class _NotificationPageState extends State<NotificationPage> {
     } catch (_) {}
   }
 
-  /// Format a date like "13 Dec 2025"
   String _formatDate(DateTime d) {
     return DateFormat('dd MMM yyyy', context.locale.toString()).format(d);
   }
 
-  /// Build a flattened list of header + notification items grouped by date
   List<_NotificationListItem> _buildGroupedItems() {
     final sorted = [..._notifications]
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -331,7 +307,7 @@ class _NotificationPageState extends State<NotificationPage> {
     String headerForDate(DateTime dt) {
       final d = DateTime(dt.year, dt.month, dt.day);
       if (d == today) return 'Today'.tr();
-      if (d == yesterday) return 'Yesterday'.tr() + ' · ${_formatDate(d)}';
+      if (d == yesterday) return '${'Yesterday'.tr()} · ${_formatDate(d)}';
       return _formatDate(d);
     }
 
@@ -347,18 +323,15 @@ class _NotificationPageState extends State<NotificationPage> {
     return items;
   }
 
-  // ✅ Updated: use FULL NAME from cache where possible (consistent style)
   String _localizedTitleFor(models.Notification n, String body) {
     final rawTitle = (n.title).trim();
 
-    // Legacy fallback (only used if we truly can't derive an ID)
     String legacyName = 'Someone'.tr();
     if (rawTitle.isNotEmpty) {
       final firstWord = rawTitle.split(' ').first.trim();
       if (firstWord.isNotEmpty && firstWord.length < 30) legacyName = firstWord;
     }
 
-    // LIKE/COMMENT/REPLY: your body does not include senderId, so we cannot fetch name reliably
     if (body.startsWith('LIKE_POST:')) {
       return 'notif_like_post'.tr(namedArgs: {'name': legacyName});
     }
@@ -369,7 +342,6 @@ class _NotificationPageState extends State<NotificationPage> {
       return 'notif_comment_reply'.tr(namedArgs: {'name': legacyName});
     }
 
-    // FOLLOW_USER:<userId>
     if (body.startsWith('FOLLOW_USER:')) {
       final parts = body.split(':');
       final userId = parts.length > 1 ? parts[1].trim() : '';
@@ -377,7 +349,6 @@ class _NotificationPageState extends State<NotificationPage> {
       return 'notif_follow_user'.tr(namedArgs: {'name': name});
     }
 
-    // FRIEND_REQUEST:<userId>
     if (body.startsWith('FRIEND_REQUEST:')) {
       final parts = body.split(':');
       final userId = parts.length > 1 ? parts[1].trim() : '';
@@ -385,7 +356,6 @@ class _NotificationPageState extends State<NotificationPage> {
       return 'notif_friend_request'.tr(namedArgs: {'name': name});
     }
 
-    // FRIEND_ACCEPTED:<userId>
     if (body.startsWith('FRIEND_ACCEPTED:')) {
       final parts = body.split(':');
       final userId = parts.length > 1 ? parts[1].trim() : '';
@@ -393,7 +363,6 @@ class _NotificationPageState extends State<NotificationPage> {
       return 'notif_friend_accepted'.tr(namedArgs: {'name': name});
     }
 
-    // MAHRAM_REQUEST:<userId>
     if (body.startsWith('MAHRAM_REQUEST:')) {
       final parts = body.split(':');
       final userId = parts.length > 1 ? parts[1].trim() : '';
@@ -401,7 +370,6 @@ class _NotificationPageState extends State<NotificationPage> {
       return 'notif_mahram_request'.tr(namedArgs: {'name': name});
     }
 
-    // MAHRAM_ACCEPTED:<userId>
     if (body.startsWith('MAHRAM_ACCEPTED:')) {
       final parts = body.split(':');
       final userId = parts.length > 1 ? parts[1].trim() : '';
@@ -409,7 +377,6 @@ class _NotificationPageState extends State<NotificationPage> {
       return 'notif_mahram_accepted'.tr(namedArgs: {'name': name});
     }
 
-    // CHAT_MESSAGE:<senderId>::<senderName>
     if (body.startsWith('CHAT_MESSAGE:')) {
       final rest = body.substring('CHAT_MESSAGE:'.length);
       final parts = rest.split('::');
@@ -420,7 +387,6 @@ class _NotificationPageState extends State<NotificationPage> {
 
     if (body.startsWith('GROUP_MESSAGE:')) return 'notif_group_message'.tr();
 
-    // GROUP_ADDED:<chatRoomId>::<groupName>::<addedByName>
     if (body.startsWith('GROUP_ADDED:')) {
       final rest = body.substring('GROUP_ADDED:'.length);
       final parts = rest.split('::');
@@ -435,7 +401,6 @@ class _NotificationPageState extends State<NotificationPage> {
       return 'notif_group_added'.tr(namedArgs: {'name': adder, 'group': gName});
     }
 
-    // ✅ COMMUNITY_INVITE:<communityId>::<communityName>::<inviterId>
     if (body.startsWith('COMMUNITY_INVITE:')) {
       final rest = body.substring('COMMUNITY_INVITE:'.length);
       final parts = rest.split('::');
@@ -443,7 +408,6 @@ class _NotificationPageState extends State<NotificationPage> {
       final communityName = (parts.length > 1 ? parts[1] : '').trim();
       final inviterName = (parts.length > 2 ? parts[2] : '').trim();
 
-      // ✅ If inviter exists, use the new key:
       if (inviterName.isNotEmpty && communityName.isNotEmpty) {
         return 'notif_community_invite_from'.tr(namedArgs: {
           'inviter': inviterName,
@@ -451,14 +415,11 @@ class _NotificationPageState extends State<NotificationPage> {
         });
       }
 
-      // ✅ fallback (old notifications without inviter)
       return 'notif_community_invite'.tr(namedArgs: {
         'name': communityName.isNotEmpty ? communityName : 'a community'.tr(),
       });
     }
 
-
-    // Marriage inquiry: use manId (2nd part)
     if (body.startsWith('MARRIAGE_INQUIRY_REQUEST:')) {
       final rest = body.substring('MARRIAGE_INQUIRY_REQUEST:'.length);
       final parts = rest.split('::');
@@ -471,19 +432,16 @@ class _NotificationPageState extends State<NotificationPage> {
       final rest = body.substring('MARRIAGE_INQUIRY_MAHRAM:'.length);
       final parts = rest.split('::');
 
-      // body = inquiryId :: manId :: womanId
       final womanId = parts.length > 2 ? parts[2].trim() : '';
       final name = _nameFromIdOrFallback(womanId, legacyName);
 
       return 'notif_mahram_chosen_for_marriage'.tr(namedArgs: {'name': name});
     }
 
-    // ✅ UPDATE: when man initiates and woman selects mahram, show the simple title key
     if (body.startsWith('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED:')) {
       return 'notif_marriage_inquiry_mahram_accepted_title'.tr();
     }
 
-    // ✅ NEW: when woman initiates, show "sent to {man}"
     if (body.startsWith('MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:')) {
       final rest = body.substring(
         'MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:'.length,
@@ -500,7 +458,6 @@ class _NotificationPageState extends State<NotificationPage> {
       final rest = body.substring('MARRIAGE_INQUIRY_MAN_DECISION:'.length);
       final parts = rest.split('::');
 
-      // ✅ body format: <inquiryId>::<womanId>::<mahramId>
       final womanId = parts.length > 1 ? parts[1].trim() : '';
       final name = _nameFromIdOrFallback(womanId, legacyName);
 
@@ -513,7 +470,6 @@ class _NotificationPageState extends State<NotificationPage> {
       return 'notif_marriage_inquiry_group_created'.tr();
     }
 
-    // ✅ UPDATED: accepted uses <otherUserId> (not "manId")
     if (body.startsWith('MARRIAGE_INQUIRY_ACCEPTED:')) {
       final rest = body.substring('MARRIAGE_INQUIRY_ACCEPTED:'.length);
       final parts = rest.split('::');
@@ -542,70 +498,144 @@ class _NotificationPageState extends State<NotificationPage> {
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
         elevation: 0,
+        centerTitle: true,
+        scrolledUnderElevation: 0,
         backgroundColor: colorScheme.surface,
+        surfaceTintColor: Colors.transparent,
         title: Text(
           'Notifications'.tr(),
           style: TextStyle(
             color: colorScheme.primary,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
+            letterSpacing: -0.2,
           ),
         ),
-        centerTitle: true,
         actions: [
-          TextButton.icon(
-            onPressed: _notifications.isEmpty ? null : _optimisticMarkAllAsRead,
-            icon: Icon(Icons.done_all, size: 18, color: colorScheme.primary),
-            label: Text(
-              'Mark all'.tr(),
-              style: TextStyle(
-                color: colorScheme.primary,
-                fontWeight: FontWeight.w500,
+          Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: TextButton(
+              onPressed: _notifications.isEmpty ? null : _optimisticMarkAllAsRead,
+              style: TextButton.styleFrom(
+                foregroundColor: _notifications.isEmpty
+                    ? colorScheme.primary.withValues(alpha: 0.35)
+                    : colorScheme.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.done_all_rounded,
+                    size: 18,
+                    color: _notifications.isEmpty
+                        ? colorScheme.primary.withValues(alpha: 0.35)
+                        : colorScheme.primary.withValues(alpha: 0.82),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Mark all'.tr(),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13.5,
+                      letterSpacing: -0.1,
+                      color: _notifications.isEmpty
+                          ? colorScheme.primary.withValues(alpha: 0.35)
+                          : colorScheme.primary,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-          const SizedBox(width: 8),
         ],
       ),
-      body: _buildBody(context, colorScheme, dbProvider),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              colorScheme.surface,
+              colorScheme.surface.withValues(alpha: 0.98),
+              colorScheme.secondary.withValues(alpha: 0.18),
+            ],
+          ),
+        ),
+        child: _buildBody(context, colorScheme, dbProvider),
+      ),
     );
   }
 
   Widget _buildBody(
-    BuildContext context,
-    ColorScheme colorScheme,
-    DatabaseProvider dbProvider,
-  ) {
+      BuildContext context,
+      ColorScheme colorScheme,
+      DatabaseProvider dbProvider,
+      ) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(
+        child: SizedBox(
+          width: 28,
+          height: 28,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.4,
+            color: colorScheme.primary,
+          ),
+        ),
+      );
     }
 
     if (_notifications.isEmpty) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32.0),
+          padding: const EdgeInsets.symmetric(horizontal: 28),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.notifications_none,
-                size: 56,
-                color: colorScheme.primary,
+              Container(
+                width: 84,
+                height: 84,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: colorScheme.secondary.withValues(alpha: 0.55),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 24,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.notifications_none_rounded,
+                  size: 40,
+                  color: colorScheme.primary.withValues(alpha: 0.88),
+                ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 18),
               Text(
                 'No notifications yet'.tr(),
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.3,
                   color: colorScheme.primary,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Text(
                 "When something happens — likes, comments, or new followers — you'll see it here."
                     .tr(),
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: colorScheme.primary),
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.45,
+                  color: colorScheme.primary.withValues(alpha: 0.68),
+                ),
               ),
             ],
           ),
@@ -616,35 +646,25 @@ class _NotificationPageState extends State<NotificationPage> {
     final groupedItems = _buildGroupedItems();
 
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 22),
       itemCount: groupedItems.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final item = groupedItems[index];
 
-        // ---- DATE HEADER ROW ----
         if (item.isHeader) {
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(4, 8, 4, 4),
-            child: Text(
-              item.headerLabel!,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: colorScheme.primary.withValues(alpha: 0.8),
-              ),
-            ),
+          return _PremiumDateHeader(
+            label: item.headerLabel!,
+            colorScheme: colorScheme,
           );
         }
 
-        // ---- NORMAL NOTIFICATION TILE ----
         final n = item.notification!;
 
         final rawBody = n.body ?? '';
         final body = rawBody.trim();
         final isUnread = !n.isRead;
 
-        // ----- TYPE DETECTION -----
         final isFriendRequest = body.startsWith('FRIEND_REQUEST:');
         final isFriendAccepted = body.startsWith('FRIEND_ACCEPTED:');
         final isCommunityInvite = body.startsWith('COMMUNITY_INVITE:');
@@ -652,9 +672,9 @@ class _NotificationPageState extends State<NotificationPage> {
         final isComment = body.startsWith('COMMENT_POST:');
         final isCommentReply = body.startsWith('COMMENT_REPLY:');
         final isFollow = body.startsWith('FOLLOW_USER:');
-        final isChatMessage = body.startsWith('CHAT_MESSAGE:'); // DM
-        final isGroupMessage = body.startsWith('GROUP_MESSAGE:'); // group msg
-        final isGroupAdded = body.startsWith('GROUP_ADDED:'); // ✅ NEW
+        final isChatMessage = body.startsWith('CHAT_MESSAGE:');
+        final isGroupMessage = body.startsWith('GROUP_MESSAGE:');
+        final isGroupAdded = body.startsWith('GROUP_ADDED:');
         final isMahramRequest = body.startsWith('MAHRAM_REQUEST:');
         final isMahramAccepted = body.startsWith('MAHRAM_ACCEPTED:');
 
@@ -681,7 +701,6 @@ class _NotificationPageState extends State<NotificationPage> {
           'MARRIAGE_INQUIRY_MAHRAM_ACCEPTED:',
         );
 
-        // ✅ NEW
         final isMarriageInquiryMahramAcceptedSentTo = body.startsWith(
           'MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:',
         );
@@ -709,8 +728,8 @@ class _NotificationPageState extends State<NotificationPage> {
         String? groupAddedName;
 
         String? communityInviteCommunityId;
-        String? communityInviteCommunityName; // ✅ NEW
-        String? communityInviteInviterId; // ✅ NEW
+        String? communityInviteCommunityName;
+        String? communityInviteInviterId;
 
         String? inquiryId;
         String? inquiryRequesterId;
@@ -720,11 +739,8 @@ class _NotificationPageState extends State<NotificationPage> {
         String? inquiryGroupName;
 
         String? inquiryMahramAcceptedManId;
-
-        // ✅ NEW: accepted otherUserId holder
         String? inquiryAcceptedOtherUserId;
 
-        // Parse IDs (and cache names when possible)
         if (isFriendRequest) {
           final parts = body.split(':');
           if (parts.length > 1) {
@@ -810,7 +826,6 @@ class _NotificationPageState extends State<NotificationPage> {
           if (parts.length > 1) groupAddedName = parts[1].trim();
         }
 
-        // ✅ COMMUNITY_INVITE:<communityId>::<communityName>::<inviterId>
         if (isCommunityInvite) {
           final rest = body.substring('COMMUNITY_INVITE:'.length);
           final parts = rest.split('::');
@@ -823,7 +838,7 @@ class _NotificationPageState extends State<NotificationPage> {
           }
           if (parts.length > 2) {
             communityInviteInviterId = parts[2].trim();
-            _cacheName(communityInviteInviterId!); // ✅ cache inviter name
+            _cacheName(communityInviteInviterId!);
           }
         }
 
@@ -860,7 +875,6 @@ class _NotificationPageState extends State<NotificationPage> {
           }
         }
 
-        // ✅ NEW: same parsing, different body prefix
         if (isMarriageInquiryMahramAcceptedSentTo) {
           final rest = body.substring(
             'MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:'.length,
@@ -879,7 +893,6 @@ class _NotificationPageState extends State<NotificationPage> {
 
           if (parts.isNotEmpty) inquiryId = parts[0].trim();
 
-          // ✅ body format: <inquiryId>::<womanId>::<mahramId>
           if (parts.length > 1) {
             inquiryWomanId = parts[1].trim();
             _cacheName(inquiryWomanId!);
@@ -894,7 +907,6 @@ class _NotificationPageState extends State<NotificationPage> {
           if (parts.length > 2) inquiryGroupName = parts[2].trim();
         }
 
-        // ✅ UPDATED: accepted uses otherUserId
         if (isMarriageInquiryAccepted) {
           final rest = body.substring('MARRIAGE_INQUIRY_ACCEPTED:'.length);
           final parts = rest.split('::');
@@ -915,7 +927,6 @@ class _NotificationPageState extends State<NotificationPage> {
           }
         }
 
-        // ----- SUBTITLE (preview) -----
         String? subtitleText;
         if (isLike) {
           subtitleText = likePreview;
@@ -945,7 +956,6 @@ class _NotificationPageState extends State<NotificationPage> {
           subtitleText = rawBody;
         }
 
-        // ----- LEADING ICON -----
         final leadingIconData = _iconForNotificationType(
           isFriendRequest: isFriendRequest,
           isFriendAccepted: isFriendAccepted,
@@ -967,30 +977,18 @@ class _NotificationPageState extends State<NotificationPage> {
           isMarriageInquiryDeclined: isMarriageInquiryDeclined,
           isMarriageInquiryMahramAccepted: isMarriageInquiryMahramAccepted,
           isMarriageInquiryMahramAcceptedSentTo:
-              isMarriageInquiryMahramAcceptedSentTo,
+          isMarriageInquiryMahramAcceptedSentTo,
         );
 
-        final leading = Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: isUnread
-                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.15)
-                : Theme.of(context).colorScheme.secondary,
-            shape: BoxShape.circle,
-          ),
-          alignment: Alignment.center,
-          child: Icon(
-            leadingIconData,
-            size: 20,
-            color: Theme.of(context).colorScheme.primary,
-          ),
+        final leading = _PremiumLeadingIcon(
+          icon: leadingIconData,
+          isUnread: isUnread,
+          colorScheme: colorScheme,
         );
 
-        // ----- TRAILING -----
         Widget? trailing;
         if (!n.isRead && !isFollow) {
-          trailing = _UnreadDot(colorScheme: Theme.of(context).colorScheme);
+          trailing = _UnreadDot(colorScheme: colorScheme);
         } else {
           trailing = null;
         }
@@ -998,11 +996,10 @@ class _NotificationPageState extends State<NotificationPage> {
         return Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(22),
             onTap: () async {
               if (!n.isRead) _optimisticMarkOneAsRead(n);
 
-              // 1) Friend request → sender profile
               if (isFriendRequest && friendRequesterId != null) {
                 if (!mounted) return;
                 await Navigator.push(
@@ -1016,7 +1013,6 @@ class _NotificationPageState extends State<NotificationPage> {
                 return;
               }
 
-              // 2) Friend accepted → accepter profile
               if (isFriendAccepted && friendAcceptedUserId != null) {
                 if (!mounted) return;
                 Navigator.push(
@@ -1028,7 +1024,6 @@ class _NotificationPageState extends State<NotificationPage> {
                 return;
               }
 
-              // 2.1) Mahram request → requester profile
               if (isMahramRequest && mahramRequesterId != null) {
                 if (!mounted) return;
                 await Navigator.push(
@@ -1042,7 +1037,6 @@ class _NotificationPageState extends State<NotificationPage> {
                 return;
               }
 
-              // 2.2) Mahram accepted → accepter profile
               if (isMahramAccepted && mahramAcceptedUserId != null) {
                 if (!mounted) return;
                 Navigator.push(
@@ -1054,7 +1048,6 @@ class _NotificationPageState extends State<NotificationPage> {
                 return;
               }
 
-              // 3) Likes / comments → post
               if ((isLike || isComment || isCommentReply) &&
                   (likePostId != null ||
                       commentPostId != null ||
@@ -1083,7 +1076,6 @@ class _NotificationPageState extends State<NotificationPage> {
                 return;
               }
 
-              // 4) Follow → follower profile
               if (isFollow && followUserId != null) {
                 if (!mounted) return;
                 Navigator.push(
@@ -1095,14 +1087,14 @@ class _NotificationPageState extends State<NotificationPage> {
                 return;
               }
 
-              // 5) Chat message → open DM
-              if (isChatMessage && chatFriendId != null && chatFriendId!.isNotEmpty) {
+              if (isChatMessage &&
+                  chatFriendId != null &&
+                  chatFriendId!.isNotEmpty) {
                 if (!mounted) return;
 
                 final friendId = chatFriendId!.trim();
                 if (friendId.isEmpty) return;
 
-                // ✅ 1) PRE-CHECK connection before navigating (prevents "flash then pop")
                 final isConnected = await dbProvider.areWeConnected(friendId);
                 if (!mounted) return;
 
@@ -1110,11 +1102,12 @@ class _NotificationPageState extends State<NotificationPage> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('You are no longer connected.'.tr())),
                   );
-                  return; // ✅ stop here, don't navigate
+                  return;
                 }
 
-                // ✅ 2) Load profile for display name (kept your logic)
-                final profile = await DatabaseService().getUserFromDatabase(friendId);
+                final profile = await DatabaseService().getUserFromDatabase(
+                  friendId,
+                );
 
                 final displayName = (profile?.name ?? '').trim().isNotEmpty
                     ? profile!.name
@@ -1126,21 +1119,19 @@ class _NotificationPageState extends State<NotificationPage> {
 
                 if (!mounted) return;
 
-                // ✅ 3) Navigate WITHOUT creating rooms
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => ChatPage(
                       friendId: friendId,
                       friendName: displayName,
-                      allowCreateRoom: false, // ✅ critical: never create from notification
+                      allowCreateRoom: false,
                     ),
                   ),
                 );
                 return;
               }
 
-              // 6) Group message → open GroupChatPage (with context)
               if (isGroupMessage &&
                   groupChatRoomId != null &&
                   groupChatRoomId!.isNotEmpty) {
@@ -1159,7 +1150,6 @@ class _NotificationPageState extends State<NotificationPage> {
                 return;
               }
 
-              // 7) Group added → open GroupChatPage (with context)
               if (isGroupAdded &&
                   groupAddedRoomId != null &&
                   groupAddedRoomId!.isNotEmpty) {
@@ -1178,7 +1168,6 @@ class _NotificationPageState extends State<NotificationPage> {
                 return;
               }
 
-              // ✅ Community invite → open CommunityPostsPage (banner will show there)
               if (isCommunityInvite &&
                   communityInviteCommunityId != null &&
                   communityInviteCommunityId!.isNotEmpty) {
@@ -1196,14 +1185,14 @@ class _NotificationPageState extends State<NotificationPage> {
                     builder: (_) => CommunityPostsPage(
                       communityId: communityInviteCommunityId!,
                       communityName:
-                          (community?['name'] ??
-                                  (communityInviteCommunityName
-                                              ?.trim()
-                                              .isNotEmpty ==
-                                          true
-                                      ? communityInviteCommunityName!.trim()
-                                      : 'Community'.tr()))
-                              .toString(),
+                      (community?['name'] ??
+                          (communityInviteCommunityName
+                              ?.trim()
+                              .isNotEmpty ==
+                              true
+                              ? communityInviteCommunityName!.trim()
+                              : 'Community'.tr()))
+                          .toString(),
                       communityDescription: community?['description']
                           ?.toString(),
                       openedFromInvite: true,
@@ -1216,7 +1205,6 @@ class _NotificationPageState extends State<NotificationPage> {
                 return;
               }
 
-              // 💍 Marriage inquiry request → open MAN profile
               if (isMarriageInquiryRequest &&
                   inquiryRequesterId != null &&
                   inquiryRequesterId!.isNotEmpty &&
@@ -1239,9 +1227,8 @@ class _NotificationPageState extends State<NotificationPage> {
                 return;
               }
 
-              // ✅ MAHRAM_ACCEPTED (both variants) → open MAN profile (same behavior)
               if ((isMarriageInquiryMahramAccepted ||
-                      isMarriageInquiryMahramAcceptedSentTo) &&
+                  isMarriageInquiryMahramAcceptedSentTo) &&
                   inquiryMahramAcceptedManId != null &&
                   inquiryMahramAcceptedManId!.isNotEmpty) {
                 if (!mounted) return;
@@ -1259,7 +1246,6 @@ class _NotificationPageState extends State<NotificationPage> {
                 return;
               }
 
-              // 💍 Marriage inquiry mahram notif → go to MAN profile
               if (isMarriageInquiryMahram &&
                   inquiryId != null &&
                   inquiryId!.isNotEmpty &&
@@ -1282,7 +1268,6 @@ class _NotificationPageState extends State<NotificationPage> {
                 return;
               }
 
-              // ✅ UPDATED: accepted → open the OTHER user's profile
               if (isMarriageInquiryAccepted &&
                   inquiryAcceptedOtherUserId != null &&
                   inquiryAcceptedOtherUserId!.isNotEmpty &&
@@ -1305,7 +1290,6 @@ class _NotificationPageState extends State<NotificationPage> {
                 return;
               }
 
-              // 💍 Man declined → open man's profile (kept as-is)
               if (isMarriageInquiryDeclined &&
                   inquiryManId != null &&
                   inquiryManId!.isNotEmpty &&
@@ -1328,7 +1312,6 @@ class _NotificationPageState extends State<NotificationPage> {
                 return;
               }
 
-              // 💍 Man decision notification → go to WOMAN profile
               if (isMarriageInquiryManDecision &&
                   inquiryId != null &&
                   inquiryId!.isNotEmpty &&
@@ -1351,7 +1334,6 @@ class _NotificationPageState extends State<NotificationPage> {
                 return;
               }
 
-              // 💍 Marriage inquiry group created → open group chat (with context)
               if (isMarriageInquiryGroupCreated &&
                   inquiryChatRoomId != null &&
                   inquiryChatRoomId!.isNotEmpty) {
@@ -1387,23 +1369,33 @@ class _NotificationPageState extends State<NotificationPage> {
             child: Ink(
               decoration: BoxDecoration(
                 color: isUnread
-                    ? Theme.of(context).colorScheme.secondary
-                    : Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(16),
+                    ? colorScheme.surface.withValues(alpha: 0.96)
+                    : colorScheme.surface.withValues(alpha: 0.88),
+                borderRadius: BorderRadius.circular(22),
                 border: Border.all(
-                  color: Theme.of(context).colorScheme.secondary,
+                  color: isUnread
+                      ? colorScheme.primary.withValues(alpha: 0.10)
+                      : colorScheme.primary.withValues(alpha: 0.05),
+                  width: 1,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isUnread ? 0.07 : 0.045),
+                    blurRadius: isUnread ? 22 : 16,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
+                  horizontal: 14,
+                  vertical: 14,
                 ),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     leading,
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1415,44 +1407,58 @@ class _NotificationPageState extends State<NotificationPage> {
                                 child: Text(
                                   _localizedTitleFor(n, body),
                                   style: TextStyle(
-                                    fontSize: 14,
+                                    fontSize: 14.5,
+                                    height: 1.35,
                                     fontWeight: isUnread
-                                        ? FontWeight.w600
-                                        : FontWeight.w400,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    letterSpacing: -0.15,
+                                    color: colorScheme.primary,
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 6),
-                              TimeAgoText(
-                                createdAt: n.createdAt,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Theme.of(context).colorScheme.primary,
+                              const SizedBox(width: 8),
+                              Padding(
+                                padding: const EdgeInsets.only(top: 1),
+                                child: TimeAgoText(
+                                  createdAt: n.createdAt,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: colorScheme.primary.withValues(
+                                      alpha: 0.50,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ],
                           ),
                           if (subtitleText != null &&
                               subtitleText.isNotEmpty) ...[
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 6),
                             Text(
                               subtitleText,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: 13,
-                                color: Theme.of(context).colorScheme.primary,
+                                fontSize: 13.25,
+                                height: 1.45,
+                                color: colorScheme.primary.withValues(
+                                  alpha: 0.68,
+                                ),
                               ),
                             ),
                           ],
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    trailing ?? const SizedBox.shrink(),
+                    if (trailing != null) ...[
+                      const SizedBox(width: 10),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: trailing,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1485,32 +1491,129 @@ class _NotificationPageState extends State<NotificationPage> {
     required bool isMarriageInquiryMahramAcceptedSentTo,
     required bool isCommunityInvite,
   }) {
-    if (isFriendRequest) return Icons.person_add_alt_1;
-    if (isFriendAccepted) return Icons.handshake;
+    if (isFriendRequest) return Icons.person_add_alt_1_rounded;
+    if (isFriendAccepted) return Icons.handshake_rounded;
     if (isMahramRequest) return Icons.verified_user_outlined;
-    if (isMahramAccepted) return Icons.verified_user;
-    if (isGroupAdded) return Icons.group_add;
-    if (isGroupMessage) return Icons.groups;
-    if (isChatMessage) return Icons.chat_bubble_outline;
-    if (isLike) return Icons.favorite;
+    if (isMahramAccepted) return Icons.verified_user_rounded;
+    if (isGroupAdded) return Icons.group_add_rounded;
+    if (isGroupMessage) return Icons.groups_rounded;
+    if (isChatMessage) return Icons.chat_bubble_outline_rounded;
+    if (isLike) return Icons.favorite_rounded;
     if (isComment || isCommentReply) return Icons.mode_comment_outlined;
-    if (isFollow) return Icons.person;
-    if (isCommunityInvite) return Icons.mail_outline;
+    if (isFollow) return Icons.person_rounded;
+    if (isCommunityInvite) return Icons.mail_outline_rounded;
 
-    // ✅ icon for MARRIAGE_INQUIRY_MAHRAM_ACCEPTED (both types)
     if (isMarriageInquiryMahramAccepted ||
         isMarriageInquiryMahramAcceptedSentTo) {
-      return Icons.verified_user;
+      return Icons.verified_user_rounded;
     }
 
-    if (isMarriageInquiryAccepted) return Icons.check_circle_outline;
+    if (isMarriageInquiryAccepted) return Icons.check_circle_outline_rounded;
     if (isMarriageInquiryDeclined) return Icons.cancel_outlined;
-    if (isMarriageInquiryGroupCreated) return Icons.forum;
-    if (isMarriageInquiryManDecision) return Icons.how_to_reg;
-    if (isMarriageInquiryMahram) return Icons.admin_panel_settings;
-    if (isMarriageInquiryRequest) return Icons.favorite_border;
+    if (isMarriageInquiryGroupCreated) return Icons.forum_rounded;
+    if (isMarriageInquiryManDecision) return Icons.how_to_reg_rounded;
+    if (isMarriageInquiryMahram) return Icons.admin_panel_settings_rounded;
+    if (isMarriageInquiryRequest) return Icons.favorite_border_rounded;
 
-    return Icons.notifications;
+    return Icons.notifications_rounded;
+  }
+}
+
+class _PremiumDateHeader extends StatelessWidget {
+  final String label;
+  final ColorScheme colorScheme;
+
+  const _PremiumDateHeader({
+    required this.label,
+    required this.colorScheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(2, 10, 2, 2),
+      child: Row(
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: colorScheme.primary.withValues(alpha: 0.18),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.15,
+              color: colorScheme.primary.withValues(alpha: 0.72),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Container(
+              height: 1,
+              color: colorScheme.primary.withValues(alpha: 0.08),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PremiumLeadingIcon extends StatelessWidget {
+  final IconData icon;
+  final bool isUnread;
+  final ColorScheme colorScheme;
+
+  const _PremiumLeadingIcon({
+    required this.icon,
+    required this.isUnread,
+    required this.colorScheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 46,
+      height: 46,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isUnread
+              ? [
+            colorScheme.primary.withValues(alpha: 0.16),
+            colorScheme.primary.withValues(alpha: 0.08),
+          ]
+              : [
+            colorScheme.secondary.withValues(alpha: 0.75),
+            colorScheme.secondary.withValues(alpha: 0.42),
+          ],
+        ),
+        border: Border.all(
+          color: colorScheme.primary.withValues(alpha: isUnread ? 0.10 : 0.05),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.primary.withValues(alpha: isUnread ? 0.08 : 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      alignment: Alignment.center,
+      child: Icon(
+        icon,
+        size: 20,
+        color: colorScheme.primary.withValues(alpha: isUnread ? 0.95 : 0.78),
+      ),
+    );
   }
 }
 
@@ -1522,11 +1625,18 @@ class _UnreadDot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 9,
-      height: 9,
+      width: 10,
+      height: 10,
       decoration: BoxDecoration(
-        color: colorScheme.primary,
         shape: BoxShape.circle,
+        color: colorScheme.primary,
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.primary.withValues(alpha: 0.28),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
     );
   }

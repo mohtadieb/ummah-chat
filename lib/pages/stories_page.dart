@@ -19,6 +19,14 @@ class _StoriesPageState extends State<StoriesPage> {
   late final List<int?> _selectedIndices;
 
   bool _initialAnswersLoaded = false;
+  bool _celebrationShown = false;
+
+  static const Color _gold = Color(0xFFC9A74E);
+  static const Color _goldDeep = Color(0xFF9F7B22);
+
+  bool _isMuhammadStory() {
+    return widget.story.id.startsWith('muhammad_part');
+  }
 
   @override
   void initState() {
@@ -50,6 +58,7 @@ class _StoriesPageState extends State<StoriesPage> {
     });
 
     final db = Provider.of<DatabaseProvider>(context, listen: false);
+    final bool wasAlreadyCompleted = db.completedStoryIds.contains(widget.story.id);
 
     await db.saveStoryAnswers(widget.story.id, _selectedIndices);
 
@@ -63,9 +72,167 @@ class _StoriesPageState extends State<StoriesPage> {
               return selected == _questions[i].correctIndex;
             });
 
-    if (allCorrect && !db.completedStoryIds.contains(widget.story.id)) {
+    if (allCorrect && !wasAlreadyCompleted) {
       await db.markStoryCompleted(widget.story.id);
+
+      if (mounted && !_celebrationShown) {
+        _celebrationShown = true;
+        await _showCompletionCelebration();
+      }
     }
+  }
+
+  Future<void> _showCompletionCelebration() async {
+    if (!mounted) return;
+
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isMuhammad = _isMuhammadStory();
+
+    final accent = isMuhammad ? _gold : cs.primary;
+    final accentDeep = isMuhammad ? _goldDeep : cs.primary;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          elevation: 0,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Container(
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(
+                color: accent.withValues(alpha: 0.35),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: accent.withValues(alpha: 0.20),
+                  blurRadius: 28,
+                  offset: const Offset(0, 16),
+                ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(22, 24, 22, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 84,
+                    height: 84,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: accent.withValues(alpha: 0.14),
+                      border: Border.all(
+                        color: accent.withValues(alpha: 0.30),
+                        width: 1.4,
+                      ),
+                    ),
+                    child: Icon(
+                      widget.story.icon,
+                      size: 36,
+                      color: accentDeep,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '🎉 ${'Well done!'.tr()}',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: accentDeep,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'You earned a new badge!'.tr(),
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: cs.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: accent.withValues(alpha: 0.20),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          'Badge unlocked'.tr(),
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: accentDeep,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          widget.story.title.tr(),
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: cs.onSurface,
+                          ),
+                        ),
+                        if (widget.story.subtitle != null) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            widget.story.subtitle!.tr(),
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: cs.onSurface.withValues(alpha: 0.64),
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: accentDeep,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                      ),
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      icon: const Icon(Icons.check_rounded),
+                      label: Text(
+                        'Continue'.tr(),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   int get _answeredCount => _selectedIndices.where((i) => i != null).length;
@@ -75,6 +242,7 @@ class _StoriesPageState extends State<StoriesPage> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final textTheme = theme.textTheme;
+    final isMuhammad = _isMuhammadStory();
 
     return Scaffold(
       body: Container(
@@ -82,7 +250,13 @@ class _StoriesPageState extends State<StoriesPage> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
+            colors: isMuhammad
+                ? [
+              cs.surface,
+              _gold.withValues(alpha: 0.03),
+              cs.surfaceContainerLowest,
+            ]
+                : [
               cs.surface,
               cs.surface,
               cs.surfaceContainerLowest,
@@ -92,48 +266,66 @@ class _StoriesPageState extends State<StoriesPage> {
         child: SafeArea(
           child: !_initialAnswersLoaded
               ? const Center(child: CircularProgressIndicator())
-              : SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildTopBackButton(context),
-                const SizedBox(height: 12),
-                _buildStoryHero(textTheme, cs),
-                const SizedBox(height: 14),
-                _buildStoryCard(textTheme, cs),
-                const SizedBox(height: 18),
-                _buildProgressStrip(cs, textTheme),
-                const SizedBox(height: 22),
-                Text(
-                  'Quiz about the story'.tr(),
-                  style: textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: cs.onSurface,
+              : Column(
+            children: [
+              // FIXED BACK BUTTON
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: _buildTopBackButton(context),
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              // SCROLLABLE CONTENT
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 8),
+                      _buildStoryHero(textTheme, cs),
+                      const SizedBox(height: 14),
+                      _buildStoryCard(textTheme, cs),
+                      const SizedBox(height: 18),
+                      _buildProgressStrip(cs, textTheme),
+                      const SizedBox(height: 22),
+                      Text(
+                        'Quiz about the story'.tr(),
+                        style: textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: isMuhammad ? _goldDeep : cs.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Tap the answer you think is correct. If you are wrong, the correct answer will be highlighted for you.'
+                            .tr(),
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: cs.onSurface.withValues(alpha: 0.68),
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _questions.length,
+                        separatorBuilder: (_, __) =>
+                        const SizedBox(height: 14),
+                        itemBuilder: (context, index) {
+                          return _buildQuestionCard(index, textTheme, cs);
+                        },
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Tap the answer you think is correct. If you are wrong, the correct answer will be highlighted for you.'.tr(),
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: cs.onSurface.withValues(alpha: 0.68),
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _questions.length,
-                  separatorBuilder: (_, __) =>
-                  const SizedBox(height: 14),
-                  itemBuilder: (context, index) {
-                    return _buildQuestionCard(index, textTheme, cs);
-                  },
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -142,6 +334,7 @@ class _StoriesPageState extends State<StoriesPage> {
 
   Widget _buildTopBackButton(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isMuhammad = _isMuhammadStory();
 
     return InkWell(
       onTap: () => Navigator.of(context).pop(),
@@ -150,7 +343,7 @@ class _StoriesPageState extends State<StoriesPage> {
         padding: const EdgeInsets.all(4),
         child: Icon(
           Icons.arrow_back_rounded,
-          color: cs.onSurface,
+          color: isMuhammad ? _goldDeep : cs.onSurface,
           size: 24,
         ),
       ),
@@ -158,6 +351,8 @@ class _StoriesPageState extends State<StoriesPage> {
   }
 
   Widget _buildStoryHero(TextTheme textTheme, ColorScheme cs) {
+    final isMuhammad = _isMuhammadStory();
+
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
       decoration: BoxDecoration(
@@ -165,18 +360,28 @@ class _StoriesPageState extends State<StoriesPage> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
+          colors: isMuhammad
+              ? [
+            _gold.withValues(alpha: 0.18),
+            _gold.withValues(alpha: 0.10),
+            cs.surfaceContainerHigh,
+          ]
+              : [
             cs.primary.withValues(alpha: 0.14),
             cs.secondary.withValues(alpha: 0.55),
             cs.surfaceContainerHigh,
           ],
         ),
         border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: 0.45),
+          color: isMuhammad
+              ? _gold.withValues(alpha: 0.55)
+              : cs.outlineVariant.withValues(alpha: 0.45),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
+            color: isMuhammad
+                ? _gold.withValues(alpha: 0.16)
+                : Colors.black.withValues(alpha: 0.06),
             blurRadius: 24,
             offset: const Offset(0, 12),
           ),
@@ -190,11 +395,16 @@ class _StoriesPageState extends State<StoriesPage> {
             height: 56,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: cs.primary.withValues(alpha: 0.14),
+              color: isMuhammad
+                  ? _gold.withValues(alpha: 0.16)
+                  : cs.primary.withValues(alpha: 0.14),
+              border: isMuhammad
+                  ? Border.all(color: _gold.withValues(alpha: 0.32))
+                  : null,
             ),
             child: Icon(
               widget.story.icon,
-              color: cs.primary,
+              color: isMuhammad ? _goldDeep : cs.primary,
               size: 28,
             ),
           ),
@@ -207,6 +417,7 @@ class _StoriesPageState extends State<StoriesPage> {
                 style: textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.3,
+                  color: isMuhammad ? _goldDeep : null,
                 ),
               ),
             ),
@@ -217,6 +428,8 @@ class _StoriesPageState extends State<StoriesPage> {
   }
 
   Widget _buildStoryCard(TextTheme textTheme, ColorScheme cs) {
+    final isMuhammad = _isMuhammadStory();
+
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(26),
@@ -229,11 +442,15 @@ class _StoriesPageState extends State<StoriesPage> {
           ],
         ),
         border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: 0.55),
+          color: isMuhammad
+              ? _gold.withValues(alpha: 0.60)
+              : cs.outlineVariant.withValues(alpha: 0.55),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: isMuhammad
+                ? _gold.withValues(alpha: 0.10)
+                : Colors.black.withValues(alpha: 0.05),
             blurRadius: 18,
             offset: const Offset(0, 8),
           ),
@@ -252,18 +469,30 @@ class _StoriesPageState extends State<StoriesPage> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: cs.primary.withValues(alpha: 0.10),
+                    color: isMuhammad
+                        ? _gold.withValues(alpha: 0.12)
+                        : cs.primary.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(999),
+                    border: isMuhammad
+                        ? Border.all(
+                      color: _gold.withValues(alpha: 0.30),
+                      width: 0.8,
+                    )
+                        : null,
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(widget.story.icon, size: 16, color: cs.primary),
+                      Icon(
+                        widget.story.icon,
+                        size: 16,
+                        color: isMuhammad ? _goldDeep : cs.primary,
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         widget.story.chipLabel.tr(),
                         style: TextStyle(
-                          color: cs.primary,
+                          color: isMuhammad ? _goldDeep : cs.primary,
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                         ),
@@ -274,7 +503,9 @@ class _StoriesPageState extends State<StoriesPage> {
                 const Spacer(),
                 Icon(
                   Icons.auto_stories_rounded,
-                  color: cs.onSurface.withValues(alpha: 0.28),
+                  color: isMuhammad
+                      ? _gold.withValues(alpha: 0.70)
+                      : cs.onSurface.withValues(alpha: 0.28),
                   size: 20,
                 ),
               ],
@@ -315,14 +546,17 @@ class _StoriesPageState extends State<StoriesPage> {
   Widget _buildProgressStrip(ColorScheme cs, TextTheme textTheme) {
     final progress =
     _questions.isEmpty ? 0.0 : _answeredCount / _questions.length;
+    final isMuhammad = _isMuhammadStory();
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHigh,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: 0.45),
+          color: isMuhammad
+              ? _gold.withValues(alpha: 0.35)
+              : cs.outlineVariant.withValues(alpha: 0.45),
         ),
       ),
       child: Column(
@@ -332,7 +566,7 @@ class _StoriesPageState extends State<StoriesPage> {
             '${_answeredCount}/${_questions.length} ${'answered'.tr()}',
             style: textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w700,
-              color: cs.onSurface,
+              color: isMuhammad ? _goldDeep : cs.onSurface,
             ),
           ),
           const SizedBox(height: 10),
@@ -341,8 +575,12 @@ class _StoriesPageState extends State<StoriesPage> {
             child: LinearProgressIndicator(
               minHeight: 8,
               value: progress.clamp(0.0, 1.0),
-              backgroundColor: cs.surfaceContainerHighest,
-              valueColor: AlwaysStoppedAnimation(cs.primary),
+              backgroundColor: isMuhammad
+                  ? _gold.withValues(alpha: 0.16)
+                  : cs.surfaceContainerHighest,
+              valueColor: AlwaysStoppedAnimation(
+                isMuhammad ? _gold : cs.primary,
+              ),
             ),
           ),
         ],
@@ -357,6 +595,7 @@ class _StoriesPageState extends State<StoriesPage> {
       ) {
     final question = _questions[questionIndex];
     final selectedIndex = _selectedIndices[questionIndex];
+    final isMuhammad = _isMuhammadStory();
 
     return Container(
       decoration: BoxDecoration(
@@ -393,13 +632,21 @@ class _StoriesPageState extends State<StoriesPage> {
                   height: 28,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: cs.primary.withValues(alpha: 0.10),
+                    color: isMuhammad
+                        ? _gold.withValues(alpha: 0.14)
+                        : cs.primary.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(999),
+                    border: isMuhammad
+                        ? Border.all(
+                      color: _gold.withValues(alpha: 0.30),
+                      width: 0.8,
+                    )
+                        : null,
                   ),
                   child: Text(
                     '${questionIndex + 1}',
                     style: TextStyle(
-                      color: cs.primary,
+                      color: isMuhammad ? _goldDeep : cs.primary,
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
                     ),
@@ -435,7 +682,7 @@ class _StoriesPageState extends State<StoriesPage> {
                       : 'Check the highlighted correct answer 💡'.tr(),
                   style: textTheme.bodySmall?.copyWith(
                     color: selectedIndex == question.correctIndex
-                        ? cs.primary
+                        ? (isMuhammad ? _goldDeep : cs.primary)
                         : Colors.orange[700],
                     fontStyle: FontStyle.italic,
                     fontWeight: FontWeight.w600,
@@ -455,6 +702,7 @@ class _StoriesPageState extends State<StoriesPage> {
   }) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final isMuhammad = _isMuhammadStory();
 
     final question = _questions[questionIndex];
     final selectedIndex = _selectedIndices[questionIndex];
@@ -484,8 +732,12 @@ class _StoriesPageState extends State<StoriesPage> {
         iconColor = Colors.red;
       }
     } else if (isSelected) {
-      borderColor = cs.primary.withValues(alpha: 0.40);
-      fillColor = cs.primary.withValues(alpha: 0.06);
+      borderColor = isMuhammad
+          ? _gold.withValues(alpha: 0.55)
+          : cs.primary.withValues(alpha: 0.40);
+      fillColor = isMuhammad
+          ? _gold.withValues(alpha: 0.12)
+          : cs.primary.withValues(alpha: 0.06);
     }
 
     return Padding(
