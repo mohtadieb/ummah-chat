@@ -22,27 +22,16 @@ class MyBioBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final trimmed = text.trim();
 
-    // Container
-    return Container(
-      // Padding outside
-      margin: const EdgeInsets.symmetric(horizontal: 28.0),
-
-      // Padding inside
-      padding: const EdgeInsets.all(28.0),
-
-      // Decoration
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.secondary, // background color
-        borderRadius: BorderRadius.circular(7), // rounded corners
-      ),
-
-      // Text content
-      child: Text(
-        text.isNotEmpty ? text : "Empty bio..".tr(), // fallback if bio is empty
-        style: TextStyle(
-          color: Theme.of(context).colorScheme.inversePrimary,
-        ),
+    return Text(
+      trimmed.isNotEmpty ? trimmed : "empty_bio".tr(),
+      style: TextStyle(
+        color: cs.onSurface.withValues(alpha: 0.88),
+        fontSize: 14.5,
+        fontWeight: FontWeight.w500,
+        height: 1.5,
       ),
     );
   }

@@ -6,7 +6,7 @@ import 'friends_page.dart';
 import 'groups_page.dart';
 import 'create_group_page.dart';
 import 'communities_page.dart';
-import 'search_page.dart'; // for "Find people" page
+import 'search_page.dart';
 import '../services/database/database_provider.dart';
 
 class ChatTabsPage extends StatefulWidget {
@@ -23,8 +23,10 @@ class _ChatTabsPageState extends State<ChatTabsPage>
   @override
   void initState() {
     super.initState();
-    // 3 tabs: Friends, Groups, Communities
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -33,161 +35,107 @@ class _ChatTabsPageState extends State<ChatTabsPage>
     super.dispose();
   }
 
+  String _currentFabLabel() {
+    if (_tabController.index == 0) return "Find people".tr();
+    if (_tabController.index == 1) return "New group".tr();
+    return "Add community".tr();
+  }
+
+  IconData _currentFabIcon() {
+    if (_tabController.index == 0) return Icons.person_search;
+    if (_tabController.index == 1) return Icons.group_add;
+    return Icons.group_add;
+  }
+
+  Future<void> _onFabPressed() async {
+    if (_tabController.index == 0) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const SearchPage(),
+        ),
+      );
+      return;
+    }
+
+    if (_tabController.index == 1) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const CreateGroupPage(),
+        ),
+      );
+      return;
+    }
+
+    await _showAddCommunityDialog(context);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: colorScheme.surface,
-
-      appBar: AppBar(
-        backgroundColor: colorScheme.surface,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        surfaceTintColor: Colors.transparent,
-        centerTitle: true,
-        title: Text(
-          "Chats".tr(),
-          style: TextStyle(
-            color: colorScheme.primary,
-            fontWeight: FontWeight.w600,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _onFabPressed,
+        icon: Icon(_currentFabIcon()),
+        label: Text(_currentFabLabel()),
+        backgroundColor: cs.primary,
+        foregroundColor: cs.onPrimary,
+        elevation: 6,
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              cs.surface,
+              cs.surface,
+              cs.surfaceContainerLowest,
+            ],
           ),
         ),
-
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(52),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-            child: Container(
-              height: 40,
-              decoration: BoxDecoration(
-                color: colorScheme.primary.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(999),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+                child: _PremiumChatsHeader(
+                  title: "Chats".tr(),
+                  subtitle: "Stay connected with friends, groups, and communities."
+                      .tr(),
+                ),
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(999),
-                child: TabBar(
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: _PremiumTabBar(
                   controller: _tabController,
-                  indicator: BoxDecoration(
-                    color: colorScheme.primary,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  indicatorSize: TabBarIndicatorSize.tab,
-
-                  // remove default underline / divider
-                  indicatorColor: Colors.transparent,
-                  dividerColor: Colors.transparent,
-
-                  // no splash / overlay highlight
-                  splashFactory: NoSplash.splashFactory,
-                  overlayColor: WidgetStateProperty.all(Colors.transparent),
-
-                  labelColor: colorScheme.onPrimary,
-                  unselectedLabelColor: colorScheme.primary,
-                  labelStyle: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
                   tabs: [
-                    Tab(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text("Friends".tr()),
-                      ),
-                    ),
-                    Tab(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text("Groups".tr()),
-                      ),
-                    ),
-                    Tab(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text("Communities".tr()),
-                      ),
-                    ),
+                    "Friends".tr(),
+                    "Groups".tr(),
+                    "Communities".tr(),
                   ],
                 ),
               ),
-            ),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  physics: const BouncingScrollPhysics(),
+                  children: const [
+                    FriendsPage(),
+                    GroupsPage(),
+                    CommunitiesPage(),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-      ),
-
-      body: TabBarView(
-        controller: _tabController,
-        physics: const BouncingScrollPhysics(),
-        children: const [
-          FriendsPage(),
-          GroupsPage(),
-          CommunitiesPage(), // content-only version
-        ],
-      ),
-
-      floatingActionButton: AnimatedBuilder(
-        animation: _tabController,
-        builder: (_, __) {
-          final colorScheme = Theme.of(context).colorScheme;
-
-          // Friends tab → Find people (open SearchPage as full screen)
-          if (_tabController.index == 0) {
-            return FloatingActionButton.extended(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const SearchPage(),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.person_search),
-              label: Text("Find people".tr()),
-              backgroundColor: colorScheme.primary,
-              foregroundColor: colorScheme.onPrimary,
-            );
-          }
-
-          // Groups tab → New group
-          if (_tabController.index == 1) {
-            return FloatingActionButton.extended(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const CreateGroupPage(),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.group_add),
-              label: Text("New group".tr()),
-              backgroundColor: colorScheme.primary,
-              foregroundColor: colorScheme.onPrimary,
-            );
-          }
-
-          // Communities tab → Add community
-          if (_tabController.index == 2) {
-            return FloatingActionButton.extended(
-              onPressed: () async {
-                await _showAddCommunityDialog(context);
-              },
-              icon: const Icon(Icons.group_add),
-              label: Text("Add community".tr()),
-              backgroundColor: colorScheme.primary,
-              foregroundColor: colorScheme.onPrimary,
-            );
-          }
-
-          return const SizedBox.shrink();
-        },
       ),
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Create community dialog (used by Communities FAB)
-  // ---------------------------------------------------------------------------
   Future<void> _showAddCommunityDialog(BuildContext context) async {
     final db = Provider.of<DatabaseProvider>(context, listen: false);
 
@@ -195,7 +143,8 @@ class _ChatTabsPageState extends State<ChatTabsPage>
     final descController = TextEditingController();
     final countryController = TextEditingController();
 
-    final colorScheme = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
 
     return showDialog(
       context: context,
@@ -205,61 +154,91 @@ class _ChatTabsPageState extends State<ChatTabsPage>
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
+              backgroundColor: cs.surfaceContainerHigh,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(24),
               ),
-              title: Text(
-                'Create community'.tr(),
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.primary,
-                ),
+              titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+              contentPadding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
+              actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              title: Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: cs.primary.withValues(alpha: 0.10),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.groups_rounded,
+                      color: cs.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Create community'.tr(),
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    TextField(
+                    _PremiumDialogField(
                       controller: nameController,
-                      decoration: InputDecoration(
-                        labelText: 'Name'.tr(),
-                        border: const OutlineInputBorder(),
-                      ),
+                      label: 'Name'.tr(),
                     ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: descController,
-                      maxLines: 3,
-                      decoration: InputDecoration(
-                        labelText: 'Description'.tr(),
-                        border: const OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: countryController,
-                      decoration: InputDecoration(
-                        labelText: 'Country'.tr(),
-                        border: const OutlineInputBorder(),
-                      ),
-                    ),
-
-                    // ✅ NEW: Private toggle
                     const SizedBox(height: 12),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text('Private community'.tr()),
-                      value: isPrivate,
-                      onChanged: (v) => setState(() => isPrivate = v),
+                    _PremiumDialogField(
+                      controller: descController,
+                      label: 'Description'.tr(),
+                      maxLines: 3,
                     ),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'private_community_hint'.tr(),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: colorScheme.primary.withValues(alpha: 0.7),
+                    const SizedBox(height: 12),
+                    _PremiumDialogField(
+                      controller: countryController,
+                      label: 'Country'.tr(),
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainer,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: cs.outlineVariant.withValues(alpha: 0.45),
                         ),
+                      ),
+                      child: Column(
+                        children: [
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              'Private community'.tr(),
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            value: isPrivate,
+                            onChanged: (v) => setState(() => isPrivate = v),
+                          ),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'private_community_hint'.tr(),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: cs.onSurface.withValues(alpha: 0.68),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -270,7 +249,7 @@ class _ChatTabsPageState extends State<ChatTabsPage>
                   onPressed: () => Navigator.pop(dialogCtx),
                   child: Text('Cancel'.tr()),
                 ),
-                ElevatedButton(
+                FilledButton(
                   onPressed: () async {
                     final name = nameController.text.trim();
                     final desc = descController.text.trim();
@@ -287,7 +266,6 @@ class _ChatTabsPageState extends State<ChatTabsPage>
                       return;
                     }
 
-                    // ✅ UPDATED: pass isPrivate
                     await db.createCommunity(
                       name,
                       desc,
@@ -306,6 +284,200 @@ class _ChatTabsPageState extends State<ChatTabsPage>
           },
         );
       },
+    );
+  }
+}
+
+class _PremiumChatsHeader extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _PremiumChatsHeader({
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            cs.primary.withValues(alpha: 0.14),
+            cs.secondary.withValues(alpha: 0.55),
+            cs.surfaceContainerHigh,
+          ],
+        ),
+        border: Border.all(
+          color: cs.outlineVariant.withValues(alpha: 0.45),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: cs.primary.withValues(alpha: 0.14),
+            ),
+            child: Icon(
+              Icons.forum_rounded,
+              color: cs.primary,
+              size: 26,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: cs.onSurface.withValues(alpha: 0.72),
+                    height: 1.25,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PremiumTabBar extends StatelessWidget {
+  final TabController controller;
+  final List<String> tabs;
+
+  const _PremiumTabBar({
+    required this.controller,
+    required this.tabs,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(5),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: cs.outlineVariant.withValues(alpha: 0.5),
+        ),
+      ),
+      child: TabBar(
+        controller: controller,
+        dividerColor: Colors.transparent,
+        indicatorSize: TabBarIndicatorSize.tab,
+        indicator: BoxDecoration(
+          color: cs.primary,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: cs.primary.withValues(alpha: 0.22),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        splashFactory: NoSplash.splashFactory,
+        overlayColor: WidgetStateProperty.all(Colors.transparent),
+        labelColor: cs.onPrimary,
+        unselectedLabelColor: cs.onSurface.withValues(alpha: 0.72),
+        labelStyle: theme.textTheme.labelLarge?.copyWith(
+          fontWeight: FontWeight.w700,
+        ),
+        unselectedLabelStyle: theme.textTheme.labelLarge?.copyWith(
+          fontWeight: FontWeight.w600,
+        ),
+        tabs: tabs
+            .map(
+              (tab) => Tab(
+            height: 42,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(tab),
+            ),
+          ),
+        )
+            .toList(),
+      ),
+    );
+  }
+}
+
+class _PremiumDialogField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final int maxLines;
+
+  const _PremiumDialogField({
+    required this.controller,
+    required this.label,
+    this.maxLines = 1,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return TextField(
+      controller: controller,
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        labelText: label,
+        filled: true,
+        fillColor: cs.surfaceContainer,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: cs.outlineVariant.withValues(alpha: 0.45),
+          ),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: cs.outlineVariant.withValues(alpha: 0.45),
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: cs.primary,
+            width: 1.2,
+          ),
+        ),
+      ),
     );
   }
 }

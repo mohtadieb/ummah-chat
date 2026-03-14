@@ -299,6 +299,25 @@
   "{name}'s mahrams": "محارم {name}",
   "No mahrams to show yet.": "لا يوجد محارم لعرضهم بعد.",
   "Add mahrams to see them here.": "أضف محارم لعرضهم هنا.",
+  "home_feed_subtitle": "مساحة للتأمل، والمجتمع، والتواصل الهادف.",
+  "create": "إنشاء",
+  "Pull down to refresh.": "اسحب للأسفل للتحديث.",
+  "answered": "تمت الإجابة",
+  "like": "إعجاب",
+  "Stay connected with friends, groups, and communities.": "ابقَ على تواصل مع الأصدقاء والمجموعات والمجتمعات.",
+
+  "About me": "عني",
+  "No completed stories yet.": "لا توجد قصص مكتملة بعد.",
+
+  "Good morning": "صباح الخير",
+  "Good afternoon": "مساء الخير",
+  "Good evening": "مساء الخير",
+
+  "mahrams_of": "محارم {name}",
+  "Mahrams": "المحارم",
+
+
+
 
 
 

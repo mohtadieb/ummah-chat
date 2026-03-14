@@ -16,7 +16,7 @@ import '../services/notifications/notification_service.dart';
 // Providers
 import 'package:provider/provider.dart';
 import '../pages/select_stories_page.dart';
-import '../services/navigation/bottom_nav_provider.dart'; // 👈 ADD THIS
+import '../services/navigation/bottom_nav_provider.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -26,102 +26,86 @@ class MainLayout extends StatefulWidget {
 }
 
 class _MainLayoutState extends State<MainLayout> {
-  // index of the Chats tab in bottom navigation (still 1)
-  static const int _chatsIndex = 1;
-  static const int _profileTabIndex = 4;
-
-  // Auth service to get current user id for ProfilePage
   final _auth = AuthService();
-
-  // 👉 Singleton instance for in-app notifications
   final NotificationService _notificationService = NotificationService();
 
-  // All main pages (for IndexedStack)
   late final List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
 
-    // Make sure user is loaded; we reuse this id below for ProfilePage
     final currentUserId = _auth.getCurrentUserId();
 
-    // Order must match BottomNavigationBar items
     _pages = [
-      const HomePage(), // 0
-      const ChatTabsPage(), // 1
-      SelectStoriesPage(), // 2
-      const DuaWallPage(), // 3
-      ProfilePage(userId: currentUserId), // 4
+      const HomePage(),
+      const ChatTabsPage(),
+      SelectStoriesPage(),
+      const DuaWallPage(),
+      ProfilePage(userId: currentUserId),
     ];
   }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    // 👇 Listen to our global bottom nav provider
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final bottomNav = Provider.of<BottomNavProvider>(context);
     final selectedIndex = bottomNav.currentIndex;
+    final isDark = theme.brightness == Brightness.dark;
 
-    // ✅ Previously we only showed actions on Profile tab.
-    // ✅ Now: show Notification + Settings actions ALWAYS.
+    final scaffoldBg =
+    isDark ? const Color(0xFF0B1511) : const Color(0xFFF6FAF7);
+
+    final navBg = isDark
+        ? const Color(0xFF12201A)
+        : const Color(0xFFFFFFFF);
+
+    final navBorderColor = isDark
+        ? Colors.white.withValues(alpha: 0.07)
+        : colorScheme.outline.withValues(alpha: 0.10);
+
+    final selectedItemColor = colorScheme.primary;
+    final unselectedItemColor =
+    colorScheme.onSurface.withValues(alpha: 0.62);
+
     return Scaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        foregroundColor: colorScheme.primary,
-        toolbarHeight: kToolbarHeight / 1.3,
-        scrolledUnderElevation: 0,
-        backgroundColor: colorScheme.surface,
-        surfaceTintColor: Colors.transparent,
+      backgroundColor: scaffoldBg,
 
-        // 🔥 Show actions on ALL tabs
+      appBar: AppBar(
+        toolbarHeight: 54,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        backgroundColor: scaffoldBg,
+        foregroundColor: colorScheme.onSurface,
+        surfaceTintColor: Colors.transparent,
+        automaticallyImplyLeading: false,
+        title: null,
         actions: [
-          // 🔔 Notification bell with unread badge
           StreamBuilder<int>(
             stream: _notificationService.unreadCountStream(),
             builder: (context, snapshot) {
               final unread = snapshot.data ?? 0;
 
-              return Stack(
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      unread > 0
-                          ? Icons.notifications_active
-                          : Icons.notifications_none_rounded,
+              return _TopActionButton(
+                icon: unread > 0
+                    ? Icons.notifications_active_rounded
+                    : Icons.notifications_none_rounded,
+                hasBadge: unread > 0,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const NotificationPage(),
                     ),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const NotificationPage(),
-                        ),
-                      );
-                    },
-                  ),
-                  if (unread > 0)
-                    Positioned(
-                      right: 10,
-                      top: 10,
-                      child: Container(
-                        width: 9,
-                        height: 9,
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
-                ],
+                  );
+                },
               );
             },
           ),
-
-          // ⚙️ Settings button
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
+          _TopActionButton(
+            icon: Icons.settings_outlined,
+            onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -130,8 +114,7 @@ class _MainLayoutState extends State<MainLayout> {
               );
             },
           ),
-
-          const SizedBox(width: 7),
+          const SizedBox(width: 10),
         ],
       ),
 
@@ -140,34 +123,169 @@ class _MainLayoutState extends State<MainLayout> {
         children: _pages,
       ),
 
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: selectedIndex,
-        onTap: (index) {
-          bottomNav.setIndex(index);
-        },
-        type: BottomNavigationBarType.fixed,
-        items: [
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.home),
-            label: 'Home'.tr(),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: navBg,
+          border: Border(
+            top: BorderSide(color: navBorderColor),
           ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.groups),
-            label: 'Social'.tr(),
+        ),
+        child: SafeArea(
+          top: false,
+          child: BottomNavigationBar(
+            currentIndex: selectedIndex,
+            onTap: (index) {
+              bottomNav.setIndex(index);
+            },
+            type: BottomNavigationBarType.fixed,
+            backgroundColor: navBg,
+            elevation: 0,
+            selectedItemColor: selectedItemColor,
+            unselectedItemColor: unselectedItemColor,
+            selectedFontSize: 11.5,
+            unselectedFontSize: 11.5,
+            selectedLabelStyle: const TextStyle(
+              fontWeight: FontWeight.w700,
+              height: 1.2,
+            ),
+            unselectedLabelStyle: const TextStyle(
+              fontWeight: FontWeight.w600,
+              height: 1.2,
+            ),
+            items: [
+              BottomNavigationBarItem(
+                icon: _NavIcon(
+                  icon: Icons.home_rounded,
+                  selected: selectedIndex == 0,
+                ),
+                label: 'Home'.tr(),
+              ),
+              BottomNavigationBarItem(
+                icon: _NavIcon(
+                  icon: Icons.groups_rounded,
+                  selected: selectedIndex == 1,
+                ),
+                label: 'Social'.tr(),
+              ),
+              BottomNavigationBarItem(
+                icon: _NavIcon(
+                  icon: Icons.menu_book_rounded,
+                  selected: selectedIndex == 2,
+                ),
+                label: 'Stories'.tr(),
+              ),
+              BottomNavigationBarItem(
+                icon: _NavIcon(
+                  icon: Icons.view_list_rounded,
+                  selected: selectedIndex == 3,
+                ),
+                label: 'Dua Wall'.tr(),
+              ),
+              BottomNavigationBarItem(
+                icon: _NavIcon(
+                  icon: Icons.person_rounded,
+                  selected: selectedIndex == 4,
+                ),
+                label: 'Profile'.tr(),
+              ),
+            ],
           ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.menu_book_rounded),
-            label: 'Stories'.tr(),
+        ),
+      ),
+    );
+  }
+}
+
+class _TopActionButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool hasBadge;
+
+  const _TopActionButton({
+    required this.icon,
+    required this.onTap,
+    this.hasBadge = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Material(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.04)
+                : colorScheme.primary.withValues(alpha: 0.06),
+            shape: const CircleBorder(),
+            child: InkWell(
+              onTap: onTap,
+              customBorder: const CircleBorder(),
+              child: SizedBox(
+                width: 40,
+                height: 40,
+                child: Icon(
+                  icon,
+                  size: 21,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+            ),
           ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.view_list),
-            label: 'Dua Wall'.tr(),
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.person),
-            label: 'Profile'.tr(),
-          ),
+          if (hasBadge)
+            Positioned(
+              right: 8,
+              top: 8,
+              child: Container(
+                width: 9,
+                height: 9,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE53935),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    width: 1.4,
+                  ),
+                ),
+              ),
+            ),
         ],
+      ),
+    );
+  }
+}
+
+class _NavIcon extends StatelessWidget {
+  final IconData icon;
+  final bool selected;
+
+  const _NavIcon({
+    required this.icon,
+    required this.selected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: selected
+            ? colorScheme.primary.withValues(alpha: isDark ? 0.18 : 0.12)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Icon(
+        icon,
+        size: 22,
       ),
     );
   }

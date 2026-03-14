@@ -602,6 +602,10 @@
   "Linked to a post": "Gekoppeld aan een bericht",
   "Could not open post.": "Kon het bericht niet openen.",
   "Private reflections": "Privé reflecties",
+  "mahrams_of": "Mahrams van {name}",
+  "Mahrams": "Mahrams",
+
+
 
   "daily_ayah_title": "Dagelijkse Ayah",
   "daily_ayah_subtitle": "Ayah {key}",
@@ -725,6 +729,18 @@
   "{name}'s mahrams": "Mahram van {name}",
   "No mahrams to show yet.": "Nog geen mahrams om te tonen.",
   "Add mahrams to see them here.": "Voeg mahrams toe om ze hier te zien.",
+  "home_feed_subtitle": "Een plek voor reflectie, gemeenschap en betekenisvolle verbinding.",
+  "create": "Maken",
+  "Pull down to refresh.": "Trek omlaag om te vernieuwen.",
+  "answered": "beantwoord",
+  "like": "Leuk",
+  "Stay connected with friends, groups, and communities.": "Blijf verbonden met vrienden, groepen en gemeenschappen.",
+  "About me": "Over mij",
+  "No completed stories yet.": "Nog geen voltooide verhalen.",
+  "Good morning": "Goedemorgen",
+  "Good afternoon": "Goedemiddag",
+  "Good evening": "Goedenavond",
+
 
 
   "Skip": "Overslaan",

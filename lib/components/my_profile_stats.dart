@@ -1,19 +1,3 @@
-/*
-
-PROFILE STATS
-
-This will be displayed on the profile page
-
---------------------------------------------------------------------------------
-
-Number of
-
-- posts
-- followers
-- following
-
- */
-
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
@@ -21,87 +5,105 @@ class MyProfileStats extends StatelessWidget {
   final int postCount;
   final int followerCount;
   final int followingCount;
-  final void Function()? onTap;
+
+  /// Old fallback callback (kept for compatibility)
+  final VoidCallback? onTap;
+
+  /// New individual callbacks
+  final VoidCallback? onPostsTap;
+  final VoidCallback? onFollowersTap;
+  final VoidCallback? onFollowingTap;
 
   const MyProfileStats({
     super.key,
     required this.postCount,
     required this.followerCount,
     required this.followingCount,
-    required this.onTap,
+    this.onTap,
+    this.onPostsTap,
+    this.onFollowersTap,
+    this.onFollowingTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    // style for count
-    var textStyleForCount = TextStyle(
-      fontSize: 21,
-      fontWeight: FontWeight.bold,
-      color: Theme.of(context).colorScheme.inversePrimary,
-    );
-
-    // style for text
-    var textStyleForText = TextStyle(
-      fontSize: 14,
-      color: Theme.of(context).colorScheme.primary,
-    );
-
-    // Proper pluralization
-    final postsLabel =
-    postCount == 1 ? "Post".tr() : "Posts".tr();
-    final followersLabel =
-    followerCount == 1 ? "Follower".tr() : "Followers".tr();
-    final followingLabel =
-    followingCount == 1 ? "Following".tr() : "Following".tr();
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Posts
-            SizedBox(
-              width: 100,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(postCount.toString(), style: textStyleForCount),
-                  const SizedBox(height: 3),
-                  Text(postsLabel, style: textStyleForText),
-                ],
-              ),
-            ),
-
-            // Followers
-            SizedBox(
-              width: 100,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(followerCount.toString(), style: textStyleForCount),
-                  const SizedBox(height: 3),
-                  Text(followersLabel, style: textStyleForText),
-                ],
-              ),
-            ),
-
-            // Following
-            SizedBox(
-              width: 100,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(followingCount.toString(), style: textStyleForCount),
-                  const SizedBox(height: 3),
-                  Text(followingLabel, style: textStyleForText),
-                ],
-              ),
-            ),
-          ],
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        Expanded(
+          child: _ProfileStatTile(
+            value: postCount.toString(),
+            label: 'Posts'.tr(),
+            onTap: onPostsTap ?? onTap,
+          ),
         ),
+        Expanded(
+          child: _ProfileStatTile(
+            value: followerCount.toString(),
+            label: 'Followers'.tr(),
+            onTap: onFollowersTap ?? onTap,
+          ),
+        ),
+        Expanded(
+          child: _ProfileStatTile(
+            value: followingCount.toString(),
+            label: 'Following'.tr(),
+            onTap: onFollowingTap ?? onTap,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProfileStatTile extends StatelessWidget {
+  final String value;
+  final String label;
+  final VoidCallback? onTap;
+
+  const _ProfileStatTile({
+    required this.value,
+    required this.label,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: cs.onSurface,
+              letterSpacing: -0.2,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurface.withValues(alpha: 0.72),
+            ),
+          ),
+        ],
       ),
+    );
+
+    if (onTap == null) return content;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: content,
     );
   }
 }

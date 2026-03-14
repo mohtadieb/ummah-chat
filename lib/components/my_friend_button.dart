@@ -13,7 +13,6 @@ class MyFriendButton extends StatelessWidget {
   final VoidCallback? onOpenRequestSheet;
   final VoidCallback? onDeleteMahram;
 
-  /// ✅ NEW: disables all taps + shows a small spinner
   final bool isBusy;
 
   const MyFriendButton({
@@ -34,23 +33,17 @@ class MyFriendButton extends StatelessWidget {
           friendStatus == 'inquiry_pending_received_mahram' ||
           friendStatus == 'inquiry_pending_received_man';
 
-  bool get _isInquirySentOrCancelable =>
-      friendStatus == 'inquiry_pending_sent' ||
-          friendStatus == 'inquiry_cancel_inquiry';
-
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    // ✅ Treat inquiry "received" role-specific statuses same as pending_received UI (Accept + Decline)
     final isTwoButtonReceived = friendStatus == 'pending_received' ||
         friendStatus == 'pending_mahram_received' ||
         _isInquiryReceived;
 
-    // ---- TWO BUTTON ROW (Accept / Decline) ----
     if (isTwoButtonReceived) {
       return SizedBox(
-        height: 36,
+        height: 40,
         child: Row(
           children: [
             Expanded(
@@ -68,7 +61,7 @@ class MyFriendButton extends StatelessWidget {
                   label: 'Accept'.tr(),
                   textStyle: const TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
@@ -90,7 +83,7 @@ class MyFriendButton extends StatelessWidget {
                   label: 'Decline'.tr(),
                   textStyle: const TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
@@ -100,23 +93,14 @@ class MyFriendButton extends StatelessWidget {
       );
     }
 
-    // ---- SINGLE BUTTON ----
     Color bg;
     Color fg;
     BorderSide? side;
     VoidCallback? onTap;
 
     switch (friendStatus) {
-    // ✅ Friend & mahram pending (cancel)
       case 'pending_sent':
       case 'pending_mahram_sent':
-        bg = Colors.transparent;
-        fg = colorScheme.primary;
-        side = BorderSide(color: colorScheme.primary);
-        onTap = onCancelRequest;
-        break;
-
-    // ✅ Inquiry states
       case 'inquiry_pending_sent':
         bg = Colors.transparent;
         fg = colorScheme.primary;
@@ -125,21 +109,15 @@ class MyFriendButton extends StatelessWidget {
         break;
 
       case 'inquiry_cancel_inquiry':
-        bg = colorScheme.tertiary;
-        fg = colorScheme.primary;
-        onTap = onCancelRequest; // end inquiry
-        break;
-
       case 'accepted':
-        bg = colorScheme.tertiary;
-        fg = colorScheme.primary;
-        onTap = onUnfriend;
-        break;
-
       case 'mahram':
-        bg = colorScheme.tertiary;
+        bg = colorScheme.primary.withValues(alpha: 0.08);
         fg = colorScheme.primary;
-        onTap = onDeleteMahram;
+        onTap = friendStatus == 'accepted'
+            ? onUnfriend
+            : friendStatus == 'mahram'
+            ? onDeleteMahram
+            : onCancelRequest;
         break;
 
       case 'blocked':
@@ -149,57 +127,45 @@ class MyFriendButton extends StatelessWidget {
         break;
 
       case 'request':
-        bg = colorScheme.secondary;
-        fg = colorScheme.primary;
-        onTap = onOpenRequestSheet;
-        break;
-
       case 'none':
       default:
-        bg = colorScheme.secondary;
-        fg = colorScheme.primary;
-        onTap = onAddFriend;
+        bg = colorScheme.primary;
+        fg = colorScheme.onPrimary;
+        onTap = friendStatus == 'request' ? onOpenRequestSheet : onAddFriend;
+        break;
     }
 
-    // Determine button text
     String label;
     switch (friendStatus) {
       case 'pending_sent':
       case 'pending_mahram_sent':
         label = 'cancel_request';
         break;
-
       case 'inquiry_pending_sent':
         label = 'cancel_inquiry';
         break;
-
       case 'inquiry_cancel_inquiry':
         label = 'end_inquiry';
         break;
-
       case 'accepted':
         label = 'Unfriend';
         break;
-
       case 'mahram':
         label = 'Mahram';
         break;
-
       case 'request':
         label = 'Request';
         break;
-
       case 'blocked':
         label = 'Blocked';
         break;
-
       case 'none':
       default:
         label = 'Add friend';
     }
 
     return SizedBox(
-      height: 36,
+      height: 40,
       child: TextButton(
         onPressed: isBusy ? null : onTap,
         style: TextButton.styleFrom(
@@ -213,14 +179,16 @@ class MyFriendButton extends StatelessWidget {
         child: _ButtonChild(
           isBusy: isBusy,
           label: label.tr(),
-          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          textStyle: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     );
   }
 }
 
-/// Small helper so we keep your FittedBox behavior, but can show a spinner when busy.
 class _ButtonChild extends StatelessWidget {
   final bool isBusy;
   final String label;
@@ -242,11 +210,14 @@ class _ButtonChild extends StatelessWidget {
         switchInCurve: Curves.easeOut,
         switchOutCurve: Curves.easeIn,
         child: isBusy
-            ? const SizedBox(
-          key: ValueKey('busy'),
+            ? SizedBox(
+          key: const ValueKey('busy'),
           width: 16,
           height: 16,
-          child: CircularProgressIndicator(strokeWidth: 2),
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: Theme.of(context).colorScheme.onPrimary,
+          ),
         )
             : Text(
           key: const ValueKey('label'),

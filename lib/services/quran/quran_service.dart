@@ -11,6 +11,7 @@
 // ✅ Supported:
 // - en -> en.sahih
 // - nl -> nl.siregar
+// - fr -> fr.hamidullah
 // - ar -> no translation (we return empty translation string)
 
 import 'dart:convert';
@@ -26,6 +27,7 @@ class QuranService {
   // ✅ Translations
   static const String _englishEdition = 'en.sahih';
   static const String _dutchEdition = 'nl.siregar';
+  static const String _frenchEdition = 'fr.hamidullah';
 
   /// Pick translation edition based on language code.
   /// - Defaults to English for unknown languages.
@@ -33,12 +35,14 @@ class QuranService {
   String? _translationEditionForLang(String? langCode) {
     final code = (langCode ?? 'en').toLowerCase();
 
-    // handle cases like "en-US", "nl-NL"
+    // handle cases like "en-US", "nl-NL", "fr-FR"
     final base = code.split('-').first;
 
     switch (base) {
       case 'nl':
         return _dutchEdition;
+      case 'fr':
+        return _frenchEdition;
       case 'ar':
         return null; // no translation
       case 'en':
@@ -71,7 +75,6 @@ class QuranService {
   }
 
   Never _throwMissingEditions(List data, String contextLabel) {
-    // Helpful debug: print identifiers we actually got back
     try {
       final ids = data
           .whereType<Map>()
@@ -83,18 +86,10 @@ class QuranService {
     throw Exception('QuranService missing editions in response');
   }
 
-  /// Fetch daily ayah (Arabic + translation) + metadata
-  ///
-  /// langCode examples:
-  /// - "en", "en-US"
-  /// - "nl", "nl-NL"
-  /// - "ar"
   Future<Map<String, dynamic>> fetchDailyAyah({String? langCode}) async {
     final globalAyahNo = _dailyGlobalAyahNumberUtc();
     final trEdition = _translationEditionForLang(langCode);
 
-    // Per docs: /ayah/{reference}/editions/{edition},{edition}
-    // If trEdition == null (Arabic UI), only request Arabic edition.
     final editions = trEdition == null
         ? _arabicEdition
         : '$_arabicEdition,$trEdition';
@@ -118,7 +113,6 @@ class QuranService {
 
     final tr = trEdition == null ? null : _findEdition(data, trEdition);
 
-    // If we requested a translation but didn't get it -> error with debug info.
     if (trEdition != null && tr == null) {
       _throwMissingEditions(data, 'fetchDailyAyah(translation=$trEdition)');
     }
@@ -130,17 +124,12 @@ class QuranService {
       'surah': surahNo,
       'ayah': ayahNoInSurah,
       'surah_name_ar': (ar['surah']?['name'] ?? '').toString(),
-      // Keep this key for UI compatibility; if no translation edition, leave it blank.
       'surah_name_en': (tr?['surah']?['englishName'] ?? '').toString(),
       'arabic': (ar['text'] ?? '').toString(),
-      'translation': (tr?['text'] ?? '').toString(), // ✅ UI expects this
+      'translation': (tr?['text'] ?? '').toString(),
     };
   }
 
-  /// Fetch by key "surah:ayah" e.g. "2:255"
-  ///
-  /// langCode examples:
-  /// - "en", "nl", "ar"
   Future<Map<String, dynamic>> fetchAyahByKey(
       String ayahKey, {
         String? langCode,
@@ -172,12 +161,17 @@ class QuranService {
     }
 
     final ar = _findEdition(data, _arabicEdition);
-    if (ar == null) _throwMissingEditions(data, 'fetchAyahByKey(arabic:$ayahKey)');
+    if (ar == null) {
+      _throwMissingEditions(data, 'fetchAyahByKey(arabic:$ayahKey)');
+    }
 
     final tr = trEdition == null ? null : _findEdition(data, trEdition);
 
     if (trEdition != null && tr == null) {
-      _throwMissingEditions(data, 'fetchAyahByKey(translation=$trEdition:$ayahKey)');
+      _throwMissingEditions(
+        data,
+        'fetchAyahByKey(translation=$trEdition:$ayahKey)',
+      );
     }
 
     return {
@@ -186,7 +180,7 @@ class QuranService {
       'surah_name_ar': (ar['surah']?['name'] ?? '').toString(),
       'surah_name_en': (tr?['surah']?['englishName'] ?? '').toString(),
       'arabic': (ar['text'] ?? '').toString(),
-      'translation': (tr?['text'] ?? '').toString(), // ✅ UI expects this
+      'translation': (tr?['text'] ?? '').toString(),
     };
   }
 }

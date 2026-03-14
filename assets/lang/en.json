@@ -667,6 +667,22 @@
   "{name}'s mahrams": "{name}'s mahrams",
   "No mahrams to show yet.": "No mahrams to show yet.",
   "Add mahrams to see them here.": "Add mahrams to see them here.",
+  "home_feed_subtitle": "A space for reflection, community, and meaningful connection.",
+  "create": "Create",
+  "Pull down to refresh.": "Pull down to refresh.",
+  "answered": "answered",
+  "like": "Like",
+  "Stay connected with friends, groups, and communities.": "Stay connected with friends, groups, and communities.",
+  "About me": "About me",
+  "No completed stories yet.": "No completed stories yet.",
+
+  "Good morning": "Good morning",
+  "Good afternoon": "Good afternoon",
+  "Good evening": "Good evening",
+
+  "mahrams_of": "Mahrams of {name}",
+  "Mahrams": "Mahrams",
+
   "story_adam": {
     "appBarTitle": "Prophet Adam (as)",
     "chipLabel": "Prophet Adam (as)",

@@ -6,94 +6,37 @@ import '../pages/fullscreen_image_page.dart';
 import 'my_chat_video_bubble.dart';
 import '../helper/post_share.dart';
 import '../pages/post_page.dart';
-
-// ✅ NEW: for reply shared-post preview
 import '../models/post.dart';
 import '../models/post_media.dart';
 import '../services/database/database_provider.dart';
 
 enum ChatBubbleShape { single, first, middle, last }
 
-/// A simple chat bubble that adapts to the app's current theme.
-///
-/// - Uses Theme.of(context).colorScheme for colors
-/// - Aligns right for current user, left for others
-/// - Smooth rounded WhatsApp-style shape
-/// - Shows timestamp + ticks (for current user's messages)
-/// - Supports "like" with double-tap
-/// - Can optionally show sender name (for group chats) inside the bubble
-/// - 🖼 Can show one or multiple images above the text
-/// - 🎥 Uses [MyChatVideoBubble] for video thumbnails
-/// - 🆕 Shows an uploading indicator for pending video messages
-/// - 🆕 Supports soft-delete ("This message was deleted")
-/// - 🆕 Supports reply preview (small quoted box)
-/// - ✅ Reply preview can show thumbnail for image replies and mini shared-post preview
 class MyChatBubble extends StatelessWidget {
   final String message;
   final bool isCurrentUser;
   final ChatBubbleShape shape;
-
-  /// Backwards-compatible single image URL (used when not using imageUrls).
   final String? imageUrl;
-
-  /// 🖼 New: list of image URLs for multi-image batches.
   final List<String> imageUrls;
-
-  /// 🎥 Optional video URL.
   final String? videoUrl;
-
-  /// Time the message was created (used to show HH:mm)
   final DateTime createdAt;
-
-  /// Whether the message has been read by the receiver (from DB)
   final bool isRead;
-
-  /// Whether the message has been delivered to the receiver (from DB)
   final bool isDelivered;
-
-  /// Whether *current user* has liked this message
   final bool isLikedByMe;
-
-  /// Total like count (length of likedBy from DB)
   final int likeCount;
-
-  /// 🆕 Whether the media is still uploading
   final bool isUploading;
-
-  /// 🆕 Whether the message was soft-deleted
   final bool isDeleted;
-
-  /// Optional double-tap handler (used to toggle like)
   final VoidCallback? onDoubleTap;
-
-  /// Optional long-press handler (used for reply/delete menu)
   final VoidCallback? onLongPress;
-
-  /// Optional tap handler for the like badge (heart)
   final VoidCallback? onLikeTap;
-
-  /// Optional: sender display name (used in group chats or passed from ChatPage).
   final String? senderName;
-
-  /// Optional: specific color for the sender name text.
-  /// If null, a fallback color based on theme will be used.
   final Color? senderColor;
-
-  /// 🆕 Reply preview fields (existing)
   final String? replyAuthorName;
   final String? replySnippet;
   final bool replyHasMedia;
-
-  /// ✅ NEW: richer reply preview support
-  /// If present, show a thumbnail in the reply quote.
   final String? replyImageUrl;
-
-  /// If present, show a mini shared-post preview in the reply quote.
   final String? replyPostId;
-
-  /// Convenience flag: replied message was a PostShare marker.
   final bool replyIsPostShare;
-
   final VoidCallback? onReplyTap;
 
   const MyChatBubble({
@@ -119,12 +62,9 @@ class MyChatBubble extends StatelessWidget {
     this.replyAuthorName,
     this.replySnippet,
     this.replyHasMedia = false,
-
-    // ✅ NEW
     this.replyImageUrl,
     this.replyPostId,
     this.replyIsPostShare = false,
-
     this.onReplyTap,
   });
 
@@ -138,40 +78,36 @@ class MyChatBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Effective image list: prefer imageUrls, fall back to single imageUrl.
     final List<String> effectiveImageUrls = imageUrls.isNotEmpty
         ? imageUrls
         : (imageUrl != null && imageUrl!.trim().isNotEmpty
-              ? [imageUrl!]
-              : <String>[]);
+        ? [imageUrl!]
+        : <String>[]);
 
-    // ✅ detect internal post share marker (current message)
     final bool isPostShare =
         !isDeleted && PostShare.isPostShareMessage(message);
-    final String? sharedPostId = isPostShare
-        ? PostShare.extractPostId(message)
-        : null;
+    final String? sharedPostId =
+    isPostShare ? PostShare.extractPostId(message) : null;
 
-    // If deleted: never show images / videos / text content.
     final bool hasImages = !isDeleted && effectiveImageUrls.isNotEmpty;
     final bool hasVideo =
         !isDeleted && videoUrl != null && videoUrl!.trim().isNotEmpty;
     final bool hasText =
         !isDeleted && !isPostShare && message.trim().isNotEmpty;
 
-    // 🟢 Sender bubble style
-    final senderBg = const Color(0xFF467E55);
+    final senderBgTop = const Color(0xFF4A8B61);
+    final senderBgBottom = const Color(0xFF2F6E46);
     final senderText = Colors.white;
 
-    // ⚪ Receiver bubble style (theme-aware)
-    final receiverBg = colors.tertiary;
-    final receiverText = colors.inversePrimary;
+    final receiverBg = isDark ? const Color(0xFF161F1C) : const Color(0xFFFFFFFF);
+    final receiverText = isDark ? const Color(0xFFF3F6F4) : const Color(0xFF14201A);
+    final receiverBorder = isDark
+        ? Colors.white.withValues(alpha: 0.06)
+        : colors.outline.withValues(alpha: 0.10);
 
-    final bgColor = isCurrentUser ? senderBg : receiverBg;
     final textColor = isCurrentUser ? senderText : receiverText;
-
-    // Build time + ticks row
     final timeLabel = _formatTime(createdAt);
 
     IconData? tickIcon;
@@ -180,7 +116,7 @@ class MyChatBubble extends StatelessWidget {
     if (isCurrentUser) {
       if (isRead) {
         tickIcon = Icons.done_all;
-        tickColor = Colors.lightBlueAccent;
+        tickColor = const Color(0xFFA7E0FF);
       } else if (isDelivered) {
         tickIcon = Icons.done_all;
         tickColor = Colors.white70;
@@ -190,7 +126,6 @@ class MyChatBubble extends StatelessWidget {
       }
     }
 
-    // ❤️ Like badge
     const heartIcon = Icon(Icons.favorite, size: 12, color: Colors.pinkAccent);
 
     Widget? likeBadge;
@@ -207,9 +142,9 @@ class MyChatBubble extends StatelessWidget {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 3,
-                  offset: const Offset(0, 1),
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
@@ -228,9 +163,9 @@ class MyChatBubble extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 3,
-                  offset: const Offset(0, 1),
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
@@ -243,7 +178,7 @@ class MyChatBubble extends StatelessWidget {
                   likeCount.toString(),
                   style: const TextStyle(
                     fontSize: 10,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                     color: Colors.black87,
                   ),
                 ),
@@ -257,14 +192,12 @@ class MyChatBubble extends StatelessWidget {
     final showSenderName =
         !isCurrentUser && senderName != null && senderName!.trim().isNotEmpty;
 
-    // ---------- IMAGE HELPERS ----------
-
     Widget _buildSingleImage(
-      BuildContext context,
-      String url, {
-      int initialIndex = 0,
-      List<String>? allUrls,
-    }) {
+        BuildContext context,
+        String url, {
+          int initialIndex = 0,
+          List<String>? allUrls,
+        }) {
       return GestureDetector(
         onTap: () {
           Navigator.of(context).push(
@@ -277,7 +210,7 @@ class MyChatBubble extends StatelessWidget {
           );
         },
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           child: Image.network(
             url,
             fit: BoxFit.cover,
@@ -289,7 +222,7 @@ class MyChatBubble extends StatelessWidget {
                   child: CircularProgressIndicator(
                     value: progress.expectedTotalBytes != null
                         ? progress.cumulativeBytesLoaded /
-                              (progress.expectedTotalBytes ?? 1)
+                        (progress.expectedTotalBytes ?? 1)
                         : null,
                   ),
                 ),
@@ -318,7 +251,7 @@ class MyChatBubble extends StatelessWidget {
       }
 
       return ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         child: GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -364,17 +297,14 @@ class MyChatBubble extends StatelessWidget {
       );
     }
 
-    // ---------- REPLY PREVIEW HELPERS ----------
-
     Widget _replyThumbShell({required Widget child}) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(6),
-        child: SizedBox(width: 34, height: 34, child: child),
+        borderRadius: BorderRadius.circular(8),
+        child: SizedBox(width: 38, height: 38, child: child),
       );
     }
 
     Widget? _buildReplyThumb(BuildContext context) {
-      // ✅ image reply thumb
       final img = (replyImageUrl ?? '').trim();
       if (img.isNotEmpty) {
         return _replyThumbShell(
@@ -390,7 +320,6 @@ class MyChatBubble extends StatelessWidget {
         );
       }
 
-      // ✅ shared post reply thumb (fetch first image)
       if (replyIsPostShare && (replyPostId ?? '').trim().isNotEmpty) {
         final postId = replyPostId!.trim();
         final db = context.read<DatabaseProvider>();
@@ -432,7 +361,6 @@ class MyChatBubble extends StatelessWidget {
         );
       }
 
-      // nothing
       return null;
     }
 
@@ -446,7 +374,7 @@ class MyChatBubble extends StatelessWidget {
           style: TextStyle(
             fontSize: 12,
             fontStyle: replyHasMedia ? FontStyle.italic : null,
-            color: textColor.withValues(alpha: 0.9),
+            color: textColor.withValues(alpha: 0.88),
           ),
         );
       }
@@ -457,7 +385,6 @@ class MyChatBubble extends StatelessWidget {
         future: db.getPostById(postId),
         builder: (context, snap) {
           final caption = (snap.data?.message ?? '').trim();
-
           final line = caption.isNotEmpty ? caption : 'Shared post'.tr();
 
           return Text(
@@ -467,7 +394,7 @@ class MyChatBubble extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontStyle: FontStyle.italic,
-              color: textColor.withValues(alpha: 0.9),
+              color: textColor.withValues(alpha: 0.88),
             ),
           );
         },
@@ -478,17 +405,15 @@ class MyChatBubble extends StatelessWidget {
         ? 'You deleted this message'.tr()
         : 'This message was deleted'.tr();
 
-    // Less vertical spacing when messages are merged in a chain
     final double verticalMargin =
-        (shape == ChatBubbleShape.single || shape == ChatBubbleShape.first)
+    (shape == ChatBubbleShape.single || shape == ChatBubbleShape.first)
         ? 6
         : 2;
 
-    const Radius r18 = Radius.circular(18);
-    const Radius r10 = Radius.circular(10);
-    const Radius r4 = Radius.circular(4);
+    const Radius r22 = Radius.circular(22);
+    const Radius r14 = Radius.circular(14);
+    const Radius r6 = Radius.circular(6);
 
-    // Tail is on the side of the sender (current user = right, others = left)
     late Radius topLeft;
     late Radius topRight;
     late Radius bottomLeft;
@@ -497,85 +422,106 @@ class MyChatBubble extends StatelessWidget {
     if (isCurrentUser) {
       switch (shape) {
         case ChatBubbleShape.single:
-          topLeft = r18;
-          topRight = r18;
-          bottomLeft = r18;
-          bottomRight = r4;
+          topLeft = r22;
+          topRight = r22;
+          bottomLeft = r22;
+          bottomRight = r6;
           break;
         case ChatBubbleShape.first:
-          topLeft = r18;
-          topRight = r18;
-          bottomLeft = r10;
-          bottomRight = r4;
+          topLeft = r22;
+          topRight = r22;
+          bottomLeft = r14;
+          bottomRight = r6;
           break;
         case ChatBubbleShape.middle:
-          topLeft = r10;
-          topRight = r10;
-          bottomLeft = r10;
-          bottomRight = r4;
+          topLeft = r14;
+          topRight = r14;
+          bottomLeft = r14;
+          bottomRight = r6;
           break;
         case ChatBubbleShape.last:
-          topLeft = r10;
-          topRight = r10;
-          bottomLeft = r18;
-          bottomRight = r4;
+          topLeft = r14;
+          topRight = r14;
+          bottomLeft = r22;
+          bottomRight = r6;
           break;
       }
     } else {
       switch (shape) {
         case ChatBubbleShape.single:
-          topLeft = r18;
-          topRight = r18;
-          bottomLeft = r4;
-          bottomRight = r18;
+          topLeft = r22;
+          topRight = r22;
+          bottomLeft = r6;
+          bottomRight = r22;
           break;
         case ChatBubbleShape.first:
-          topLeft = r18;
-          topRight = r18;
-          bottomLeft = r4;
-          bottomRight = r10;
+          topLeft = r22;
+          topRight = r22;
+          bottomLeft = r6;
+          bottomRight = r14;
           break;
         case ChatBubbleShape.middle:
-          topLeft = r10;
-          topRight = r10;
-          bottomLeft = r4;
-          bottomRight = r10;
+          topLeft = r14;
+          topRight = r14;
+          bottomLeft = r6;
+          bottomRight = r14;
           break;
         case ChatBubbleShape.last:
-          topLeft = r10;
-          topRight = r10;
-          bottomLeft = r4;
-          bottomRight = r18;
+          topLeft = r14;
+          topRight = r14;
+          bottomLeft = r6;
+          bottomRight = r22;
           break;
       }
     }
 
     final shouldShowReplyPreview =
         !isDeleted &&
-        ((replyAuthorName != null && replyAuthorName!.trim().isNotEmpty) ||
-            (replySnippet != null && replySnippet!.trim().isNotEmpty) ||
-            ((replyImageUrl ?? '').trim().isNotEmpty) ||
-            (replyIsPostShare && (replyPostId ?? '').trim().isNotEmpty));
+            ((replyAuthorName != null && replyAuthorName!.trim().isNotEmpty) ||
+                (replySnippet != null && replySnippet!.trim().isNotEmpty) ||
+                ((replyImageUrl ?? '').trim().isNotEmpty) ||
+                (replyIsPostShare && (replyPostId ?? '').trim().isNotEmpty));
 
     final bubble = Container(
       margin: EdgeInsets.symmetric(vertical: verticalMargin, horizontal: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
       constraints: BoxConstraints(
-        maxWidth: MediaQuery.of(context).size.width * 0.75,
+        maxWidth: MediaQuery.of(context).size.width * 0.77,
       ),
       decoration: BoxDecoration(
-        color: bgColor,
+        gradient: isCurrentUser
+            ? const LinearGradient(
+          colors: [
+            Color(0xFF4A8B61),
+            Color(0xFF2F6E46),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        )
+            : null,
+        color: isCurrentUser ? null : receiverBg,
         borderRadius: BorderRadius.only(
           topLeft: topLeft,
           topRight: topRight,
           bottomLeft: bottomLeft,
           bottomRight: bottomRight,
         ),
+        border: Border.all(
+          color: isCurrentUser
+              ? Colors.white.withValues(alpha: 0.08)
+              : receiverBorder,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.16 : 0.05),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
-        crossAxisAlignment: isCurrentUser
-            ? CrossAxisAlignment.end
-            : CrossAxisAlignment.start,
+        crossAxisAlignment:
+        isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           if (showSenderName && !isDeleted) ...[
@@ -583,69 +529,67 @@ class MyChatBubble extends StatelessWidget {
               senderName!,
               style: TextStyle(
                 fontSize: 12,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
                 color: senderColor ?? colors.primary.withValues(alpha: 0.95),
               ),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 3),
           ],
-
-          // 🆕 Reply preview (quote box) — now tappable
           if (!isDeleted && shouldShowReplyPreview) ...[
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: onReplyTap,
               child: Container(
-                margin: const EdgeInsets.only(bottom: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                margin: const EdgeInsets.only(bottom: 7),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
                 decoration: BoxDecoration(
                   color: isCurrentUser
-                      ? Colors.black.withValues(alpha: 0.10)
-                      : Colors.black.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(8),
+                      ? Colors.black.withValues(alpha: 0.12)
+                      : (isDark
+                      ? Colors.white.withValues(alpha: 0.05)
+                      : const Color(0xFFF4F7F5)),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border(
-                    left: BorderSide(color: const Color(0xFF128C7E), width: 3),
+                    left: BorderSide(
+                      color: isCurrentUser
+                          ? Colors.white.withValues(alpha: 0.78)
+                          : const Color(0xFF3D8A5A),
+                      width: 3,
+                    ),
                   ),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Thumb (image or shared post)
                     Builder(
                       builder: (context) {
                         final thumb = _buildReplyThumb(context);
-                        if (thumb == null) return const SizedBox(width: 0);
+                        if (thumb == null) return const SizedBox.shrink();
                         return Padding(
-                          padding: const EdgeInsets.only(right: 8, top: 2),
+                          padding: const EdgeInsets.only(right: 8, top: 1),
                           child: thumb,
                         );
                       },
                     ),
-
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (replyAuthorName != null &&
-                              replyAuthorName!.trim().isNotEmpty)
-                            const SizedBox(height: 1),
-                          if (replyAuthorName != null &&
-                              replyAuthorName!.trim().isNotEmpty)
-                            const Text(''),
                           if (replyAuthorName != null &&
                               replyAuthorName!.trim().isNotEmpty)
                             Text(
                               replyAuthorName!,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF128C7E),
+                                fontWeight: FontWeight.w800,
+                                color: isCurrentUser
+                                    ? Colors.white
+                                    : const Color(0xFF2F6E46),
                               ),
                             ),
-                          const SizedBox(height: 2),
-
-                          // If replying to a shared post, show its caption/title.
+                          if (replyAuthorName != null &&
+                              replyAuthorName!.trim().isNotEmpty)
+                            const SizedBox(height: 2),
                           if (replyIsPostShare &&
                               (replyPostId ?? '').trim().isNotEmpty)
                             _buildReplySharedPostLine(context)
@@ -657,10 +601,9 @@ class MyChatBubble extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 12,
-                                fontStyle: replyHasMedia
-                                    ? FontStyle.italic
-                                    : null,
-                                color: textColor.withValues(alpha: 0.9),
+                                fontStyle:
+                                replyHasMedia ? FontStyle.italic : null,
+                                color: textColor.withValues(alpha: 0.88),
                               ),
                             ),
                         ],
@@ -671,7 +614,6 @@ class MyChatBubble extends StatelessWidget {
               ),
             ),
           ],
-
           if (isDeleted) ...[
             Text(
               deletedText,
@@ -683,7 +625,6 @@ class MyChatBubble extends StatelessWidget {
             ),
             const SizedBox(height: 4),
           ] else ...[
-            // 🎥 Video
             if (hasVideo) ...[
               MyChatVideoBubble(
                 videoUrl: videoUrl!,
@@ -693,14 +634,10 @@ class MyChatBubble extends StatelessWidget {
               ),
               if (hasImages || hasText) const SizedBox(height: 6),
             ],
-
-            // 🖼 Images
             if (hasImages) ...[
               _buildImageGrid(context),
               if (hasText) const SizedBox(height: 6),
             ],
-
-            // 🆕 Internal shared post card (current message)
             if (!isDeleted && isPostShare && sharedPostId != null) ...[
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
@@ -717,19 +654,27 @@ class MyChatBubble extends StatelessWidget {
                 },
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(11),
                   decoration: BoxDecoration(
                     color: isCurrentUser
-                        ? Colors.black.withValues(alpha: 0.10)
-                        : Colors.black.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(12),
+                        ? Colors.black.withValues(alpha: 0.12)
+                        : (isDark
+                        ? Colors.white.withValues(alpha: 0.05)
+                        : const Color(0xFFF5F8F6)),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: Colors.black.withValues(alpha: 0.06),
+                      color: isCurrentUser
+                          ? Colors.white.withValues(alpha: 0.10)
+                          : Colors.black.withValues(alpha: 0.05),
                     ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.article_outlined, size: 18),
+                      Icon(
+                        Icons.article_outlined,
+                        size: 18,
+                        color: textColor.withValues(alpha: 0.92),
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
@@ -739,12 +684,12 @@ class MyChatBubble extends StatelessWidget {
                           style: TextStyle(
                             color: textColor.withValues(alpha: 0.95),
                             fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
                       Icon(
-                        Icons.chevron_right,
+                        Icons.chevron_right_rounded,
                         size: 18,
                         color: textColor.withValues(alpha: 0.55),
                       ),
@@ -754,18 +699,19 @@ class MyChatBubble extends StatelessWidget {
               ),
               const SizedBox(height: 6),
             ],
-
-            // Caption / text
             if (hasText) ...[
               Text(
                 message,
-                style: TextStyle(color: textColor, fontSize: 16, height: 1.3),
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.w500,
+                  height: 1.35,
+                ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 5),
             ],
           ],
-
-          // Time + ticks
           Row(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.end,
@@ -773,8 +719,9 @@ class MyChatBubble extends StatelessWidget {
               Text(
                 timeLabel,
                 style: TextStyle(
-                  color: textColor.withValues(alpha: 0.8),
+                  color: textColor.withValues(alpha: 0.72),
                   fontSize: 11,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
               if (isCurrentUser && tickIcon != null) ...[

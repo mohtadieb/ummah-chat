@@ -5,22 +5,20 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:video_player/video_player.dart';
+import 'package:visibility_detector/visibility_detector.dart';
 
 import '../helper/navigate_pages.dart';
 import '../helper/time_ago_text.dart';
 import '../models/post.dart';
 import '../models/post_media.dart';
+import '../pages/fullscreen_image_page.dart';
 import '../pages/share/share_post_to_friend_page.dart';
 import '../pages/share/share_post_to_group_page.dart';
 import '../services/database/database_provider.dart';
 import '../components/my_input_alert_box.dart';
 import '../services/auth/auth_service.dart';
 import 'my_confirmation_box.dart';
-import '../services/navigation/bottom_nav_provider.dart';
-import 'package:video_player/video_player.dart';
-import 'package:visibility_detector/visibility_detector.dart';
-
-import '../pages/fullscreen_image_page.dart';
 
 const bool kUseAdaptiveMediaAspectRatio = true;
 const bool kShowSubtlePostSeparator = true;
@@ -31,7 +29,6 @@ class MyPostTile extends StatefulWidget {
   final void Function()? onPostTap;
   final BuildContext scaffoldContext;
   final bool isInPostPage;
-
   final void Function(bool isSaved)? onBookmarkChanged;
 
   const MyPostTile({
@@ -76,10 +73,6 @@ class _MyPostTileState extends State<MyPostTile>
   void initState() {
     super.initState();
 
-    // ✅ IMPORTANT: DO NOT load comments per tile (stutter source)
-    // Comments should load only on post details page.
-
-    // ✅ Media: cached + deduped in provider
     _mediaFuture = databaseProvider.getPostMediaCached(widget.post.id);
     _mediaFuture.then((items) {
       if (!mounted) return;
@@ -192,7 +185,7 @@ class _MyPostTileState extends State<MyPostTile>
         if (message.isNotEmpty) '',
         if (message.isNotEmpty) message,
         if (firstUrl != null) '',
-        if (firstUrl != null) firstUrl!,
+        if (firstUrl != null) firstUrl,
         '',
         '— Ummah Chat',
       ].join('\n');
@@ -206,7 +199,6 @@ class _MyPostTileState extends State<MyPostTile>
     }
   }
 
-
   Future<void> _openShareChooser() async {
     final cs = Theme.of(context).colorScheme;
 
@@ -215,7 +207,7 @@ class _MyPostTileState extends State<MyPostTile>
       showDragHandle: true,
       backgroundColor: cs.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (sheetContext) {
         return SafeArea(
@@ -337,7 +329,7 @@ class _MyPostTileState extends State<MyPostTile>
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (sheetContext) => SafeArea(
         child: Wrap(
@@ -479,75 +471,12 @@ class _MyPostTileState extends State<MyPostTile>
   void _handleUserTap() {
     final currentUserId = AuthService().getCurrentUserId();
 
-    // 👉 Other user → normal navigation
     if (widget.post.userId != currentUserId) {
       widget.onUserTap?.call();
       return;
     }
 
-    // 👉 Own post → jump to own profile tab
     goToOwnProfileTab(context);
-  }
-
-
-  Widget _buildHeader(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: _handleUserTap,
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor:
-                  theme.colorScheme.secondary.withValues(alpha: 0.2),
-                  child: Text(
-                    widget.post.name.isNotEmpty
-                        ? widget.post.name[0].toUpperCase()
-                        : '@',
-                    style: TextStyle(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.post.name,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '@${widget.post.username}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const Spacer(),
-          IconButton(
-            onPressed: _showOptions,
-            icon: const Icon(Icons.more_horiz),
-            splashRadius: 18,
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-          ),
-        ],
-      ),
-    );
   }
 
   void _openFullscreenForMedia(PostMedia media) {
@@ -675,7 +604,7 @@ class _MyPostTileState extends State<MyPostTile>
           style: style?.copyWith(
             decoration: TextDecoration.underline,
             color: Theme.of(context).colorScheme.primary,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
           ),
         ),
       );
@@ -702,23 +631,111 @@ class _MyPostTileState extends State<MyPostTile>
     );
   }
 
+  Widget _buildHeader(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Row(
+      children: [
+        GestureDetector(
+          onTap: _handleUserTap,
+          behavior: HitTestBehavior.opaque,
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: cs.primary.withValues(alpha: 0.12),
+                child: Text(
+                  widget.post.name.isNotEmpty
+                      ? widget.post.name[0].toUpperCase()
+                      : '@',
+                  style: TextStyle(
+                    color: cs.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.post.name,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '@${widget.post.username}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: cs.onSurface.withValues(alpha: 0.60),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const Spacer(),
+        IconButton(
+          onPressed: _showOptions,
+          icon: const Icon(Icons.more_horiz),
+          splashRadius: 18,
+          color: cs.onSurface.withValues(alpha: 0.7),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTextOnlyContent(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: cs.outlineVariant.withValues(alpha: 0.45),
+        ),
+      ),
+      child: _buildSelectableLinkText(
+        context,
+        text: widget.post.message,
+        style: theme.textTheme.bodyLarge?.copyWith(
+          color: cs.onSurface,
+          height: 1.55,
+          fontWeight: FontWeight.w500,
+        ),
+        onTapNonLink: widget.onPostTap,
+      ),
+    );
+  }
+
   Widget _buildImageOrText(BuildContext context) {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
 
     if (!_mediaReady) {
-      // ✅ fixed-size placeholder so layout stays stable while loading
-      return AspectRatio(
-        aspectRatio: 4 / 5,
-        child: Container(
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest
-                .withValues(alpha: 0.45),
-          ),
-          alignment: Alignment.center,
-          child: const SizedBox(
-            width: 22,
-            height: 22,
-            child: CircularProgressIndicator(strokeWidth: 2),
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: AspectRatio(
+          aspectRatio: 4 / 5,
+          child: Container(
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHigh,
+            ),
+            alignment: Alignment.center,
+            child: const SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
           ),
         ),
       );
@@ -727,66 +744,53 @@ class _MyPostTileState extends State<MyPostTile>
     if (_media.isNotEmpty) {
       final aspectRatio = _currentMediaAspectRatio();
 
-      return AspectRatio(
-        aspectRatio: aspectRatio,
-        child: PageView.builder(
-          key: PageStorageKey<String>('post_media_${widget.post.id}'),
-          itemCount: _media.length,
-          onPageChanged: (index) => setState(() => _currentMediaIndex = index),
-          itemBuilder: (context, index) {
-            final media = _media[index];
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: AspectRatio(
+          aspectRatio: aspectRatio,
+          child: PageView.builder(
+            key: PageStorageKey<String>('post_media_${widget.post.id}'),
+            itemCount: _media.length,
+            onPageChanged: (index) => setState(() => _currentMediaIndex = index),
+            itemBuilder: (context, index) {
+              final media = _media[index];
 
-            if (media.type == 'video') {
-              return _VideoPostPlayer(videoUrl: media.url);
-            }
+              if (media.type == 'video') {
+                return _VideoPostPlayer(videoUrl: media.url);
+              }
 
-            return GestureDetector(
-              onTap: () => _openFullscreenForMedia(media),
-              child: Image.network(
-                media.url,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                cacheWidth: 1080,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: CircularProgressIndicator(),
-                    ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    alignment: Alignment.center,
-                    child: Text('Failed to load media'.tr()),
-                  );
-                },
-              ),
-            );
-          },
+              return GestureDetector(
+                onTap: () => _openFullscreenForMedia(media),
+                child: Image.network(
+                  media.url,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  cacheWidth: 1080,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: theme.colorScheme.surfaceContainerHigh,
+                      alignment: Alignment.center,
+                      child: Text('Failed to load media'.tr()),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
         ),
       );
     }
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: _buildSelectableLinkText(
-        context,
-        text: widget.post.message,
-        style: theme.textTheme.bodyMedium?.copyWith(
-          color: theme.colorScheme.onSurface,
-          height: 1.4,
-        ),
-        onTapNonLink: widget.onPostTap,
-      ),
-    );
+    return _buildTextOnlyContent(context);
   }
 
   Widget _buildMediaIndicator(BuildContext context) {
@@ -795,20 +799,20 @@ class _MyPostTileState extends State<MyPostTile>
     final theme = Theme.of(context);
 
     return Padding(
-      padding: const EdgeInsets.only(top: 6, bottom: 2),
+      padding: const EdgeInsets.only(top: 10, bottom: 2),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: List.generate(_media.length, (index) {
           final isActive = index == _currentMediaIndex;
           return AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
+            duration: const Duration(milliseconds: 220),
             margin: const EdgeInsets.symmetric(horizontal: 3),
             height: 6,
-            width: isActive ? 14 : 6,
+            width: isActive ? 16 : 6,
             decoration: BoxDecoration(
               color: isActive
                   ? theme.colorScheme.primary
-                  : theme.colorScheme.onSurface.withValues(alpha: 0.25),
+                  : theme.colorScheme.onSurface.withValues(alpha: 0.22),
               borderRadius: BorderRadius.circular(999),
             ),
           );
@@ -817,8 +821,34 @@ class _MyPostTileState extends State<MyPostTile>
     );
   }
 
+  Widget _buildActionButton({
+    required BuildContext context,
+    required VoidCallback onTap,
+    required Widget icon,
+    String? tooltip,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Tooltip(
+      message: tooltip ?? '',
+      child: Material(
+        color: cs.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: SizedBox(
+            width: 42,
+            height: 42,
+            child: Center(child: icon),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildActionsRow(BuildContext context) {
-    final theme = Theme.of(context);
+    final cs = Theme.of(context).colorScheme;
 
     final likedByCurrentUser =
     listeningProvider.isPostLikedByCurrentUser(widget.post.id);
@@ -828,158 +858,160 @@ class _MyPostTileState extends State<MyPostTile>
 
     final bookmarkedByCurrentUser = _optimisticBookmarked ?? providerBookmarked;
 
-    final iconColor = theme.colorScheme.onSurface.withValues(alpha: 0.9);
+    final iconColor = cs.onSurface.withValues(alpha: 0.88);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: _toggleLikePost,
-            icon: likedByCurrentUser
-                ? const Icon(Icons.favorite)
-                : const Icon(Icons.favorite_border),
+    return Row(
+      children: [
+        _buildActionButton(
+          context: context,
+          onTap: _toggleLikePost,
+          tooltip: 'like'.tr(),
+          icon: Icon(
+            likedByCurrentUser ? Icons.favorite : Icons.favorite_border,
             color: likedByCurrentUser ? Colors.red : iconColor,
-            splashRadius: 20,
           ),
-          IconButton(
-            onPressed: _openNewCommentBox,
-            icon: const Icon(Icons.mode_comment_outlined),
+        ),
+        const SizedBox(width: 8),
+        _buildActionButton(
+          context: context,
+          onTap: _openNewCommentBox,
+          tooltip: 'comment'.tr(),
+          icon: Icon(Icons.mode_comment_outlined, color: iconColor),
+        ),
+        const SizedBox(width: 8),
+        _buildActionButton(
+          context: context,
+          onTap: _openPrivateReflectionDialog,
+          tooltip: 'private_reflection'.tr(),
+          icon: Icon(Icons.lock_outline_rounded, color: iconColor),
+        ),
+        const SizedBox(width: 8),
+        _buildActionButton(
+          context: context,
+          onTap: _openShareChooser,
+          tooltip: 'share'.tr(),
+          icon: Icon(Icons.send_outlined, color: iconColor),
+        ),
+        const Spacer(),
+        _buildActionButton(
+          context: context,
+          onTap: _toggleBookmarkPost,
+          tooltip: 'save'.tr(),
+          icon: Icon(
+            bookmarkedByCurrentUser ? Icons.bookmark : Icons.bookmark_border,
             color: iconColor,
-            splashRadius: 20,
           ),
-          IconButton(
-            onPressed: _openPrivateReflectionDialog,
-            icon: const Icon(Icons.lock_outline_rounded),
-            color: iconColor,
-            splashRadius: 20,
-            tooltip: 'private_reflection'.tr(),
-          ),
-          IconButton(
-            onPressed: () => _openShareChooser(),
-            icon: const Icon(Icons.send_outlined),
-            color: iconColor,
-            splashRadius: 20,
-            tooltip: 'share'.tr(),
-          ),
-          const Spacer(),
-          IconButton(
-            onPressed: _toggleBookmarkPost,
-            icon: Icon(
-              bookmarkedByCurrentUser ? Icons.bookmark : Icons.bookmark_border,
-            ),
-            color: iconColor,
-            splashRadius: 20,
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
+
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
 
     final likeCount = listeningProvider.getLikeCount(widget.post.id);
-
-    // ✅ Uses posts.comment_count (no comment fetching here)
     final int commentCount = listeningProvider.getCommentCount(widget.post.id);
 
     return Column(
       children: [
-        if (kShowSubtlePostSeparator)
-          Container(
-            height: 10,
-            color: theme.colorScheme.surfaceContainerLowest,
-          ),
-        Material(
-          color: theme.colorScheme.surface,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: _buildHeader(context),
-              ),
-              const SizedBox(height: 4),
-              _buildImageOrText(context),
-              _buildMediaIndicator(context),
-              const SizedBox(height: 6),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: _buildActionsRow(context),
-              ),
-              if (likeCount > 0)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Text(
-                    "likes".plural(
-                      likeCount,
-                      namedArgs: {"count": likeCount.toString()},
-                    ),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
-                ),
-              const SizedBox(height: 4),
-              if (_media.isNotEmpty && widget.post.message.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: _buildSelectableLinkText(
-                    context,
-                    text: '${widget.post.username} ${widget.post.message}',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurface,
-                      height: 1.35,
-                    ),
-                    onTapNonLink: widget.onPostTap,
-                  ),
-                ),
-              const SizedBox(height: 4),
-
-              // ✅ EXACT BEHAVIOR YOU WANT:
-              // - show nothing when 0
-              // - plural uses your "View all comments" key:
-              //   one: "View 1 comment"
-              //   other: "View all {count} comments"
-              if (!widget.isInPostPage)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: GestureDetector(
-                    onTap: commentCount > 0 ? widget.onPostTap : null,
-                    child: Text(
-                      commentCount == 0
-                          ? 'No comments yet'.tr()
-                          : 'View all comments'.plural(
-                        commentCount,
-                        namedArgs: {'count': commentCount.toString()},
-                      ),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: commentCount == 0
-                            ? theme.colorScheme.onSurfaceVariant
-                            : theme.colorScheme.primary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
-
-              const SizedBox(height: 4),
-              Padding(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                child: TimeAgoText(
-                  createdAt: widget.post.createdAt,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.8),
-                    letterSpacing: 0.2,
-                  ),
-                ),
+        if (kShowSubtlePostSeparator) const SizedBox(height: 2),
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                cs.surfaceContainerHigh,
+                cs.surfaceContainer,
+              ],
+            ),
+            border: Border.all(
+              color: cs.outlineVariant.withValues(alpha: 0.55),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
               ),
             ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(context),
+                  const SizedBox(height: 10),
+                  _buildImageOrText(context),
+                  _buildMediaIndicator(context),
+                  const SizedBox(height: 12),
+                  _buildActionsRow(context),
+                  if (likeCount > 0) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      "likes".plural(
+                        likeCount,
+                        namedArgs: {"count": likeCount.toString()},
+                      ),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                  ],
+                  if (_media.isNotEmpty && widget.post.message.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    _buildSelectableLinkText(
+                      context,
+                      text: '${widget.post.username} ${widget.post.message}',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: cs.onSurface,
+                        height: 1.45,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      onTapNonLink: widget.onPostTap,
+                    ),
+                  ],
+                  if (!widget.isInPostPage) ...[
+                    const SizedBox(height: 10),
+                    GestureDetector(
+                      onTap: commentCount > 0 ? widget.onPostTap : null,
+                      child: Text(
+                        commentCount == 0
+                            ? 'No comments yet'.tr()
+                            : 'View all comments'.plural(
+                          commentCount,
+                          namedArgs: {'count': commentCount.toString()},
+                        ),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: commentCount == 0
+                              ? cs.onSurface.withValues(alpha: 0.55)
+                              : cs.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  TimeAgoText(
+                    createdAt: widget.post.createdAt,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: cs.onSurface.withValues(alpha: 0.55),
+                      letterSpacing: 0.2,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ],
@@ -987,8 +1019,7 @@ class _MyPostTileState extends State<MyPostTile>
   }
 }
 
-class SharePostToChatPage {
-}
+class SharePostToChatPage {}
 
 class _VideoPostPlayer extends StatefulWidget {
   final String videoUrl;

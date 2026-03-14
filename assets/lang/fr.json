@@ -679,6 +679,23 @@
   "{name}'s mahrams": "Mahram de {name}",
   "No mahrams to show yet.": "Aucun mahram à afficher pour le moment.",
   "Add mahrams to see them here.": "Ajoutez des mahrams pour les voir ici.",
+  "home_feed_subtitle": "Un espace de réflexion, de communauté et de lien authentique.",
+  "create": "Créer",
+  "Pull down to refresh.": "Tirez vers le bas pour actualiser.",
+  "answered": "répondues",
+  "like": "J’aime",
+  "Stay connected with friends, groups, and communities.": "Restez en contact avec vos amis, groupes et communautés.",
+  "About me": "À propos de moi",
+  "No completed stories yet.": "Aucune histoire terminée pour le moment.",
+  "Good morning": "Bonjour",
+  "Good afternoon": "Bon après-midi",
+  "Good evening": "Bonsoir",
+
+  "mahrams_of": "محارم {name}",
+  "Mahrams": "Mahram",
+
+
+
 
   "story_adam": {
     "appBarTitle": "Prophète Adam (as)",

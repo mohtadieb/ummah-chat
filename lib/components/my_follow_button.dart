@@ -1,17 +1,3 @@
-/*
-FOLLOW BUTTON
-
-This is a follow / unfollow button, depending on whose profile page we are
-currently viewing.
-
---------------------------------------------------------------------------------
-
-To use this widget, you need:
-
-- a function (e.g. toggleFollow() when the button is pressed)
-- isFollowing (e.g. false -> then we will show follow button instead of unfollow button)
-*/
-
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
@@ -25,40 +11,31 @@ class MyFollowButton extends StatelessWidget {
     required this.isFollowing,
   });
 
-  // BUILD UI
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
 
-    // Padding outside
-    return Padding(
-      padding: const EdgeInsets.all(7),
+    final bg = isFollowing ? cs.primary.withValues(alpha: 0.08) : cs.primary;
+    final fg = isFollowing ? cs.primary : cs.onPrimary;
+    final border = isFollowing ? BorderSide(color: cs.primary.withValues(alpha: 0.20)) : null;
 
-      // Curve corners
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14), // rounded button corners
-
-        // Material Button
-        child: MaterialButton(
-
-          // Padding inside
-          padding: const EdgeInsets.all(7),
-          onPressed: onPressed,
-
-          // Button color changes based on follow state
-          color:
-          isFollowing
-              ?
-          Theme.of(context).colorScheme.primary // already following
-              :
-          Colors.blue, // not following yet
-
-          // Text
-          child: Text(
-            isFollowing ? "Unfollow".tr() : "Follow".tr(),
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.tertiary, // text color
-              fontWeight: FontWeight.bold,
-            ),
+    return SizedBox(
+      height: 40,
+      child: TextButton(
+        onPressed: onPressed,
+        style: TextButton.styleFrom(
+          backgroundColor: bg,
+          foregroundColor: fg,
+          side: border,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+        ),
+        child: Text(
+          isFollowing ? "Unfollow".tr() : "Follow".tr(),
+          style: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
           ),
         ),
       ),

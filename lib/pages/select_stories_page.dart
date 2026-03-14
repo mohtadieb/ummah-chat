@@ -1,4 +1,3 @@
-// lib/pages/select_stories_page.dart
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -48,8 +47,7 @@ class SelectStoriesPage extends StatefulWidget {
 }
 
 class _SelectStoriesPageState extends State<SelectStoriesPage> {
-  final Color _accent = const Color(0xFF0F8254);
-  final Color _gold = const Color(0xFFC9A74E); // ✨ soft golden for Muhammad (ﷺ)
+  final Color _gold = const Color(0xFFC9A74E);
   late final List<StoryData> _stories;
 
   bool _loaded = false;
@@ -58,44 +56,31 @@ class _SelectStoriesPageState extends State<SelectStoriesPage> {
   void initState() {
     super.initState();
     _stories = [
-      // Early prophets
       adamStory,
       idrisStory,
       nuhStory,
       hudStory,
       salihStory,
-
-      // Ibrahim family
       ibrahimStory,
       lutStory,
       ismailStory,
       ishaqStory,
       yaqubStory,
       yusufStory,
-
-      // Other nations
       shuaybStory,
       ayyubStory,
       dhulKiflStory,
-
-      // Musa era
       musaStory,
       harunStory,
-
-      // Kings & prophets
       dawudStory,
       sulaymanStory,
       ilyasStory,
       alyasaStory,
       yunusStory,
-
-      // Later prophets
       zakariyaStory,
       yahyaStory,
       maryamStory,
       isaStory,
-
-      // Group: Muhammad (ﷺ)
       muhammadPart1Story,
       muhammadPart2Story,
       muhammadPart3Story,
@@ -137,101 +122,97 @@ class _SelectStoriesPageState extends State<SelectStoriesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-      backgroundColor: colorScheme.surface,
-
-      // 🌿 Fixed header so cards never scroll "under" it
-      appBar: AppBar(
-        elevation: 0,
-        scrolledUnderElevation: 0, // 🔥 prevents color change on scroll
-        surfaceTintColor: Colors.transparent, // 🔥 prevents M3 overlay tint
-        backgroundColor: colorScheme.surface,
-        centerTitle: true,
-        title: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Stories of the Prophets'.tr(),
-              style: textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                fontSize: 22,
-                color: _accent,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Choose a story to read and explore the quiz.'.tr(),
-              style: textTheme.bodyMedium?.copyWith(
-                fontSize: 14,
-                color: Colors.grey[700],
-              ),
-            ),
-          ],
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              cs.surface,
+              cs.surface,
+              cs.surfaceContainerLowest,
+            ],
+          ),
         ),
-      ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: Consumer<DatabaseProvider>(
+              builder: (context, db, _) {
+                final completedIds = db.completedStoryIds;
 
-      body: SafeArea(
-        // top: false to avoid extra gap under the AppBar
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: Consumer<DatabaseProvider>(
-            builder: (context, db, _) {
-              final completedIds = db.completedStoryIds;
+                if (!_loaded) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-              if (!_loaded) {
-                return const Center(child: CircularProgressIndicator());
-              }
+                return ScrollConfiguration(
+                  behavior: const _NoBounceScrollBehavior(),
+                  child: ListView.separated(
+                    physics: const ClampingScrollPhysics(),
+                    itemCount: _stories.length + 1,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        return _PremiumStoriesHeader(
+                          title: 'Stories of the Prophets'.tr(),
+                          subtitle: 'Choose a story to read and explore the quiz.'.tr(),
+                        );
+                      }
 
-              return ScrollConfiguration(
-                behavior: const _NoBounceScrollBehavior(),
-                child: ListView.separated(
-                  physics: const ClampingScrollPhysics(), // ✅ no stretch / weird movement
-                  itemCount: _stories.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final story = _stories[index];
-                    final isCompleted = completedIds.contains(story.id);
-                    final isMuhammad = _isMuhammadStory(story);
-                    final isFirstMuhammad = _isFirstMuhammadStory(index);
+                      final story = _stories[index - 1];
+                      final isCompleted = completedIds.contains(story.id);
+                      final isMuhammad = _isMuhammadStory(story);
+                      final isFirstMuhammad = _isFirstMuhammadStory(index - 1);
 
-                    final card = _buildStoryCard(
-                      context: context,
-                      story: story,
-                      isCompleted: isCompleted,
-                      isMuhammad: isMuhammad,
-                    );
-
-                    if (isFirstMuhammad) {
-                      // Insert a headline above the first Muhammad (ﷺ) story
-                      final textTheme = Theme.of(context).textTheme;
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          const SizedBox(height: 28),
-                          Text(
-                            'prophet_muhammad'.tr(),
-                            style: textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 21,
-                              color: _gold,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                          const SizedBox(height: 7),
-                          card,
-                        ],
+                      final card = _buildStoryCard(
+                        context: context,
+                        story: story,
+                        isCompleted: isCompleted,
+                        isMuhammad: isMuhammad,
                       );
-                    }
 
-                    return card;
-                  },
-                ),
-              );
-            },
+                      if (isFirstMuhammad) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            const SizedBox(height: 18),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _gold.withValues(alpha: 0.10),
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: _gold.withValues(alpha: 0.35),
+                                ),
+                              ),
+                              child: Text(
+                                'prophet_muhammad'.tr(),
+                                style: textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: _gold,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            card,
+                          ],
+                        );
+                      }
+
+                      return card;
+                    },
+                  ),
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -245,10 +226,11 @@ class _SelectStoriesPageState extends State<SelectStoriesPage> {
     required bool isMuhammad,
   }) {
     final textTheme = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
     final String subtitlePreview = (story.cardPreview ?? '');
 
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(22),
       onTap: () async {
         await Navigator.push(
           context,
@@ -256,41 +238,52 @@ class _SelectStoriesPageState extends State<SelectStoriesPage> {
             builder: (_) => StoriesPage(story: story),
           ),
         );
-        // Reload progress when coming back
         _loadProgress();
       },
       child: Ink(
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.secondary,
-          borderRadius: BorderRadius.circular(16),
-          border: isMuhammad
-              ? Border.all(
-            color: _gold,
-            width: 1.6,
-          )
-              : null, // ✨ golden border only for Muhammad (ﷺ) stories
+          borderRadius: BorderRadius.circular(22),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              cs.surfaceContainerHigh,
+              cs.surfaceContainer,
+            ],
+          ),
+          border: Border.all(
+            color: isMuhammad
+                ? _gold.withValues(alpha: 0.65)
+                : cs.outlineVariant.withValues(alpha: 0.55),
+            width: isMuhammad ? 1.4 : 1.0,
+          ),
           boxShadow: [
             BoxShadow(
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
               color: Colors.black.withValues(alpha: 0.05),
             ),
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(15),
           child: Row(
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: 52,
+                height: 52,
                 decoration: BoxDecoration(
-                  color: _accent.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(16),
+                  color: isMuhammad
+                      ? _gold.withValues(alpha: 0.12)
+                      : cs.primary.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(18),
                 ),
-                child: Icon(story.icon, color: _accent),
+                child: Icon(
+                  story.icon,
+                  color: isMuhammad ? _gold : cs.primary,
+                ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 13),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -298,22 +291,22 @@ class _SelectStoriesPageState extends State<SelectStoriesPage> {
                     Text(
                       story.title.tr(),
                       style: textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
                       ),
                     ),
-
                     if (isCompleted) ...[
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 7),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.green.withValues(alpha: 0.06),
+                          color: Colors.green.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(999),
                           border: Border.all(
-                            color: Colors.green.withValues(alpha: 0.6),
+                            color: Colors.green.withValues(alpha: 0.35),
                             width: 0.8,
                           ),
                         ),
@@ -330,37 +323,40 @@ class _SelectStoriesPageState extends State<SelectStoriesPage> {
                               'Completed'.tr(),
                               style: textTheme.bodySmall?.copyWith(
                                 color: Colors.green[800],
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ],
                         ),
                       ),
                     ],
-
                     if (story.subtitle != null) ...[
                       const SizedBox(height: 6),
                       Text(
                         story.subtitle!.tr(),
                         style: textTheme.bodySmall?.copyWith(
-                          color: Colors.grey[600],
+                          color: cs.onSurface.withValues(alpha: 0.60),
                         ),
                       ),
                     ],
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitlePreview.tr(),
-                      // maxLines: 2,
-                      // overflow: TextOverflow.ellipsis,
-                      style: textTheme.bodySmall?.copyWith(
-                        color: Colors.grey[600],
+                    if (subtitlePreview.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitlePreview.tr(),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: cs.onSurface.withValues(alpha: 0.68),
+                          height: 1.35,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.chevron_right_rounded),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: cs.onSurface.withValues(alpha: 0.55),
+              ),
             ],
           ),
         ),
@@ -369,13 +365,96 @@ class _SelectStoriesPageState extends State<SelectStoriesPage> {
   }
 }
 
-// 🔒 Custom scroll behavior: no bounce, no stretch, no glow
+class _PremiumStoriesHeader extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _PremiumStoriesHeader({
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            cs.primary.withValues(alpha: 0.14),
+            cs.secondary.withValues(alpha: 0.55),
+            cs.surfaceContainerHigh,
+          ],
+        ),
+        border: Border.all(
+          color: cs.outlineVariant.withValues(alpha: 0.45),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: cs.primary.withValues(alpha: 0.14),
+            ),
+            child: Icon(
+              Icons.auto_stories_rounded,
+              color: cs.primary,
+              size: 26,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: cs.onSurface.withValues(alpha: 0.72),
+                    height: 1.25,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _NoBounceScrollBehavior extends ScrollBehavior {
   const _NoBounceScrollBehavior();
 
   @override
   ScrollPhysics getScrollPhysics(BuildContext context) {
-    // Force non-bouncy, non-stretch physics
     return const ClampingScrollPhysics();
   }
 
@@ -385,7 +464,6 @@ class _NoBounceScrollBehavior extends ScrollBehavior {
       Widget child,
       ScrollableDetails details,
       ) {
-    // Remove iOS / Material3 stretch / glow visuals
     return child;
   }
 }
