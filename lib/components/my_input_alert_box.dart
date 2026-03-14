@@ -55,7 +55,6 @@ class _MyInputAlertBoxState extends State<MyInputAlertBox> {
 
   @override
   void dispose() {
-    // ✅ Only dispose if we created it
     if (_ownsController) {
       _controller.dispose();
     }
@@ -85,11 +84,9 @@ class _MyInputAlertBoxState extends State<MyInputAlertBox> {
     setState(() => _saving = true);
 
     try {
-      // ✅ Run the right callback
       if (widget.onPressedWithText != null) {
         await Future.sync(() => widget.onPressedWithText!(text));
       } else {
-        // fallback to old signature (no args)
         if (widget.onPressed != null) {
           await Future.sync(widget.onPressed!);
         }
@@ -98,7 +95,6 @@ class _MyInputAlertBoxState extends State<MyInputAlertBox> {
       if (!mounted) return;
 
       if (widget.autoClose) {
-        // ✅ Close at end of frame to avoid controller/listener issues during rebuilds
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
           _safeClose();
@@ -106,7 +102,6 @@ class _MyInputAlertBoxState extends State<MyInputAlertBox> {
       }
     } catch (e, st) {
       debugPrint('❌ MyInputAlertBox confirm error: $e\n$st');
-      // keep dialog open on error
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -128,8 +123,11 @@ class _MyInputAlertBoxState extends State<MyInputAlertBox> {
             constraints: BoxConstraints(maxHeight: mq.size.height * 0.85),
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
             decoration: BoxDecoration(
-              color: color.surface,
+              color: color.surfaceContainerHigh,
               borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: color.outline.withValues(alpha: 0.10),
+              ),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.12),
@@ -141,7 +139,6 @@ class _MyInputAlertBoxState extends State<MyInputAlertBox> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Drag indicator
                 Container(
                   width: 42,
                   height: 5,
@@ -152,7 +149,6 @@ class _MyInputAlertBoxState extends State<MyInputAlertBox> {
                 ),
                 const SizedBox(height: 18),
 
-                // Title row with close button
                 Row(
                   children: [
                     Expanded(
@@ -169,7 +165,7 @@ class _MyInputAlertBoxState extends State<MyInputAlertBox> {
                       onPressed: _saving ? null : _safeClose,
                       icon: Icon(
                         Icons.close_rounded,
-                        color: color.outline,
+                        color: color.onSurfaceVariant,
                         size: 22,
                       ),
                     ),
@@ -188,15 +184,28 @@ class _MyInputAlertBoxState extends State<MyInputAlertBox> {
                           controller: _controller,
                           maxLength: 140,
                           maxLines: 4,
+                          style: TextStyle(
+                            color: color.onSurface,
+                            fontSize: 15,
+                          ),
                           decoration: InputDecoration(
                             filled: true,
                             fillColor: color.surfaceContainerHighest,
                             hintText: widget.hintText,
-                            hintStyle: TextStyle(color: color.outline),
+                            hintStyle: TextStyle(
+                              color: color.onSurfaceVariant,
+                              fontSize: 15,
+                            ),
                             contentPadding: const EdgeInsets.all(16),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
                               borderSide: BorderSide.none,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(
+                                color: color.outline.withValues(alpha: 0.10),
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
@@ -207,7 +216,8 @@ class _MyInputAlertBoxState extends State<MyInputAlertBox> {
                             ),
                             counterStyle: TextStyle(
                               fontSize: 12,
-                              color: color.outline,
+                              color: color.onSurfaceVariant,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ),
@@ -227,7 +237,7 @@ class _MyInputAlertBoxState extends State<MyInputAlertBox> {
                     TextButton(
                       onPressed: _saving ? null : _safeClose,
                       style: TextButton.styleFrom(
-                        foregroundColor: color.outline,
+                        foregroundColor: color.onSurface,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 14,
                           vertical: 10,
@@ -235,7 +245,10 @@ class _MyInputAlertBoxState extends State<MyInputAlertBox> {
                       ),
                       child: Text(
                         "Cancel".tr(),
-                        style: const TextStyle(fontSize: 15),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                     const Spacer(),

@@ -147,6 +147,8 @@ class _DuaWallPageState extends State<DuaWallPage> {
     showDialog(
       context: context,
       builder: (dialogContext) {
+        final cs = Theme.of(dialogContext).colorScheme;
+
         return SingleChildScrollView(
           padding: EdgeInsets.only(
             left: 16,
@@ -155,8 +157,38 @@ class _DuaWallPageState extends State<DuaWallPage> {
           ),
           child: StatefulBuilder(
             builder: (innerContext, setInnerState) {
+              Widget buildChip({
+                required String label,
+                required bool selected,
+                required VoidCallback onTap,
+              }) {
+                return FilterChip(
+                  label: Text(
+                    label,
+                    style: TextStyle(
+                      color: selected ? cs.onPrimary : cs.onSurface,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  selected: selected,
+                  showCheckmark: false,
+                  selectedColor: cs.primary,
+                  backgroundColor: cs.surfaceContainerHighest,
+                  side: BorderSide(
+                    color: selected
+                        ? cs.primary
+                        : cs.outline.withValues(alpha: 0.18),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  onSelected: (_) => onTap(),
+                );
+              }
+
               return MyInputAlertBox(
                 textController: duaController,
+                title: "Write a dua".tr(),
                 hintText: "Write your dua here...".tr(),
                 onPressedText: "Post".tr(),
                 onPressed: () async {
@@ -208,8 +240,8 @@ class _DuaWallPageState extends State<DuaWallPage> {
                       "Visibility".tr(),
                       style: TextStyle(
                         fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -217,104 +249,45 @@ class _DuaWallPageState extends State<DuaWallPage> {
                       spacing: 8,
                       runSpacing: 8,
                       children: [
-                        FilterChip(
-                          label: Text(
-                            "Show my name".tr(),
-                            style: TextStyle(
-                              color: !isAnonymous && !isPrivate
-                                  ? Theme.of(context).colorScheme.onPrimary
-                                  : Theme.of(context).colorScheme.primary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                        buildChip(
+                          label: "Show my name".tr(),
                           selected: !isAnonymous && !isPrivate,
-                          showCheckmark: false,
-                          selectedColor: Theme.of(context).colorScheme.primary,
-                          backgroundColor: Theme.of(context).colorScheme.surface,
-                          side: BorderSide(
-                            color: (!isAnonymous && !isPrivate)
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context).colorScheme.primary.withValues(alpha: 0.28),
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          onSelected: (_) {
+                          onTap: () {
                             setInnerState(() {
                               isAnonymous = false;
                               isPrivate = false;
                             });
                           },
                         ),
-                        FilterChip(
-                          label: Text(
-                            "Anonymous".tr(),
-                            style: TextStyle(
-                              color: isAnonymous
-                                  ? Theme.of(context).colorScheme.onPrimary
-                                  : Theme.of(context).colorScheme.primary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                        buildChip(
+                          label: "Anonymous".tr(),
                           selected: isAnonymous,
-                          showCheckmark: false,
-                          selectedColor: Theme.of(context).colorScheme.primary,
-                          backgroundColor: Theme.of(context).colorScheme.surface,
-                          side: BorderSide(
-                            color: isAnonymous
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context).colorScheme.primary.withValues(alpha: 0.28),
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          onSelected: (value) {
+                          onTap: () {
                             setInnerState(() {
-                              isAnonymous = value;
-                              if (value) isPrivate = false;
+                              isAnonymous = true;
+                              isPrivate = false;
                             });
                           },
                         ),
-                        FilterChip(
-                          label: Text(
-                            "Private (only me)".tr(),
-                            style: TextStyle(
-                              color: isPrivate
-                                  ? Theme.of(context).colorScheme.onPrimary
-                                  : Theme.of(context).colorScheme.primary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                        buildChip(
+                          label: "Private (only me)".tr(),
                           selected: isPrivate,
-                          showCheckmark: false,
-                          selectedColor: Theme.of(context).colorScheme.primary,
-                          backgroundColor: Theme.of(context).colorScheme.surface,
-                          side: BorderSide(
-                            color: isPrivate
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context).colorScheme.primary.withValues(alpha: 0.28),
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          onSelected: (value) {
+                          onTap: () {
                             setInnerState(() {
-                              isPrivate = value;
-                              if (value) isAnonymous = false;
+                              isPrivate = true;
+                              isAnonymous = false;
                             });
                           },
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Text(
                       'visibility_help'.tr(),
                       style: TextStyle(
-                        fontSize: 11,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withValues(alpha: 0.7),
+                        fontSize: 11.5,
+                        color: cs.onSurfaceVariant,
+                        height: 1.35,
                       ),
                     ),
                   ],
