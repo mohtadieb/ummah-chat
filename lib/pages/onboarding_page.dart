@@ -25,24 +25,20 @@ class _OnboardingPageState extends State<OnboardingPage> {
   // Instead store translation KEYS and translate inside build().
   final List<_OnboardingData> _pages = const [
     _OnboardingData(
-      titleKey: 'onboarding_welcome_title',
-      subtitleKey: 'onboarding_welcome_subtitle',
-      assetPath: 'assets/images/onboarding_ummah_chat_1.png',
+      subtitleKey: 'onboarding_dua_stories_subtitle',
+      assetPath: 'assets/images/onboarding_1.png',
     ),
     _OnboardingData(
-      titleKey: 'onboarding_dua_title',
-      subtitleKey: 'onboarding_dua_subtitle',
-      assetPath: 'assets/images/onboarding_dua_wall.png',
+      subtitleKey: 'onboarding_proposal_subtitle',
+      assetPath: 'assets/images/onboarding_2.png',
     ),
     _OnboardingData(
-      titleKey: 'onboarding_stories_title',
-      subtitleKey: 'onboarding_stories_subtitle',
-      assetPath: 'assets/images/onboarding_stories_communities.png',
+      subtitleKey: 'onboarding_relationships_subtitle',
+      assetPath: 'assets/images/onboarding_3.png',
     ),
     _OnboardingData(
-      titleKey: 'onboarding_inquire_for_marriage_title',
-      subtitleKey: 'onboarding_inquire_for_marriage_subtitle',
-      assetPath: 'assets/images/onboarding_inquire_for_marriage.png',
+      subtitleKey: 'onboarding_ummah_chat_subtitle',
+      assetPath: 'assets/images/onboarding_4.png',
     ),
   ];
   void _goNext() {
@@ -103,7 +99,6 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   final page = _pages[index];
 
                   // ✅ Translate here so it always uses the CURRENT locale
-                  final title = page.titleKey.tr();
                   final subtitle = page.subtitleKey.tr();
 
                   return Padding(
@@ -116,7 +111,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       children: [
                         // IMAGE
                         SizedBox(
-                          height: 260,
+                          height: MediaQuery.of(context).size.height * 0.60,
                           child: Image.asset(
                             page.assetPath,
                             fit: BoxFit.contain,
@@ -124,17 +119,6 @@ class _OnboardingPageState extends State<OnboardingPage> {
                         ),
                         const SizedBox(height: 32),
 
-                        // TITLE
-                        Text(
-                          title,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
-                            color: colorScheme.primary,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
 
                         // SUBTITLE
                         Text(
@@ -217,12 +201,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
 class _OnboardingData {
   // ✅ Store translation keys, not translated strings
-  final String titleKey;
   final String subtitleKey;
   final String assetPath;
 
   const _OnboardingData({
-    required this.titleKey,
     required this.subtitleKey,
     required this.assetPath,
   });

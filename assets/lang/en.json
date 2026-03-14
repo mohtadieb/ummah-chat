@@ -74,12 +74,9 @@
   "Voice_message": "Voice message",
   "Recording": "Recording...",
   "Stop": "Stop",
-  "Onboarding_1_title": "Welcome to Ummah Chat",
-  "Onboarding_1_sub": "A safe place for the Ummah.",
-  "Onboarding_2_title": "Stories & Communities",
-  "Onboarding_2_sub": "Share and connect with others.",
-  "Onboarding_3_title": "Dua Wall",
-  "Onboarding_3_sub": "Make dua for your brothers and sisters.",
+
+
+
   "Empty bio..": "Empty bio...",
   "Edit bio...": "Edit bio...",
   "Saved": "Saved",
@@ -352,8 +349,7 @@
   "Visible to: Friends": "Visible to: Friends",
   "Visible to: Nobody": "Visible to: Nobody",
   "mahram_selected_waiting_confirmation": "Mahram selected. Waiting for confirmation.",
-  "onboarding_inquire_for_marriage_title": "Inquire for Marriage",
-  "onboarding_inquire_for_marriage_subtitle": "Express your intention respectfully and involve families in the right way",
+
   "cannot_send_friend_request_visibility_nobody": "You can’t send friend requests while your profile visibility is set to “Nobody”. Change your visibility and try again.",
   "search_users": "Search users",
   "No friends to show yet.": "No friends to show yet.",
@@ -598,12 +594,12 @@
   "Login Error": "Login Error",
   "Google Login Error": "Google Login Error",
   "login_failed_generic": "Login failed. Please try again.",
-  "onboarding_welcome_title": "Welcome to Ummah Chat",
-  "onboarding_welcome_subtitle": "A calm, faith-centered place to connect with Muslims around the world.",
-  "onboarding_dua_title": "Share duas & say Ameen",
-  "onboarding_dua_subtitle": "Write your duas on the Dua Wall and support others by saying Ameen 🤲.",
-  "onboarding_stories_title": "Stories, friends & communities",
-  "onboarding_stories_subtitle": "Read stories of the prophets, follow friends, and join communities that feel like home.",
+
+  "onboarding_dua_stories_subtitle": "Reflect, make dua, and explore meaningful reminders that bring faith into everyday life.",
+  "onboarding_proposal_subtitle": "Approach marriage with clarity, respect, and a space designed for sincere intentions.",
+  "onboarding_relationships_subtitle": "Stay connected with the people around you and grow through shared support and belonging.",
+  "onboarding_ummah_chat_subtitle": "A place to message, share, and feel closer to a global Muslim community.",
+
   "No comments yet": "No comments yet",
   "prophets_stories_level": "Prophets Stories Level {level}",
   "stories_completed": "Stories completed: {done} / {total}",
