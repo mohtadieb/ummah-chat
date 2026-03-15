@@ -1,4 +1,3 @@
-// lib/pages/friends_page.dart
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -17,12 +16,7 @@ import '../services/notifications/notification_service.dart';
 import 'chat_page.dart';
 
 class FriendsPage extends StatefulWidget {
-  /// ✅ If null -> show CURRENT user's list
-  /// ✅ If provided -> show THAT user's friends-only list
   final String? userId;
-
-  /// ✅ Only used for the current-user chat tab:
-  /// show friends + mahrams together.
   final bool includeMahrams;
 
   const FriendsPage({
@@ -71,17 +65,16 @@ class _FriendsPageState extends State<FriendsPage> {
       );
     }
 
-    // ✅ Other user profile lists always stay friends-only
     if (_isOtherUserView) {
       return StreamBuilder<List<UserProfile>>(
         stream: dbProvider.friendsStreamForUser(targetUserId),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                "Error loading friends".tr(),
-                style: TextStyle(color: colorScheme.primary),
-              ),
+            return _buildSimpleState(
+              context,
+              icon: Icons.error_outline_rounded,
+              title: "Error loading friends".tr(),
+              subtitle: '',
             );
           }
 
@@ -92,38 +85,11 @@ class _FriendsPageState extends State<FriendsPage> {
           final allFriends = snapshot.data ?? [];
 
           if (allFriends.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.group_outlined,
-                      size: 52,
-                      color: colorScheme.primary.withValues(alpha: 0.6),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      "No friends yet".tr(),
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      "No friends to show yet.".tr(),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: colorScheme.primary.withValues(alpha: 0.75),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            return _buildSimpleState(
+              context,
+              icon: Icons.group_outlined,
+              title: "No friends yet".tr(),
+              subtitle: "No friends to show yet.".tr(),
             );
           }
 
@@ -143,67 +109,21 @@ class _FriendsPageState extends State<FriendsPage> {
               _searchQuery.trim().isNotEmpty && filteredFriends.isEmpty;
 
           return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 4.0),
-                child: MySearchBar(
-                  controller: _searchController,
-                  hintText: 'Search friends'.tr(),
-                  onChanged: (value) {
-                    setState(() => _searchQuery = value);
-                  },
-                  onClear: () {
-                    setState(() => _searchQuery = '');
-                  },
-                ),
+              _buildTopSection(
+                context,
+                title: "Friends".tr(),
+                count: allFriends.length,
+                hintText: 'Search friends'.tr(),
               ),
-              const SizedBox(height: 4),
-              Padding(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4),
-                child: Row(
-                  children: [
-                    Text(
-                      "Friends".tr(),
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: colorScheme.secondary,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        '${allFriends.length}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 4),
               Expanded(
                 child: noMatches
-                    ? Center(
-                  child: Text(
-                    'No friends match your search'.tr(),
-                    style: TextStyle(
-                      color: colorScheme.primary.withValues(alpha: 0.8),
-                    ),
-                  ),
+                    ? _buildSimpleState(
+                  context,
+                  icon: Icons.search_off_rounded,
+                  title: 'No friends match your search'.tr(),
+                  subtitle: '',
+                  compact: true,
                 )
                     : ScrollConfiguration(
                   behavior: ScrollConfiguration.of(context)
@@ -211,6 +131,7 @@ class _FriendsPageState extends State<FriendsPage> {
                   child: ListView.builder(
                     physics: const ClampingScrollPhysics(),
                     padding: EdgeInsets.only(
+                      top: 6,
                       bottom: MediaQuery.of(context).padding.bottom + 96,
                     ),
                     itemCount: filteredFriends.length,
@@ -269,7 +190,6 @@ class _FriendsPageState extends State<FriendsPage> {
       );
     }
 
-    // ✅ Own list: optionally include mahrams for the main chat tab
     return StreamBuilder<Map<String, int>>(
       stream: chatProvider.unreadCountsPollingStream(currentUserId),
       builder: (context, unreadSnapshot) {
@@ -287,11 +207,11 @@ class _FriendsPageState extends State<FriendsPage> {
                   : dbProvider.friendsStream(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
-                  return Center(
-                    child: Text(
-                      "Error loading friends".tr(),
-                      style: TextStyle(color: colorScheme.primary),
-                    ),
+                  return _buildSimpleState(
+                    context,
+                    icon: Icons.error_outline_rounded,
+                    title: "Error loading friends".tr(),
+                    subtitle: '',
                   );
                 }
 
@@ -304,44 +224,18 @@ class _FriendsPageState extends State<FriendsPage> {
                     .toList();
 
                 if (allFriends.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 32.0),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.group_outlined,
-                            size: 52,
-                            color: colorScheme.primary.withValues(alpha: 0.6),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            widget.includeMahrams
-                                ? "No chats yet".tr()
-                                : "No friends yet".tr(),
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.primary,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            widget.includeMahrams
-                                ? "Add friends or mahrams to start chatting."
-                                .tr()
-                                : "Add people as friends or accept friend requests to start chatting."
-                                .tr(),
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: colorScheme.primary.withValues(alpha: 0.75),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  return _buildSimpleState(
+                    context,
+                    icon: widget.includeMahrams
+                        ? Icons.chat_bubble_outline_rounded
+                        : Icons.group_outlined,
+                    title: widget.includeMahrams
+                        ? "No chats yet".tr()
+                        : "No friends yet".tr(),
+                    subtitle: widget.includeMahrams
+                        ? "Add friends or mahrams to start chatting.".tr()
+                        : "Add people as friends or accept friend requests to start chatting."
+                        .tr(),
                   );
                 }
 
@@ -378,80 +272,27 @@ class _FriendsPageState extends State<FriendsPage> {
                     notificationService.activeDmFriendId;
 
                 return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 4.0),
-                      child: MySearchBar(
-                        controller: _searchController,
-                        hintText: widget.includeMahrams
-                            ? 'Search chats'.tr()
-                            : 'Search friends'.tr(),
-                        onChanged: (value) {
-                          setState(() {
-                            _searchQuery = value;
-                          });
-                        },
-                        onClear: () {
-                          setState(() {
-                            _searchQuery = '';
-                          });
-                        },
-                      ),
+                    _buildTopSection(
+                      context,
+                      title: widget.includeMahrams
+                          ? "Your chats".tr()
+                          : "Your friends".tr(),
+                      count: allFriends.length,
+                      hintText: widget.includeMahrams
+                          ? 'Search chats'.tr()
+                          : 'Search friends'.tr(),
                     ),
-                    const SizedBox(height: 4),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0,
-                        vertical: 4,
-                      ),
-                      child: Row(
-                        children: [
-                          Text(
-                            widget.includeMahrams
-                                ? "Your chats".tr()
-                                : "Your friends".tr(),
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.primary,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: colorScheme.secondary,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              '${allFriends.length}',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 4),
                     Expanded(
                       child: noMatches
-                          ? Center(
-                        child: Text(
-                          widget.includeMahrams
-                              ? 'No chats match your search'.tr()
-                              : 'No friends match your search'.tr(),
-                          style: TextStyle(
-                            color: colorScheme.primary
-                                .withValues(alpha: 0.8),
-                          ),
-                        ),
+                          ? _buildSimpleState(
+                        context,
+                        icon: Icons.search_off_rounded,
+                        title: widget.includeMahrams
+                            ? 'No chats match your search'.tr()
+                            : 'No friends match your search'.tr(),
+                        subtitle: '',
+                        compact: true,
                       )
                           : ScrollConfiguration(
                         behavior: ScrollConfiguration.of(context)
@@ -459,6 +300,7 @@ class _FriendsPageState extends State<FriendsPage> {
                         child: ListView.builder(
                           physics: const ClampingScrollPhysics(),
                           padding: EdgeInsets.only(
+                            top: 6,
                             bottom:
                             MediaQuery.of(context).padding.bottom + 96,
                           ),
@@ -533,6 +375,156 @@ class _FriendsPageState extends State<FriendsPage> {
           },
         );
       },
+    );
+  }
+
+  Widget _buildTopSection(
+      BuildContext context, {
+        required String title,
+        required int count,
+        required String hintText,
+      }) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              colorScheme.surfaceContainerHigh,
+              colorScheme.surfaceContainer,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.55),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            MySearchBar(
+              controller: _searchController,
+              hintText: hintText,
+              onChanged: (value) {
+                setState(() => _searchQuery = value);
+              },
+              onClear: () {
+                setState(() => _searchQuery = '');
+              },
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: colorScheme.onSurface,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '$count',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSimpleState(
+      BuildContext context, {
+        required IconData icon,
+        required String title,
+        required String subtitle,
+        bool compact = false,
+      }) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: compact ? 24 : 32),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainer,
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.55),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.10),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  size: 30,
+                  color: colorScheme.primary,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+              if (subtitle.trim().isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  subtitle,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.45,
+                    color: colorScheme.onSurface.withValues(alpha: 0.70),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -13,7 +13,7 @@ class CommunitiesPage extends StatefulWidget {
   const CommunitiesPage({super.key});
 
   @override
-  _CommunitiesPageState createState() => _CommunitiesPageState();
+  State<CommunitiesPage> createState() => _CommunitiesPageState();
 }
 
 class _CommunitiesPageState extends State<CommunitiesPage> {
@@ -85,7 +85,7 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
     final hasSearchResults =
         listeningProvider.communitySearchResults.isNotEmpty;
 
-    const double searchBarAndTopSpacing = 68;
+    const double searchBarAndTopSpacing = 92;
     const double overlayGapBelowSearch = 12;
 
     final double availableOverlayHeight =
@@ -95,103 +95,26 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
     availableOverlayHeight > 180 ? availableOverlayHeight : 180;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              MySearchBar(
-                controller: _searchController,
-                hintText: 'Search communities'.tr(),
-                onChanged: (value) {
-                  _onCommunitySearchChanged(value);
-                },
-                onClear: () {
-                  _searchDebounce?.cancel();
-                  setState(() {
-                    _searchQuery = '';
-                    _isSearching = false;
-                  });
-                  listeningProvider.clearCommunitySearchResults();
-                },
+              _buildTopSection(
+                context,
+                title: 'Your communities'.tr(),
+                count: joinedCommunities.length,
               ),
-
-              const SizedBox(height: 12),
-
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8.0),
-                child: Row(
-                  children: [
-                    Text(
-                      'Your communities'.tr(),
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    if (joinedCommunities.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colorScheme.secondary,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          '${joinedCommunities.length}',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: colorScheme.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-
               Expanded(
                 child: joinedCommunities.isEmpty
-                    ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.groups_2_outlined,
-                          size: 48,
-                          color: colorScheme.primary,
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          "You haven't joined any communities yet".tr(),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                            color: colorScheme.primary,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          "Explore communities above or create your own to connect with others."
-                              .tr(),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: colorScheme.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                    ? _buildSimpleState(
+                  context,
+                  icon: Icons.groups_2_outlined,
+                  title: "You haven't joined any communities yet".tr(),
+                  subtitle:
+                  "Explore communities above or create your own to connect with others."
+                      .tr(),
                 )
                     : ScrollConfiguration(
                   behavior: ScrollConfiguration.of(context)
@@ -200,10 +123,10 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
                     physics: const ClampingScrollPhysics(),
                     keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
-                    padding: const EdgeInsets.only(top: 2),
+                    padding: const EdgeInsets.only(top: 6, bottom: 96),
                     itemCount: joinedCommunities.length,
                     separatorBuilder: (_, __) =>
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 0),
                     itemBuilder: (context, index) {
                       final community = joinedCommunities[index];
 
@@ -234,7 +157,26 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
               ),
             ],
           ),
-
+          Positioned(
+            top: 14,
+            left: 14,
+            right: 14,
+            child: MySearchBar(
+              controller: _searchController,
+              hintText: 'Search communities'.tr(),
+              onChanged: (value) {
+                _onCommunitySearchChanged(value);
+              },
+              onClear: () {
+                _searchDebounce?.cancel();
+                setState(() {
+                  _searchQuery = '';
+                  _isSearching = false;
+                });
+                listeningProvider.clearCommunitySearchResults();
+              },
+            ),
+          ),
           if (hasSearchText)
             Positioned(
               top: searchBarAndTopSpacing,
@@ -243,22 +185,27 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
               child: Material(
                 color: Colors.transparent,
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: overlayMaxHeight,
-                  ),
+                  constraints: BoxConstraints(maxHeight: overlayMaxHeight),
                   child: Container(
                     margin: const EdgeInsets.only(top: overlayGapBelowSearch),
                     decoration: BoxDecoration(
-                      color: colorScheme.surface,
-                      borderRadius: BorderRadius.circular(16),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          colorScheme.surfaceContainerHigh,
+                          colorScheme.surfaceContainer,
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(24),
                       border: Border.all(
-                        color: colorScheme.secondary,
+                        color: colorScheme.outlineVariant.withValues(alpha: 0.55),
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.14),
-                          blurRadius: 18,
-                          offset: const Offset(0, 8),
+                          color: Colors.black.withValues(alpha: 0.12),
+                          blurRadius: 22,
+                          offset: const Offset(0, 10),
                         ),
                       ],
                     ),
@@ -282,25 +229,35 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
                       physics: const ClampingScrollPhysics(),
                       keyboardDismissBehavior:
                       ScrollViewKeyboardDismissBehavior.onDrag,
-                      padding:
-                      const EdgeInsets.symmetric(vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                      ),
                       itemCount: listeningProvider
                           .communitySearchResults.length,
                       separatorBuilder: (_, __) => Divider(
                         height: 1,
-                        color: colorScheme.secondary,
+                        color: colorScheme.outlineVariant
+                            .withValues(alpha: 0.5),
                       ),
                       itemBuilder: (context, index) {
                         final community = listeningProvider
                             .communitySearchResults[index];
 
                         return ListTile(
-                          dense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 2,
+                          ),
+                          leading: _buildSearchAvatar(
+                            context,
+                            community['name'] ?? '',
+                            community['avatar_url'],
+                          ),
                           title: Text(
                             community['name'],
                             style: TextStyle(
-                              fontWeight: FontWeight.w500,
-                              color: colorScheme.primary,
+                              fontWeight: FontWeight.w700,
+                              color: colorScheme.onSurface,
                             ),
                           ),
                           subtitle: (community['description'] ?? '')
@@ -312,10 +269,16 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 12,
-                              color: colorScheme.primary,
+                              color: colorScheme.onSurface
+                                  .withValues(alpha: 0.68),
                             ),
                           )
                               : null,
+                          trailing: Icon(
+                            Icons.chevron_right_rounded,
+                            color: colorScheme.onSurface
+                                .withValues(alpha: 0.5),
+                          ),
                           onTap: () {
                             Navigator.push(
                               context,
@@ -343,19 +306,28 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            Icons.search_off_rounded,
-                            size: 42,
-                            color: colorScheme.primary,
+                          Container(
+                            width: 58,
+                            height: 58,
+                            decoration: BoxDecoration(
+                              color: colorScheme.primary
+                                  .withValues(alpha: 0.10),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.search_off_rounded,
+                              size: 28,
+                              color: colorScheme.primary,
+                            ),
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 12),
                           Text(
                             'No communities found'.tr(),
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.primary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: colorScheme.onSurface,
                             ),
                           ),
                           const SizedBox(height: 6),
@@ -364,7 +336,8 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 13,
-                              color: colorScheme.primary,
+                              color: colorScheme.onSurface
+                                  .withValues(alpha: 0.68),
                             ),
                           ),
                         ],
@@ -375,6 +348,168 @@ class _CommunitiesPageState extends State<CommunitiesPage> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTopSection(
+      BuildContext context, {
+        required String title,
+        required int count,
+      }) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colorScheme.surfaceContainerHigh,
+            colorScheme.surfaceContainer,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.55),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.only(top: 52),
+        child: Row(
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: colorScheme.onSurface,
+                letterSpacing: -0.2,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 4,
+              ),
+              decoration: BoxDecoration(
+                color: colorScheme.primary.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: colorScheme.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSimpleState(
+      BuildContext context, {
+        required IconData icon,
+        required String title,
+        required String subtitle,
+      }) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainer,
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.55),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.10),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  size: 30,
+                  color: colorScheme.primary,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.45,
+                  color: colorScheme.onSurface.withValues(alpha: 0.70),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchAvatar(
+      BuildContext context,
+      String name,
+      String? avatarUrl,
+      ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final url = (avatarUrl ?? '').trim();
+
+    if (url.isNotEmpty) {
+      return CircleAvatar(
+        radius: 20,
+        backgroundImage: NetworkImage(url),
+      );
+    }
+
+    final initial = name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : 'C';
+
+    return CircleAvatar(
+      radius: 20,
+      backgroundColor: colorScheme.primary.withValues(alpha: 0.10),
+      child: Text(
+        initial,
+        style: TextStyle(
+          color: colorScheme.primary,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }

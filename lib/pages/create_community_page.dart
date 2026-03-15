@@ -1,53 +1,63 @@
-// lib/pages/create_group_page.dart
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/user_profile.dart';
 import '../services/auth/auth_service.dart';
-import '../services/chat/chat_provider.dart';
 import '../services/database/database_provider.dart';
-import 'group_chat_page.dart';
+import 'community_posts_page.dart';
 
-class CreateGroupPage extends StatefulWidget {
-  const CreateGroupPage({super.key});
+class CreateCommunityPage extends StatefulWidget {
+  const CreateCommunityPage({super.key});
 
   @override
-  State<CreateGroupPage> createState() => _CreateGroupPageState();
+  State<CreateCommunityPage> createState() => _CreateCommunityPageState();
 }
 
-class _CreateGroupPageState extends State<CreateGroupPage> {
-  final _groupNameController = TextEditingController();
+class _CreateCommunityPageState extends State<CreateCommunityPage> {
+  final _nameController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _countryController = TextEditingController();
   final _searchController = TextEditingController();
+
   final _authService = AuthService();
 
-  final Set<String> _selectedFriendIds = {};
+  final Set<String> _selectedMemberIds = {};
 
   bool _isCreating = false;
+  bool _isPrivate = false;
   String _searchQuery = '';
 
   @override
   void dispose() {
-    _groupNameController.dispose();
+    _nameController.dispose();
+    _descriptionController.dispose();
+    _countryController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _createGroup(BuildContext context) async {
+  void _toggleMember(String userId, bool currentlySelected) {
+    setState(() {
+      if (currentlySelected) {
+        _selectedMemberIds.remove(userId);
+      } else {
+        _selectedMemberIds.add(userId);
+      }
+    });
+  }
+
+  Future<void> _createCommunity(BuildContext context) async {
     final currentUserId = _authService.getCurrentUserId();
     if (currentUserId.isEmpty) return;
 
-    final name = _groupNameController.text.trim();
+    final name = _nameController.text.trim();
+    final description = _descriptionController.text.trim();
+    final country = _countryController.text.trim();
+
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please enter a group name'.tr())),
-      );
-      return;
-    }
-
-    if (_selectedFriendIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please select at least one member'.tr())),
+        SnackBar(content: Text('Please enter a name for your community.'.tr())),
       );
       return;
     }
@@ -55,29 +65,67 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
     setState(() => _isCreating = true);
 
     try {
-      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+      final db = Provider.of<DatabaseProvider>(context, listen: false);
 
-      final roomId = await chatProvider.createGroupRoom(
-        name: name,
-        creatorId: currentUserId,
-        initialMemberIds: _selectedFriendIds.toList(),
+      await db.createCommunity(
+        name,
+        description,
+        country,
+        isPrivate: _isPrivate,
       );
+
+      await db.getAllCommunities();
+
+      final createdCommunity = _findCreatedCommunity(
+        db: db,
+        currentUserId: currentUserId,
+        name: name,
+        description: description,
+        country: country,
+      );
+
+      if (createdCommunity == null) {
+        throw Exception('Could not find the created community');
+      }
+
+      final communityId = (createdCommunity['id'] ?? '').toString();
+      if (communityId.isEmpty) {
+        throw Exception('Created community id is missing');
+      }
+
+      if (_selectedMemberIds.isNotEmpty) {
+        final inviterName = await _resolveInviterName(db, currentUserId);
+
+        for (final memberId in _selectedMemberIds) {
+          await db.inviteUserToCommunity(
+            communityId,
+            memberId,
+            name,
+            inviterName,
+          );
+        }
+      }
 
       if (!mounted) return;
 
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => GroupChatPage(
-            chatRoomId: roomId,
-            groupName: name,
+          builder: (_) => CommunityPostsPage(
+            communityId: communityId,
+            communityName: name,
+            communityDescription: description.isEmpty ? null : description,
+            communityAvatarUrl: createdCommunity['avatar_url']?.toString(),
           ),
         ),
       );
     } catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${'Failed to create group:'.tr()} $e')),
+        SnackBar(
+          content: Text('${'Failed to create community'.tr()}: $e'),
+        ),
       );
     } finally {
       if (mounted) {
@@ -86,14 +134,78 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
     }
   }
 
-  void _toggleMember(String userId, bool currentlySelected) {
-    setState(() {
-      if (currentlySelected) {
-        _selectedFriendIds.remove(userId);
-      } else {
-        _selectedFriendIds.add(userId);
-      }
-    });
+  Map<String, dynamic>? _findCreatedCommunity({
+    required DatabaseProvider db,
+    required String currentUserId,
+    required String name,
+    required String description,
+    required String country,
+  }) {
+    final communities = db.allCommunities;
+
+    final exactMatches = communities.where((c) {
+      final createdBy = (c['created_by'] ?? '').toString();
+      final cName = (c['name'] ?? '').toString().trim();
+      final cDescription = (c['description'] ?? '').toString().trim();
+      final cCountry = (c['country'] ?? '').toString().trim();
+
+      return createdBy == currentUserId &&
+          cName == name &&
+          cDescription == description &&
+          cCountry == country;
+    }).toList();
+
+    if (exactMatches.isNotEmpty) {
+      exactMatches.sort((a, b) {
+        final aCreatedAt = DateTime.tryParse((a['created_at'] ?? '').toString());
+        final bCreatedAt = DateTime.tryParse((b['created_at'] ?? '').toString());
+
+        if (aCreatedAt == null && bCreatedAt == null) return 0;
+        if (aCreatedAt == null) return 1;
+        if (bCreatedAt == null) return -1;
+        return bCreatedAt.compareTo(aCreatedAt);
+      });
+
+      return exactMatches.first;
+    }
+
+    final fallbackMatches = communities.where((c) {
+      final createdBy = (c['created_by'] ?? '').toString();
+      final cName = (c['name'] ?? '').toString().trim();
+      return createdBy == currentUserId && cName == name;
+    }).toList();
+
+    if (fallbackMatches.isNotEmpty) {
+      fallbackMatches.sort((a, b) {
+        final aCreatedAt = DateTime.tryParse((a['created_at'] ?? '').toString());
+        final bCreatedAt = DateTime.tryParse((b['created_at'] ?? '').toString());
+
+        if (aCreatedAt == null && bCreatedAt == null) return 0;
+        if (aCreatedAt == null) return 1;
+        if (bCreatedAt == null) return -1;
+        return bCreatedAt.compareTo(aCreatedAt);
+      });
+
+      return fallbackMatches.first;
+    }
+
+    return null;
+  }
+
+  Future<String> _resolveInviterName(
+      DatabaseProvider db,
+      String currentUserId,
+      ) async {
+    try {
+      final me = await db.getUserProfile(currentUserId);
+      final fullName = (me?.name ?? '').trim();
+      final username = (me?.username ?? '').trim();
+
+      if (fullName.isNotEmpty) return fullName;
+      if (username.isNotEmpty) return username;
+    } catch (_) {}
+
+    return 'Someone'.tr();
   }
 
   @override
@@ -105,14 +217,14 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
     if (currentUserId.isEmpty) {
       return Scaffold(
         appBar: AppBar(
-          title: Text('New group'.tr()),
+          title: Text('New community'.tr()),
           backgroundColor: colorScheme.surface,
           elevation: 0,
           scrolledUnderElevation: 0,
         ),
         body: Center(
           child: Text(
-            'You must be logged in to create a group'.tr(),
+            'You must be logged in to create a community'.tr(),
             style: TextStyle(color: colorScheme.primary),
           ),
         ),
@@ -127,7 +239,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
         scrolledUnderElevation: 0,
         centerTitle: true,
         title: Text(
-          'New group'.tr(),
+          'New community'.tr(),
           style: TextStyle(
             color: colorScheme.primary,
             fontWeight: FontWeight.w700,
@@ -205,7 +317,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Create your group'.tr(),
+                                      'Create your community'.tr(),
                                       style: Theme.of(context)
                                           .textTheme
                                           .titleMedium
@@ -216,7 +328,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      'Choose a name and select friends or mahrams to start chatting together.'
+                                      'Choose a name, add details, and invite people to join your community.'
                                           .tr(),
                                       style: Theme.of(context)
                                           .textTheme
@@ -238,13 +350,13 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                         child: TextField(
-                          controller: _groupNameController,
+                          controller: _nameController,
                           style: TextStyle(
                             color: colorScheme.primary,
                             fontWeight: FontWeight.w600,
                           ),
                           decoration: InputDecoration(
-                            labelText: 'Group name'.tr(),
+                            labelText: 'Name'.tr(),
                             labelStyle: TextStyle(
                               color: colorScheme.primary.withValues(alpha: 0.72),
                             ),
@@ -273,6 +385,142 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                                 width: 1.4,
                               ),
                             ),
+                          ),
+                        ),
+                      ),
+
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                        child: TextField(
+                          controller: _descriptionController,
+                          maxLines: 3,
+                          minLines: 2,
+                          style: TextStyle(
+                            color: colorScheme.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: 'Description'.tr(),
+                            alignLabelWithHint: true,
+                            labelStyle: TextStyle(
+                              color: colorScheme.primary.withValues(alpha: 0.72),
+                            ),
+                            filled: true,
+                            fillColor: colorScheme.surfaceContainerHigh,
+                            prefixIcon: Padding(
+                              padding: const EdgeInsets.only(bottom: 34),
+                              child: Icon(
+                                Icons.notes_rounded,
+                                color: colorScheme.primary.withValues(alpha: 0.78),
+                              ),
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(18),
+                              borderSide: BorderSide(
+                                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(18),
+                              borderSide: BorderSide(
+                                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(18),
+                              borderSide: BorderSide(
+                                color: colorScheme.primary,
+                                width: 1.4,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                        child: TextField(
+                          controller: _countryController,
+                          style: TextStyle(
+                            color: colorScheme.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: 'Country'.tr(),
+                            labelStyle: TextStyle(
+                              color: colorScheme.primary.withValues(alpha: 0.72),
+                            ),
+                            filled: true,
+                            fillColor: colorScheme.surfaceContainerHigh,
+                            prefixIcon: Icon(
+                              Icons.public_rounded,
+                              color: colorScheme.primary.withValues(alpha: 0.78),
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(18),
+                              borderSide: BorderSide(
+                                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(18),
+                              borderSide: BorderSide(
+                                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(18),
+                              borderSide: BorderSide(
+                                color: colorScheme.primary,
+                                width: 1.4,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHigh,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: colorScheme.outlineVariant.withValues(alpha: 0.45),
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: Text(
+                                  'Private community'.tr(),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: colorScheme.primary,
+                                  ),
+                                ),
+                                value: _isPrivate,
+                                onChanged: (v) => setState(() => _isPrivate = v),
+                              ),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  'private_community_hint'.tr(),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                    color: colorScheme.onSurface
+                                        .withValues(alpha: 0.68),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -308,19 +556,22 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                               },
                               icon: Icon(
                                 Icons.close_rounded,
-                                color: colorScheme.primary.withValues(alpha: 0.72),
+                                color: colorScheme.primary
+                                    .withValues(alpha: 0.72),
                               ),
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(18),
                               borderSide: BorderSide(
-                                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                                color: colorScheme.outlineVariant
+                                    .withValues(alpha: 0.5),
                               ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(18),
                               borderSide: BorderSide(
-                                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                                color: colorScheme.outlineVariant
+                                    .withValues(alpha: 0.5),
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(
@@ -339,7 +590,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                         child: Row(
                           children: [
                             Text(
-                              'Select members'.tr(),
+                              'Invite members'.tr(),
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
@@ -347,7 +598,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            if (_selectedFriendIds.isNotEmpty)
+                            if (_selectedMemberIds.isNotEmpty)
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 8,
@@ -358,7 +609,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                                   borderRadius: BorderRadius.circular(999),
                                 ),
                                 child: Text(
-                                  '${_selectedFriendIds.length}',
+                                  '${_selectedMemberIds.length}',
                                   style: TextStyle(
                                     color: colorScheme.primary,
                                     fontSize: 11,
@@ -409,7 +660,8 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                                     Icon(
                                       Icons.group_outlined,
                                       size: 52,
-                                      color: colorScheme.primary.withValues(alpha: 0.6),
+                                      color: colorScheme.primary
+                                          .withValues(alpha: 0.6),
                                     ),
                                     const SizedBox(height: 12),
                                     Text(
@@ -422,7 +674,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                                     ),
                                     const SizedBox(height: 6),
                                     Text(
-                                      'Add friends or mahrams before creating a group.'
+                                      'Add friends or mahrams before inviting members.'
                                           .tr(),
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
@@ -453,7 +705,9 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                             if (aMahram != bMahram) {
                               return aMahram ? 1 : -1;
                             }
-                            return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+                            return a.name
+                                .toLowerCase()
+                                .compareTo(b.name.toLowerCase());
                           });
 
                           if (filteredConnections.isEmpty) {
@@ -463,7 +717,8 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                                 child: Text(
                                   'No members match your search'.tr(),
                                   style: TextStyle(
-                                    color: colorScheme.primary.withValues(alpha: 0.8),
+                                    color: colorScheme.primary
+                                        .withValues(alpha: 0.8),
                                   ),
                                 ),
                               ),
@@ -477,16 +732,19 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                             itemCount: filteredConnections.length,
                             itemBuilder: (context, index) {
                               final user = filteredConnections[index];
-                              final isSelected = _selectedFriendIds.contains(user.id);
-                              final isMahram = dbProvider.isMahramUser(user.id);
+                              final isSelected =
+                              _selectedMemberIds.contains(user.id);
+                              final isMahram =
+                              dbProvider.isMahramUser(user.id);
 
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 10),
-                                child: _MemberSelectionTile(
+                                child: _CommunityMemberSelectionTile(
                                   user: user,
                                   isSelected: isSelected,
                                   isMahram: isMahram,
-                                  onTap: () => _toggleMember(user.id, isSelected),
+                                  onTap: () =>
+                                      _toggleMember(user.id, isSelected),
                                 ),
                               );
                             },
@@ -513,7 +771,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                   child: SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: _isCreating ? null : () => _createGroup(context),
+                      onPressed: _isCreating ? null : () => _createCommunity(context),
                       icon: _isCreating
                           ? const SizedBox(
                         width: 16,
@@ -522,7 +780,9 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                       )
                           : const Icon(Icons.check_rounded),
                       label: Text(
-                        _isCreating ? 'Creating...'.tr() : 'Create group'.tr(),
+                        _isCreating
+                            ? 'Creating...'.tr()
+                            : 'Create community'.tr(),
                       ),
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
@@ -548,13 +808,13 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
   }
 }
 
-class _MemberSelectionTile extends StatelessWidget {
+class _CommunityMemberSelectionTile extends StatelessWidget {
   final UserProfile user;
   final bool isSelected;
   final bool isMahram;
   final VoidCallback onTap;
 
-  const _MemberSelectionTile({
+  const _CommunityMemberSelectionTile({
     required this.user,
     required this.isSelected,
     required this.isMahram,

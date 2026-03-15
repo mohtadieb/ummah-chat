@@ -1,7 +1,5 @@
 // lib/pages/communities/community_posts_page.dart
 
-import 'dart:io';
-
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -10,7 +8,6 @@ import 'package:provider/provider.dart';
 import '../../models/post.dart';
 import '../../models/user_profile.dart';
 import '../../services/database/database_provider.dart';
-import '../../components/my_input_alert_box.dart';
 import '../../components/my_post_tile.dart';
 import '../../components/my_user_tile.dart';
 import '../../helper/navigate_pages.dart';
@@ -21,7 +18,7 @@ enum _CommunityMenuAction {
   viewMembers,
   joinCommunity,
   inviteMembers,
-  changeCommunityPhoto, // ✅ NEW
+  changeCommunityPhoto,
   leaveCommunity,
   deleteCommunity,
 }
@@ -86,21 +83,17 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
     databaseProvider.loadAllPosts();
     _loadMembers();
     _loadMembershipState();
-    _loadCommunityOwner(); // ✅ ADD THIS
+    _loadCommunityOwner();
 
     _loadMyInviterName();
 
     if (widget.openedFromInvite) {
-      _inviteChecked = false; // let DB decide
+      _inviteChecked = false;
       _hasPendingInvite = false;
     }
     _loadPendingInviteState();
 
-    // ✅ Use passed avatar (fast path)
     _communityAvatarUrl = widget.communityAvatarUrl;
-
-    // ✅ Optional: if avatar not passed, fetch it from DB
-    // (so appbar still gets it even when opened from notification/invite)
     _loadCommunityAvatarIfMissing();
   }
 
@@ -171,7 +164,6 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
   }
 
   Future<void> _loadCommunityAvatarIfMissing() async {
-    // only fetch if we don't already have one
     final current = (_communityAvatarUrl ?? '').trim();
     if (current.isNotEmpty) return;
 
@@ -189,14 +181,30 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
   }
 
   Widget _buildCommunityAvatar(ColorScheme colorScheme) {
-    const radius = 18.0;
+    const radius = 24.0;
 
     final url = (_communityAvatarUrl ?? '').trim();
 
     if (url.isNotEmpty) {
-      return CircleAvatar(
-        radius: radius,
-        backgroundImage: NetworkImage(url),
+      return Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: colorScheme.primary.withValues(alpha: 0.18),
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 14,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: CircleAvatar(
+          radius: radius,
+          backgroundImage: NetworkImage(url),
+        ),
       );
     }
 
@@ -204,14 +212,32 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
         ? widget.communityName.trim()[0].toUpperCase()
         : 'C';
 
-    return CircleAvatar(
-      radius: radius,
-      backgroundColor: colorScheme.primary.withValues(alpha: 0.12),
-      child: Text(
-        initial,
-        style: TextStyle(
-          color: colorScheme.primary,
-          fontWeight: FontWeight.w700,
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: [
+            colorScheme.primary.withValues(alpha: 0.18),
+            colorScheme.secondary.withValues(alpha: 0.90),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(
+          color: colorScheme.primary.withValues(alpha: 0.16),
+          width: 1.1,
+        ),
+      ),
+      child: CircleAvatar(
+        radius: radius,
+        backgroundColor: Colors.transparent,
+        child: Text(
+          initial,
+          style: TextStyle(
+            color: colorScheme.primary,
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+          ),
         ),
       ),
     );
@@ -237,7 +263,7 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
       if (!mounted) return;
 
       setState(() {
-        _communityAvatarUrl = newUrl; // ✅ update appbar instantly
+        _communityAvatarUrl = newUrl;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -278,7 +304,6 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
         );
       }).toList();
 
-      // ✅ Put owner first (if we know the owner id)
       final ownerId = (_communityOwnerId ?? '').trim();
       if (ownerId.isNotEmpty) {
         members.sort((a, b) {
@@ -311,19 +336,19 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
       showDragHandle: true,
       backgroundColor: colorScheme.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (sheetCtx) {
         if (_isLoadingMembers) {
           return const SizedBox(
-            height: 200,
+            height: 220,
             child: Center(child: CircularProgressIndicator()),
           );
         }
 
         if (_members.isEmpty) {
           return SizedBox(
-            height: 200,
+            height: 220,
             child: Center(child: Text('No members yet'.tr())),
           );
         }
@@ -331,13 +356,13 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
         final ownerId = (_communityOwnerId ?? '').trim();
 
         return SizedBox(
-          height: 320,
+          height: 360,
           child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             itemCount: _members.length,
             separatorBuilder: (_, __) => Divider(
-              height: 0,
-              color: colorScheme.secondary.withValues(alpha: 0.5),
+              height: 14,
+              color: colorScheme.outlineVariant.withValues(alpha: 0.45),
             ),
             itemBuilder: (sheetCtx, index) {
               final u = _members[index];
@@ -347,10 +372,8 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
               return GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () {
-                  // close the bottomsheet first
                   Navigator.of(sheetCtx).pop();
 
-                  // then navigate next frame
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     if (!mounted) return;
 
@@ -362,32 +385,41 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
                   });
                 },
                 child: IgnorePointer(
-                  // ✅ prevents MyUserTile from eating the tap
                   ignoring: true,
-                  child: Row(
-                    children: [
-                      Expanded(child: MyUserTile(user: u)),
-                      if (isOwner)
-                        Container(
-                          margin: const EdgeInsets.only(left: 8),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(999),
-                            color: colorScheme.primary.withValues(alpha: 0.10),
-                          ),
-                          child: Text(
-                            'community_owner'.tr(),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.primary,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainer,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(child: MyUserTile(user: u)),
+                        if (isOwner)
+                          Container(
+                            margin: const EdgeInsets.only(left: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(999),
+                              color: colorScheme.primary.withValues(alpha: 0.10),
+                            ),
+                            child: Text(
+                              'community_owner'.tr(),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: colorScheme.primary,
+                              ),
                             ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               );
@@ -408,8 +440,6 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
 
     final TextEditingController searchCtrl = TextEditingController();
     String query = '';
-
-    // ✅ NEW: track button loading per friend for instant feedback
     final Set<String> invitingIds = {};
 
     await showModalBottomSheet(
@@ -418,7 +448,7 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
       isScrollControlled: true,
       backgroundColor: colorScheme.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (_) {
         return StatefulBuilder(
@@ -434,43 +464,66 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Header
                     Row(
                       children: [
                         Expanded(
                           child: Text(
                             'community_invite_members'.tr(),
                             style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.primary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: colorScheme.onSurface,
                             ),
                           ),
                         ),
-                        IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: Icon(Icons.close, color: colorScheme.primary),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHighest,
+                            shape: BoxShape.circle,
+                          ),
+                          child: IconButton(
+                            onPressed: () => Navigator.pop(context),
+                            icon: Icon(
+                              Icons.close_rounded,
+                              color: colorScheme.onSurface,
+                            ),
+                          ),
                         ),
                       ],
                     ),
-
-                    // Search
+                    const SizedBox(height: 6),
                     TextField(
                       controller: searchCtrl,
                       decoration: InputDecoration(
                         hintText: 'community_search_friends'.tr(),
-                        prefixIcon: const Icon(Icons.search),
+                        prefixIcon: const Icon(Icons.search_rounded),
+                        filled: true,
+                        fillColor: colorScheme.surfaceContainer,
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(18),
+                          borderSide: BorderSide(
+                            color: colorScheme.outlineVariant,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(18),
+                          borderSide: BorderSide(
+                            color: colorScheme.outlineVariant,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(18),
+                          borderSide: BorderSide(
+                            color: colorScheme.primary,
+                            width: 1.2,
+                          ),
                         ),
                       ),
                       onChanged: (v) {
                         setModalState(() => query = v.trim().toLowerCase());
                       },
                     ),
-                    const SizedBox(height: 12),
-
-                    // Friends list (stream)
+                    const SizedBox(height: 14),
                     SizedBox(
                       height: 420,
                       child: StreamBuilder<List<UserProfile>>(
@@ -487,8 +540,8 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
                           final filtered = query.isEmpty
                               ? friends
                               : friends.where((f) {
-                            final name = (f.name).toLowerCase();
-                            final username = (f.username).toLowerCase();
+                            final name = f.name.toLowerCase();
+                            final username = f.username.toLowerCase();
                             return name.contains(query) ||
                                 username.contains(query);
                           }).toList();
@@ -501,19 +554,12 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
 
                           return ListView.separated(
                             itemCount: filtered.length,
-                            separatorBuilder: (_, __) => Divider(
-                              height: 0,
-                              color: colorScheme.secondary.withValues(
-                                alpha: 0.5,
-                              ),
-                            ),
+                            separatorBuilder: (_, __) => const SizedBox(height: 10),
                             itemBuilder: (_, index) {
                               final friend = filtered[index];
                               final friendId = friend.id;
 
-                              final alreadyMember = _memberIds.contains(
-                                friendId,
-                              );
+                              final alreadyMember = _memberIds.contains(friendId);
                               final alreadyInvited = _pendingInviteIds.contains(
                                 friendId,
                               );
@@ -530,93 +576,131 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
                                 trailingText = 'community_invited'.tr();
                               }
 
-                              return ListTile(
-                                leading: CircleAvatar(
-                                  backgroundImage:
-                                  (friend.profilePhotoUrl ?? '').isNotEmpty
-                                      ? NetworkImage(friend.profilePhotoUrl!)
-                                      : null,
-                                  child: (friend.profilePhotoUrl ?? '').isEmpty
-                                      ? Text(
+                              return Container(
+                                decoration: BoxDecoration(
+                                  color: colorScheme.surfaceContainer,
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(
+                                    color: colorScheme.outlineVariant.withValues(
+                                      alpha: 0.5,
+                                    ),
+                                  ),
+                                ),
+                                child: ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundImage:
+                                    (friend.profilePhotoUrl ?? '').isNotEmpty
+                                        ? NetworkImage(friend.profilePhotoUrl!)
+                                        : null,
+                                    backgroundColor: colorScheme.primary
+                                        .withValues(alpha: 0.10),
+                                    child: (friend.profilePhotoUrl ?? '').isEmpty
+                                        ? Text(
+                                      friend.name.isNotEmpty
+                                          ? friend.name[0].toUpperCase()
+                                          : '?',
+                                      style: TextStyle(
+                                        color: colorScheme.primary,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    )
+                                        : null,
+                                  ),
+                                  title: Text(
                                     friend.name.isNotEmpty
-                                        ? friend.name[0]
-                                        : '?',
-                                  )
-                                      : null,
-                                ),
-                                title: Text(
-                                  friend.name.isNotEmpty
-                                      ? friend.name
-                                      : friend.username,
-                                  style: TextStyle(color: colorScheme.primary),
-                                ),
-                                subtitle: friend.username.isNotEmpty
-                                    ? Text('@${friend.username}')
-                                    : null,
-                                trailing: TextButton(
-                                  onPressed: disabled
-                                      ? null
-                                      : () async {
-                                    // ✅ instant feedback
-                                    setModalState(() {
-                                      invitingIds.add(friendId);
-                                    });
-
-                                    try {
-                                      final inviterName =
-                                      _inviterName.trim().isNotEmpty
-                                          ? _inviterName.trim()
-                                          : 'Someone'.tr(); // fallback
-
-                                      await databaseProvider
-                                          .inviteUserToCommunity(
-                                        widget.communityId,
-                                        friendId,
-                                        widget.communityName,
-                                        inviterName,
-                                      );
-
-                                      // ✅ optimistic disable button
-                                      setModalState(() {
-                                        invitingIds.remove(friendId);
-                                        _pendingInviteIds.add(friendId);
-                                      });
-
-                                      if (!mounted) return;
-                                      ScaffoldMessenger.of(this.context)
-                                          .showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            'community_invite_sent'.tr(),
-                                          ),
-                                        ),
-                                      );
-                                    } catch (e) {
-                                      // ❌ revert so button becomes clickable again
-                                      setModalState(() {
-                                        invitingIds.remove(friendId);
-                                      });
-
-                                      if (!mounted) return;
-                                      ScaffoldMessenger.of(this.context)
-                                          .showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            'community_invite_failed'.tr(),
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  },
-                                  child: isInviting
-                                      ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
+                                        ? friend.name
+                                        : friend.username,
+                                    style: TextStyle(
+                                      color: colorScheme.onSurface,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  subtitle: friend.username.isNotEmpty
+                                      ? Text(
+                                    '@${friend.username}',
+                                    style: TextStyle(
+                                      color: colorScheme.onSurface
+                                          .withValues(alpha: 0.65),
                                     ),
                                   )
-                                      : Text(trailingText),
+                                      : null,
+                                  trailing: TextButton(
+                                    onPressed: disabled
+                                        ? null
+                                        : () async {
+                                      setModalState(() {
+                                        invitingIds.add(friendId);
+                                      });
+
+                                      try {
+                                        final inviterName =
+                                        _inviterName.trim().isNotEmpty
+                                            ? _inviterName.trim()
+                                            : 'Someone'.tr();
+
+                                        await databaseProvider
+                                            .inviteUserToCommunity(
+                                          widget.communityId,
+                                          friendId,
+                                          widget.communityName,
+                                          inviterName,
+                                        );
+
+                                        setModalState(() {
+                                          invitingIds.remove(friendId);
+                                          _pendingInviteIds.add(friendId);
+                                        });
+
+                                        if (!mounted) return;
+                                        ScaffoldMessenger.of(this.context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'community_invite_sent'.tr(),
+                                            ),
+                                          ),
+                                        );
+                                      } catch (e) {
+                                        setModalState(() {
+                                          invitingIds.remove(friendId);
+                                        });
+
+                                        if (!mounted) return;
+                                        ScaffoldMessenger.of(this.context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'community_invite_failed'.tr(),
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: colorScheme.primary,
+                                      backgroundColor:
+                                      colorScheme.primary.withValues(
+                                        alpha: disabled ? 0.04 : 0.10,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                    ),
+                                    child: isInviting
+                                        ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                        : Text(
+                                      trailingText,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               );
                             },
@@ -681,6 +765,7 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
       builder: (_) => AlertDialog(
         title: Text('Leave community?'.tr()),
         content: Text("leave_warning".tr(namedArgs: {"name": communityName})),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -691,7 +776,7 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text('Leave'.tr(), style: TextStyle(color: Colors.red)),
+            child: Text('Leave'.tr(), style: TextStyle(color: Colors.red.shade600)),
           ),
         ],
       ),
@@ -734,6 +819,7 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
       builder: (_) => AlertDialog(
         title: Text("delete_community_title".tr()),
         content: Text("delete_community_warning".tr()),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -759,7 +845,7 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
       await databaseProvider.deleteCommunity(widget.communityId);
 
       if (!mounted) return;
-      Navigator.pop(context); // leave CommunityPostsPage
+      Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Community deleted.'.tr())),
       );
@@ -774,24 +860,56 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
   Widget _buildInviteBanner(ColorScheme colorScheme) {
     if (!_inviteChecked) return const SizedBox.shrink();
     if (!_hasPendingInvite) return const SizedBox.shrink();
-    if (_isJoined) return const SizedBox.shrink(); // already a member -> no banner
+    if (_isJoined) return const SizedBox.shrink();
 
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      color: colorScheme.primary.withValues(alpha: 0.08),
+      margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            colorScheme.primary.withValues(alpha: 0.10),
+            colorScheme.secondary.withValues(alpha: 0.85),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: colorScheme.primary.withValues(alpha: 0.18),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.mail_outline, color: colorScheme.primary),
-          const SizedBox(width: 10),
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.mail_outline_rounded,
+              color: colorScheme.primary,
+            ),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               'community_invite_banner'.tr(),
               style: TextStyle(
                 fontSize: 13,
-                color: colorScheme.primary,
-                fontWeight: FontWeight.w500,
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+                height: 1.35,
               ),
             ),
           ),
@@ -802,83 +920,271 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
               height: 18,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
-          else ...[
-            TextButton(
-              onPressed: () async {
-                setState(() => _handlingInviteAction = true);
-                try {
-                  await databaseProvider.acceptCommunityInvite(
-                    widget.communityId,
-                  );
+          else
+            Column(
+              children: [
+                TextButton(
+                  onPressed: () async {
+                    setState(() => _handlingInviteAction = true);
+                    try {
+                      await databaseProvider.acceptCommunityInvite(
+                        widget.communityId,
+                      );
 
-                  if (!mounted) return;
-                  setState(() => _handlingInviteAction = false);
+                      if (!mounted) return;
+                      setState(() => _handlingInviteAction = false);
 
-                  await _loadMembershipState();
-                  await _loadPendingInviteState();
-                  await _loadMembers();
+                      await _loadMembershipState();
+                      await _loadPendingInviteState();
+                      await _loadMembers();
 
-                  if (!mounted) return;
-                  setState(() {
-                    _hasPendingInvite = false; // ensure hidden even if check slow
-                  });
+                      if (!mounted) return;
+                      setState(() {
+                        _hasPendingInvite = false;
+                      });
 
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'you_joined_community'.tr(
-                          namedArgs: {"name": widget.communityName},
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'you_joined_community'.tr(
+                              namedArgs: {"name": widget.communityName},
+                            ),
+                          ),
                         ),
-                      ),
+                      );
+                    } catch (e) {
+                      if (!mounted) return;
+                      setState(() => _handlingInviteAction = false);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed to accept invite.'.tr())),
+                      );
+                    }
+                  },
+                  style: TextButton.styleFrom(
+                    foregroundColor: colorScheme.primary,
+                    backgroundColor: colorScheme.primary.withValues(alpha: 0.10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                  );
-                } catch (e) {
-                  if (!mounted) return;
-                  setState(() => _handlingInviteAction = false);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to accept invite.'.tr())),
-                  );
-                }
-              },
-              child: Text('Accept'.tr()),
+                  ),
+                  child: Text(
+                    'Accept'.tr(),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                TextButton(
+                  onPressed: () async {
+                    setState(() => _handlingInviteAction = true);
+                    try {
+                      await databaseProvider.declineCommunityInvite(
+                        widget.communityId,
+                      );
+
+                      if (!mounted) return;
+
+                      setState(() => _handlingInviteAction = false);
+                      await _loadPendingInviteState();
+
+                      if (!mounted) return;
+
+                      setState(() => _hasPendingInvite = false);
+                      Navigator.pop(context);
+                    } catch (e) {
+                      if (!mounted) return;
+                      setState(() => _handlingInviteAction = false);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed to decline invite.'.tr())),
+                      );
+                    }
+                  },
+                  child: Text(
+                    'Decline'.tr(),
+                    style: TextStyle(
+                      color: Colors.red.shade600,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            TextButton(
-              onPressed: () async {
-                setState(() => _handlingInviteAction = true);
-                try {
-                  await databaseProvider.declineCommunityInvite(
-                    widget.communityId,
-                  );
+        ],
+      ),
+    );
+  }
 
-                  if (!mounted) return;
-
-                  // 1) stop spinner immediately
-                  setState(() => _handlingInviteAction = false);
-
-                  // 2) re-check pending invite (DB truth)
-                  await _loadPendingInviteState();
-
-                  if (!mounted) return;
-
-                  // 3) ensure banner hidden locally too
-                  setState(() => _hasPendingInvite = false);
-
-                  // 4) leave page
-                  Navigator.pop(context);
-                } catch (e) {
-                  if (!mounted) return;
-                  setState(() => _handlingInviteAction = false);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to decline invite.'.tr())),
-                  );
-                }
-              },
-              child: Text(
-                'Decline'.tr(),
-                style: const TextStyle(color: Colors.red),
+  Widget _buildJoinHintBanner(ColorScheme colorScheme) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.55),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withValues(alpha: 0.10),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.info_outline_rounded,
+              size: 20,
+              color: colorScheme.primary,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              "Join this community to share posts.".tr(),
+              style: TextStyle(
+                fontSize: 13,
+                color: colorScheme.onSurface.withValues(alpha: 0.78),
+                fontWeight: FontWeight.w600,
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPremiumHeader(ColorScheme colorScheme) {
+    final description = (widget.communityDescription ?? '').trim();
+    final memberCount = _members.length;
+
+    String membersSubtitle;
+    if (_isLoadingMembers) {
+      membersSubtitle = 'Loading members…'.tr();
+    } else if (_members.isEmpty) {
+      membersSubtitle = 'No members yet'.tr();
+    } else {
+      membersSubtitle = "member_count".plural(
+        memberCount,
+        namedArgs: {"count": memberCount.toString()},
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            colorScheme.surfaceContainerHigh,
+            colorScheme.surfaceContainer,
           ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.55),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildCommunityAvatar(colorScheme),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.communityName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: colorScheme.onSurface,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _buildMiniPill(
+                      context,
+                      icon: Icons.groups_2_rounded,
+                      label: membersSubtitle,
+                    ),
+                    if (_isOwner)
+                      _buildMiniPill(
+                        context,
+                        icon: Icons.workspace_premium_rounded,
+                        label: 'community_owner'.tr(),
+                      ),
+                    if (_isJoined && !_isOwner)
+                      _buildMiniPill(
+                        context,
+                        icon: Icons.check_circle_rounded,
+                        label: 'community_member'.tr(),
+                      ),
+                  ],
+                ),
+                if (description.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    description,
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.45,
+                      color: colorScheme.onSurface.withValues(alpha: 0.70),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniPill(
+      BuildContext context, {
+        required IconData icon,
+        required String label,
+      }) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: colorScheme.primary),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: colorScheme.primary,
+            ),
+          ),
         ],
       ),
     );
@@ -887,10 +1193,8 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-
     final listeningProvider = Provider.of<DatabaseProvider>(context);
 
-    // Only posts for this community
     final List<Post> communityPosts = listeningProvider.posts
         .where((p) => p.communityId == widget.communityId)
         .toList();
@@ -902,201 +1206,187 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
       ...communityPosts,
     ];
 
-    final String membersSubtitle;
-    if (_isLoadingMembers) {
-      membersSubtitle = 'Loading members…'.tr();
-    } else if (_members.isEmpty) {
-      membersSubtitle = 'No members yet'.tr();
-    } else {
-      membersSubtitle = "member_count".plural(
-        _members.length,
-        namedArgs: {"count": _members.length.toString()},
-      );
-    }
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: colorScheme.surface,
         elevation: 0,
         centerTitle: false,
-        title: Row(
-          children: [
-            _buildCommunityAvatar(colorScheme),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.communityName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 21,
-                      fontWeight: FontWeight.w600,
-                      color: colorScheme.primary.withValues(alpha: 0.7),
-                    ),
-                  ),
-                  if ((widget.communityDescription ?? '').trim().isNotEmpty)
-                    Text(
-                      widget.communityDescription!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: colorScheme.primary.withValues(alpha: 0.7),
-                      ),
-                    ),
-                  Text(
-                    membersSubtitle,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: colorScheme.primary.withValues(alpha: 0.7),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+        titleSpacing: 8,
+        title: Text(
+          'Community'.tr(),
+          style: TextStyle(
+            color: colorScheme.onSurface,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.2,
+          ),
         ),
         actions: [
-          PopupMenuButton<_CommunityMenuAction>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: (action) async {
-              switch (action) {
-                case _CommunityMenuAction.viewMembers:
-                  await _openMembersBottomSheet();
-                  break;
-                case _CommunityMenuAction.joinCommunity:
-                  await _joinCommunity();
-                  break;
-                case _CommunityMenuAction.inviteMembers:
-                  await _openInviteFriendsSheet();
-                  break;
-                case _CommunityMenuAction.changeCommunityPhoto:
-                  await _changeCommunityPhoto();
-                  break;
-                case _CommunityMenuAction.leaveCommunity:
-                  await _confirmLeaveCommunity();
-                  break;
-                case _CommunityMenuAction.deleteCommunity:
-                  await _confirmDeleteCommunity();
-                  break;
-              }
-            },
-            itemBuilder: (context) {
-              final items = <PopupMenuEntry<_CommunityMenuAction>>[];
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainer,
+              shape: BoxShape.circle,
+            ),
+            child: PopupMenuButton<_CommunityMenuAction>(
+              icon: Icon(Icons.more_horiz_rounded, color: colorScheme.onSurface),
+              surfaceTintColor: colorScheme.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              onSelected: (action) async {
+                switch (action) {
+                  case _CommunityMenuAction.viewMembers:
+                    await _openMembersBottomSheet();
+                    break;
+                  case _CommunityMenuAction.joinCommunity:
+                    await _joinCommunity();
+                    break;
+                  case _CommunityMenuAction.inviteMembers:
+                    await _openInviteFriendsSheet();
+                    break;
+                  case _CommunityMenuAction.changeCommunityPhoto:
+                    await _changeCommunityPhoto();
+                    break;
+                  case _CommunityMenuAction.leaveCommunity:
+                    await _confirmLeaveCommunity();
+                    break;
+                  case _CommunityMenuAction.deleteCommunity:
+                    await _confirmDeleteCommunity();
+                    break;
+                }
+              },
+              itemBuilder: (context) {
+                final items = <PopupMenuEntry<_CommunityMenuAction>>[];
 
-              // 1) View members (always)
-              items.add(
-                PopupMenuItem(
-                  value: _CommunityMenuAction.viewMembers,
-                  child: Row(
-                    children: [
-                      Icon(Icons.group_outlined, size: 20, color: colorScheme.primary),
-                      const SizedBox(width: 12),
-                      Text('View members'.tr()),
-                    ],
-                  ),
-                ),
-              );
-
-              // 2) Join (only if NOT joined)
-              if (!_isJoined) {
                 items.add(
                   PopupMenuItem(
-                    value: _CommunityMenuAction.joinCommunity,
-                    child: Row(
-                      children: [
-                        Icon(Icons.login, size: 20, color: colorScheme.primary),
-                        const SizedBox(width: 12),
-                        Text('Join community'.tr()),
-                      ],
-                    ),
-                  ),
-                );
-              }
-
-              // 3) Owner-only: Invite members
-              if (_isOwner) {
-                items.add(
-                  PopupMenuItem(
-                    value: _CommunityMenuAction.inviteMembers,
-                    child: Row(
-                      children: [
-                        Icon(Icons.person_add_alt_1, size: 20, color: colorScheme.primary),
-                        const SizedBox(width: 12),
-                        Text('community_invite_members'.tr()),
-                      ],
-                    ),
-                  ),
-                );
-
-                // 4) Owner-only: Change photo
-                items.add(
-                  PopupMenuItem(
-                    value: _CommunityMenuAction.changeCommunityPhoto,
+                    value: _CommunityMenuAction.viewMembers,
                     child: Row(
                       children: [
                         Icon(
-                          Icons.photo_camera_back_outlined,
+                          Icons.group_outlined,
                           size: 20,
                           color: colorScheme.primary,
                         ),
                         const SizedBox(width: 12),
-                        Text('Change community photo'.tr()),
+                        Text('View members'.tr()),
                       ],
                     ),
                   ),
                 );
-              }
 
-              // 5) Leave community (joined, ABOVE delete)
-              if (_isJoined) {
-                items.add(
-                  PopupMenuItem(
-                    value: _CommunityMenuAction.leaveCommunity,
-                    child: Row(
-                      children: [
-                        Icon(Icons.logout, size: 20, color: Colors.red.shade600),
-                        const SizedBox(width: 12),
-                        Text('Leave community'.tr()),
-                      ],
+                if (!_isJoined) {
+                  items.add(
+                    PopupMenuItem(
+                      value: _CommunityMenuAction.joinCommunity,
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.login_rounded,
+                            size: 20,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(width: 12),
+                          Text('Join community'.tr()),
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              }
+                  );
+                }
 
-              // 6) Delete community (owner-only, LAST)
-              if (_isOwner) {
-                items.add(
-                  PopupMenuItem(
-                    value: _CommunityMenuAction.deleteCommunity,
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete_outline,
-                            size: 20, color: Colors.red.shade600),
-                        const SizedBox(width: 12),
-                        Text(
-                          'delete_community'.tr(),
-                          style: const TextStyle(color: Colors.red),
-                        ),
-                      ],
+                if (_isOwner) {
+                  items.add(
+                    PopupMenuItem(
+                      value: _CommunityMenuAction.inviteMembers,
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.person_add_alt_1_rounded,
+                            size: 20,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(width: 12),
+                          Text('community_invite_members'.tr()),
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              }
+                  );
 
-              return items;
-            },
+                  items.add(
+                    PopupMenuItem(
+                      value: _CommunityMenuAction.changeCommunityPhoto,
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.photo_camera_back_outlined,
+                            size: 20,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(width: 12),
+                          Text('Change community photo'.tr()),
+                        ],
+                      ),
+                    ),
+                  );
+                }
 
+                if (_isJoined) {
+                  items.add(
+                    PopupMenuItem(
+                      value: _CommunityMenuAction.leaveCommunity,
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.logout_rounded,
+                            size: 20,
+                            color: Colors.red.shade600,
+                          ),
+                          const SizedBox(width: 12),
+                          Text('Leave community'.tr()),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                if (_isOwner) {
+                  items.add(
+                    PopupMenuItem(
+                      value: _CommunityMenuAction.deleteCommunity,
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.delete_outline_rounded,
+                            size: 20,
+                            color: Colors.red.shade600,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'delete_community'.tr(),
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                return items;
+              },
+            ),
           ),
         ],
       ),
       floatingActionButton: _isJoined
-          ? FloatingActionButton(
+          ? FloatingActionButton.extended(
         backgroundColor: colorScheme.primary,
-        child: const Icon(Icons.add),
+        foregroundColor: colorScheme.onPrimary,
+        elevation: 8,
+        icon: const Icon(Icons.add_rounded),
+        label: Text(
+          'Post'.tr(),
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
         onPressed: () {
           Navigator.push(
             context,
@@ -1112,34 +1402,11 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
           : null,
       body: Column(
         children: [
-          _buildInviteBanner(colorScheme), // ✅ banner FIRST
-
+          _buildPremiumHeader(colorScheme),
+          _buildInviteBanner(colorScheme),
           if (!_isJoined && !(_inviteChecked && _hasPendingInvite))
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              color: colorScheme.primary.withValues(alpha: 0.05),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 20,
-                    color: colorScheme.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      "Join this community to share posts.".tr(),
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
+            _buildJoinHintBanner(colorScheme),
+          const SizedBox(height: 10),
           Expanded(child: _buildPostList(postsToShow)),
         ],
       ),
@@ -1148,10 +1415,11 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
 
   Widget _buildPostList(List<Post> posts) {
     if (posts.isEmpty) {
-      return Center(child: Text("Nothing here yet…".tr()));
+      return _buildEmptyState();
     }
 
     return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 90),
       itemCount: posts.length,
       itemBuilder: (context, index) {
         final post = posts[index];
@@ -1171,22 +1439,110 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
     );
   }
 
+  Widget _buildEmptyState() {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 26),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainer,
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.55),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 68,
+                height: 68,
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.10),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.forum_outlined,
+                  size: 32,
+                  color: colorScheme.primary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                "Nothing here yet…".tr(),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _isJoined
+                    ? 'Be the first to share something with this community.'.tr()
+                    : 'Join this community to see and share posts.'.tr(),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.45,
+                  color: colorScheme.onSurface.withValues(alpha: 0.68),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildLoadingPostTile() {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
       padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.grey.shade900,
-        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(
+          colors: [
+            colorScheme.surfaceContainerHigh,
+            colorScheme.surfaceContainer,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.55),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          const CircularProgressIndicator(),
-          const SizedBox(width: 16),
+          SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.4,
+              color: colorScheme.primary,
+            ),
+          ),
+          const SizedBox(width: 14),
           Expanded(
             child: Text(
               "Posting your content…".tr(),
-              style: const TextStyle(fontSize: 14, color: Colors.white70),
+              style: TextStyle(
+                fontSize: 14,
+                color: colorScheme.onSurface.withValues(alpha: 0.82),
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],

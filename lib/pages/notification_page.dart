@@ -406,7 +406,8 @@ class _NotificationPageState extends State<NotificationPage> {
       final parts = rest.split('::');
 
       final communityName = (parts.length > 1 ? parts[1] : '').trim();
-      final inviterName = (parts.length > 2 ? parts[2] : '').trim();
+      final inviterId = (parts.length > 2 ? parts[2] : '').trim();
+      final inviterName = _nameFromIdOrFallback(inviterId, legacyName);
 
       if (inviterName.isNotEmpty && communityName.isNotEmpty) {
         return 'notif_community_invite_from'.tr(namedArgs: {
@@ -1179,22 +1180,23 @@ class _NotificationPageState extends State<NotificationPage> {
 
                 if (!mounted) return;
 
+                if (community == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('This community is no longer available.'.tr()),
+                    ),
+                  );
+                  return;
+                }
+
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => CommunityPostsPage(
                       communityId: communityInviteCommunityId!,
-                      communityName:
-                      (community?['name'] ??
-                          (communityInviteCommunityName
-                              ?.trim()
-                              .isNotEmpty ==
-                              true
-                              ? communityInviteCommunityName!.trim()
-                              : 'Community'.tr()))
-                          .toString(),
-                      communityDescription: community?['description']
-                          ?.toString(),
+                      communityName: (community['name'] ?? 'Community'.tr()).toString(),
+                      communityDescription: community['description']?.toString(),
+                      communityAvatarUrl: community['avatar_url']?.toString(),
                       openedFromInvite: true,
                     ),
                   ),

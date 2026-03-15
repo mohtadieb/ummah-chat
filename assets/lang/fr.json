@@ -558,6 +558,24 @@
   "onboarding_relationships_subtitle": "Restez connecté aux personnes autour de vous et grandissez grâce au soutien et au sentiment d'appartenance.",
   "onboarding_ummah_chat_subtitle": "Un espace pour échanger, partager et se sentir plus proche d'une communauté musulmane mondiale.",
 
+  "New community": "Nouvelle communauté",
+  "Create your community": "Créer votre communauté",
+  "Choose a name, add details, and invite people to join your community.": "Choisissez un nom, ajoutez des détails et invitez des personnes à rejoindre votre communauté.",
+  "Search members": "Rechercher des membres",
+  "Invite members": "Inviter des membres",
+  "Community": "Communauté",
+  "Be the first to share something with this community.": "Soyez le premier à partager quelque chose avec cette communauté.",
+  "Join this community to see and share posts.": "Rejoignez cette communauté pour voir et partager des publications.",
+  "This community is no longer available.": "Cette communauté n'est plus disponible.",
+
+  "Create a new password": "Créer un nouveau mot de passe",
+  "Choose a strong password and confirm it below to secure your account.": "Choisissez un mot de passe fort et confirmez-le ci-dessous pour sécuriser votre compte.",
+  "Make sure both password fields match before saving.": "Assurez-vous que les deux champs du mot de passe correspondent avant d'enregistrer."
+
+  "Discover people": "Découvrir des personnes",
+  "Search by name or username to find people across Ummah Chat.": "Recherchez par nom ou nom d'utilisateur pour trouver des personnes sur Ummah Chat.",
+  "You can search by full name or username.": "Vous pouvez rechercher par nom complet ou nom d'utilisateur.",
+  "Results": "Résultats",
   "No comments yet": "Aucun commentaire pour le moment",
   "prophets_stories_level": "Histoires des prophètes – niveau {level}",
   "stories_completed": "Histoires terminées : {done} / {total}",

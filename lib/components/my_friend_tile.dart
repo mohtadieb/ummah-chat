@@ -1,31 +1,18 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+
 import '../models/user_profile.dart';
-import 'my_card_tile.dart';
 import 'my_profile_avatar.dart';
 
 class MyFriendTile extends StatelessWidget {
   final UserProfile user;
   final String? customTitle;
-
-  /// 👉 Tap on the content area (everything except avatar)
   final VoidCallback onTap;
-
-  /// 👉 Tap on avatar only (optional)
   final VoidCallback? onAvatarTap;
-
-  /// Whether the friend is currently online
   final bool isOnline;
-
-  /// Number of unread messages from this friend
   final int unreadCount;
-
-  /// Optional: last message preview text
   final String? lastMessagePreview;
-
-  /// Optional: last message time label (e.g. "14:32", "Mon", "19/11")
   final String? lastMessageTimeLabel;
-
   final bool isMahram;
 
   const MyFriendTile({
@@ -52,163 +39,234 @@ class MyFriendTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return MyCardTile(
-      // ✅ Important: keep this null so only our inner InkWells handle taps
-      onTap: null,
-      child: Row(
-        children: [
-          // 👤 Avatar + online dot (tap -> profile)
-          InkWell(
-            onTap: onAvatarTap,
-            borderRadius: BorderRadius.circular(999),
-            splashColor: colorScheme.primary.withValues(alpha: 0.10),
-            highlightColor: colorScheme.primary.withValues(alpha: 0.05),
-            child: MyProfileAvatar(
-              imageUrl: user.profilePhotoUrl,
-              radius: 22,
-              isOnline: isOnline,
-              isMahram: isMahram,
-              fallbackChild: Text(
-                _getInitials(),
-                style: TextStyle(
-                  color: colorScheme.primary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-
-          const SizedBox(width: 12),
-
-          // ✅ Everything except avatar is tappable -> onTap (chat or profile depending on page)
-          Expanded(
-            child: InkWell(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(14),
-              splashColor: colorScheme.primary.withValues(alpha: 0.10),
-              highlightColor: colorScheme.primary.withValues(alpha: 0.05),
-              child: Padding(
-                // 👇 makes the tap target comfy without changing layout visually
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Row(
-                  children: [
-                    // 📝 Name + username + last message
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            customTitle ?? user.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: colorScheme.primary,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  '@${user.username}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: colorScheme.primary
-                                        .withValues(alpha: 0.7),
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                              if (isOnline) ...[
-                                const SizedBox(width: 6),
-                                Container(
-                                  width: 4,
-                                  height: 4,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFF12B981),
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Online'.tr(),
-                                  style: const TextStyle(
-                                    color: Color(0xFF12B981),
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-
-                          if (lastMessagePreview != null &&
-                              lastMessagePreview!.trim().isNotEmpty) ...[
-                            const SizedBox(height: 3),
-                            Text(
-                              lastMessagePreview!,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: colorScheme.primary
-                                    .withValues(alpha: 0.7),
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(width: 8),
-
-                    // 🕒 Time + unread badge (also part of "rest tap")
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        if (lastMessageTimeLabel != null)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 4.0),
-                            child: Text(
-                              lastMessageTimeLabel!,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: colorScheme.primary
-                                    .withValues(alpha: 0.6),
-                              ),
-                            ),
-                          ),
-                        if (unreadCount > 0)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.redAccent,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              unreadCount > 9 ? '9+' : '$unreadCount',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colorScheme.surfaceContainerHigh,
+            colorScheme.surfaceContainer,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.55),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: Row(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(left: 14),
+              child: InkWell(
+                onTap: onAvatarTap,
+                borderRadius: BorderRadius.circular(999),
+                splashColor: colorScheme.primary.withValues(alpha: 0.10),
+                highlightColor: colorScheme.primary.withValues(alpha: 0.05),
+                child: Padding(
+                  padding: const EdgeInsets.all(2),
+                  child: MyProfileAvatar(
+                    imageUrl: user.profilePhotoUrl,
+                    radius: 24,
+                    isOnline: isOnline,
+                    isMahram: isMahram,
+                    fallbackChild: Text(
+                      _getInitials(),
+                      style: TextStyle(
+                        color: colorScheme.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: InkWell(
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(20),
+                splashColor: colorScheme.primary.withValues(alpha: 0.10),
+                highlightColor: colorScheme.primary.withValues(alpha: 0.05),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 14, 14, 14),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    customTitle ?? user.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: colorScheme.onSurface,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 15,
+                                      letterSpacing: -0.1,
+                                    ),
+                                  ),
+                                ),
+                                if (isMahram) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.primary.withValues(
+                                        alpha: 0.10,
+                                      ),
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: Text(
+                                      'Mahram'.tr(),
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: colorScheme.primary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    '@${user.username}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: colorScheme.onSurface.withValues(
+                                        alpha: 0.62,
+                                      ),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                                if (isOnline) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF12B981),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    'Online'.tr(),
+                                    style: const TextStyle(
+                                      color: Color(0xFF12B981),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            if (lastMessagePreview != null &&
+                                lastMessagePreview!.trim().isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                lastMessagePreview!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: colorScheme.onSurface.withValues(
+                                    alpha: 0.72,
+                                  ),
+                                  fontSize: 12.5,
+                                  fontWeight: unreadCount > 0
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (lastMessageTimeLabel != null)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: Text(
+                                lastMessageTimeLabel!,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: colorScheme.onSurface.withValues(
+                                    alpha: 0.55,
+                                  ),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          if (unreadCount > 0)
+                            Container(
+                              constraints: const BoxConstraints(
+                                minWidth: 22,
+                                minHeight: 22,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primary,
+                                borderRadius: BorderRadius.circular(999),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: colorScheme.primary.withValues(
+                                      alpha: 0.25,
+                                    ),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                unreadCount > 9 ? '9+' : '$unreadCount',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: colorScheme.onPrimary,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -281,6 +281,27 @@
   "onboarding_relationships_subtitle": "ابقَ على تواصل مع من حولك وانمُ من خلال الدعم المتبادل وروح الانتماء.",
   "onboarding_ummah_chat_subtitle": "مساحة للتواصل والمشاركة والشعور بالقرب من مجتمع مسلم عالمي.",
 
+  "Join this community to see and share posts.": "انضم إلى هذا المجتمع لرؤية المنشورات ومشاركتها.",
+  "This community is no longer available.": "هذا المجتمع لم يعد متاحًا.",
+
+  "Discover people": "اكتشف الأشخاص",
+  "Search by name or username to find people across Ummah Chat.": "ابحث بالاسم أو باسم المستخدم للعثور على أشخاص على Ummah Chat.",
+  "You can search by full name or username.": "يمكنك البحث بالاسم الكامل أو باسم المستخدم.",
+  "Results": "النتائج",
+
+  "Create a new password": "أنشئ كلمة مرور جديدة",
+  "Choose a strong password and confirm it below to secure your account.": "اختر كلمة مرور قوية وقم بتأكيدها أدناه لتأمين حسابك.",
+  "Make sure both password fields match before saving.": "تأكد من تطابق حقلي كلمة المرور قبل الحفظ."
+
+
+  "New community": "مجتمع جديد",
+  "Create your community": "أنشئ مجتمعك",
+  "Choose a name, add details, and invite people to join your community.": "اختر اسمًا وأضف التفاصيل وادعُ الأشخاص للانضمام إلى مجتمعك.",
+  "Search members": "ابحث عن الأعضاء",
+  "Invite members": "دعوة الأعضاء",
+  "Community": "المجتمع",
+  "Be the first to share something with this community.": "كن أول من يشارك شيئًا مع هذا المجتمع.",
+
   "cannot_send_friend_request_visibility_nobody": "لا يمكنك إرسال طلبات صداقة عندما تكون خصوصية الملف الشخصي مضبوطة على «لا أحد». غيّر إعداد الخصوصية ثم حاول مرة أخرى.",
   "search_users": "البحث عن المستخدمين",
   "No friends to show yet.": "لا يوجد أصدقاء لعرضهم حتى الآن.",

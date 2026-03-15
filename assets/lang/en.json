@@ -600,6 +600,27 @@
   "onboarding_relationships_subtitle": "Stay connected with the people around you and grow through shared support and belonging.",
   "onboarding_ummah_chat_subtitle": "A place to message, share, and feel closer to a global Muslim community.",
 
+  "Community": "Community",
+  "Be the first to share something with this community.": "Be the first to share something with this community.",
+  "New community": "New community",
+  "Create your community": "Create your community",
+  "Choose a name, add details, and invite people to join your community.": "Choose a name, add details, and invite people to join your community.",
+  "Search members": "Search members",
+  "Invite members": "Invite members",
+
+  "Join this community to see and share posts.": "Join this community to see and share posts.",
+  "This community is no longer available.": "This community is no longer available.",
+
+  "Discover people": "Discover people",
+  "Search by name or username to find people across Ummah Chat.": "Search by name or username to find people across Ummah Chat.",
+  "You can search by full name or username.": "You can search by full name or username.",
+  "Results": "Results",
+
+  "Create a new password": "Create a new password",
+  "Choose a strong password and confirm it below to secure your account.": "Choose a strong password and confirm it below to secure your account.",
+  "Make sure both password fields match before saving.": "Make sure both password fields match before saving.",
+
+
   "No comments yet": "No comments yet",
   "prophets_stories_level": "Prophets Stories Level {level}",
   "stories_completed": "Stories completed: {done} / {total}",

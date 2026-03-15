@@ -1,23 +1,11 @@
 import 'package:flutter/material.dart';
-import 'my_card_tile.dart';
 
 class MyGroupTile extends StatelessWidget {
-  /// Display name of the group
   final String groupName;
-
-  /// Optional avatar URL for the group
   final String? avatarUrl;
-
-  /// Optional: last message preview text
   final String? lastMessagePreview;
-
-  /// Optional: last message time label (e.g. "14:32", "Mon", "19/11")
   final String? lastMessageTimeLabel;
-
-  /// Number of unread messages in this group
   final int unreadCount;
-
-  /// Tap handler to open the group chat
   final VoidCallback? onTap;
 
   const MyGroupTile({
@@ -34,86 +22,123 @@ class MyGroupTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return MyCardTile(
-      onTap: onTap,
-      child: Row(
-        children: [
-          // 👥 Group avatar
-          _buildGroupAvatar(colorScheme),
-
-          const SizedBox(width: 12),
-
-          // 📝 Group name + last message
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colorScheme.surfaceContainerHigh,
+            colorScheme.surfaceContainer,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.55),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(24),
+          splashColor: colorScheme.primary.withValues(alpha: 0.10),
+          highlightColor: colorScheme.primary.withValues(alpha: 0.05),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+            child: Row(
               children: [
-                Text(
-                  groupName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: colorScheme.primary,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
+                _buildGroupAvatar(colorScheme),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        groupName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colorScheme.onSurface,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                          letterSpacing: -0.1,
+                        ),
+                      ),
+                      if (lastMessagePreview != null &&
+                          lastMessagePreview!.trim().isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          lastMessagePreview!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: colorScheme.onSurface.withValues(alpha: 0.70),
+                            fontSize: 12.5,
+                            fontWeight: unreadCount > 0
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                if (lastMessagePreview != null &&
-                    lastMessagePreview!.trim().isNotEmpty) ...[
-                  const SizedBox(height: 3),
-                  Text(
-                    lastMessagePreview!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: colorScheme.primary.withValues(alpha: 0.7),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
+                const SizedBox(width: 10),
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (lastMessageTimeLabel != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6.0),
+                        child: Text(
+                          lastMessageTimeLabel!,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: colorScheme.onSurface.withValues(alpha: 0.55),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    if (unreadCount > 0)
+                      _UnreadBadge(
+                        count: unreadCount,
+                        colorScheme: colorScheme,
+                      ),
+                  ],
+                ),
               ],
             ),
           ),
-
-          const SizedBox(width: 8),
-
-          // 🕒 Time + unread badge
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (lastMessageTimeLabel != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4.0),
-                  child: Text(
-                    lastMessageTimeLabel!,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: colorScheme.primary.withValues(alpha: 0.7),
-                    ),
-                  ),
-                ),
-
-              if (unreadCount > 0)
-                _UnreadBadge(
-                  count: unreadCount,
-                  colorScheme: colorScheme,
-                ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  /// Simple avatar for group
   Widget _buildGroupAvatar(ColorScheme colorScheme) {
-    const radius = 22.0;
+    const radius = 24.0;
 
     if (avatarUrl != null && avatarUrl!.trim().isNotEmpty) {
-      return CircleAvatar(
-        radius: radius,
-        backgroundImage: NetworkImage(avatarUrl!),
+      return Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: colorScheme.primary.withValues(alpha: 0.14),
+          ),
+        ),
+        child: CircleAvatar(
+          radius: radius,
+          backgroundImage: NetworkImage(avatarUrl!),
+        ),
       );
     }
 
@@ -127,7 +152,7 @@ class MyGroupTile extends StatelessWidget {
         initial,
         style: TextStyle(
           color: colorScheme.primary,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
@@ -148,17 +173,26 @@ class _UnreadBadge extends StatelessWidget {
     final String label = count > 99 ? '99+' : count.toString();
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
       decoration: BoxDecoration(
         color: colorScheme.primary,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.primary.withValues(alpha: 0.25),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Text(
         label,
+        textAlign: TextAlign.center,
         style: TextStyle(
           color: colorScheme.onPrimary,
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );

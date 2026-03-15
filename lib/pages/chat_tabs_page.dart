@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'create_community_page.dart';
 import 'friends_page.dart';
 import 'groups_page.dart';
 import 'create_group_page.dart';
@@ -68,7 +69,15 @@ class _ChatTabsPageState extends State<ChatTabsPage>
       return;
     }
 
-    await _showAddCommunityDialog(context);
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const CreateCommunityPage(),
+      ),
+    );
+
+    if (!mounted) return;
+    Provider.of<DatabaseProvider>(context, listen: false).getAllCommunities();
   }
 
   @override
@@ -133,157 +142,6 @@ class _ChatTabsPageState extends State<ChatTabsPage>
           ),
         ),
       ),
-    );
-  }
-
-  Future<void> _showAddCommunityDialog(BuildContext context) async {
-    final db = Provider.of<DatabaseProvider>(context, listen: false);
-
-    final nameController = TextEditingController();
-    final descController = TextEditingController();
-    final countryController = TextEditingController();
-
-    final cs = Theme.of(context).colorScheme;
-    final theme = Theme.of(context);
-
-    return showDialog(
-      context: context,
-      builder: (dialogCtx) {
-        bool isPrivate = false;
-
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              backgroundColor: cs.surfaceContainerHigh,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-              titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-              contentPadding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
-              actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              title: Row(
-                children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: cs.primary.withValues(alpha: 0.10),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.groups_rounded,
-                      color: cs.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Create community'.tr(),
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: cs.onSurface,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _PremiumDialogField(
-                      controller: nameController,
-                      label: 'Name'.tr(),
-                    ),
-                    const SizedBox(height: 12),
-                    _PremiumDialogField(
-                      controller: descController,
-                      label: 'Description'.tr(),
-                      maxLines: 3,
-                    ),
-                    const SizedBox(height: 12),
-                    _PremiumDialogField(
-                      controller: countryController,
-                      label: 'Country'.tr(),
-                    ),
-                    const SizedBox(height: 14),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: cs.surfaceContainer,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: cs.outlineVariant.withValues(alpha: 0.45),
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          SwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(
-                              'Private community'.tr(),
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            value: isPrivate,
-                            onChanged: (v) => setState(() => isPrivate = v),
-                          ),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              'private_community_hint'.tr(),
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: cs.onSurface.withValues(alpha: 0.68),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogCtx),
-                  child: Text('Cancel'.tr()),
-                ),
-                FilledButton(
-                  onPressed: () async {
-                    final name = nameController.text.trim();
-                    final desc = descController.text.trim();
-                    final country = countryController.text.trim();
-
-                    if (name.isEmpty) {
-                      ScaffoldMessenger.of(dialogCtx).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Please enter a name for your community.'.tr(),
-                          ),
-                        ),
-                      );
-                      return;
-                    }
-
-                    await db.createCommunity(
-                      name,
-                      desc,
-                      country,
-                      isPrivate: isPrivate,
-                    );
-
-                    if (dialogCtx.mounted) {
-                      Navigator.pop(dialogCtx);
-                    }
-                  },
-                  child: Text('Create'.tr()),
-                ),
-              ],
-            );
-          },
-        );
-      },
     );
   }
 }

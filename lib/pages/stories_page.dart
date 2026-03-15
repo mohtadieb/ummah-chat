@@ -551,7 +551,7 @@ class _StoriesPageState extends State<StoriesPage> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cs.surfaceContainer,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isMuhammad
@@ -720,10 +720,12 @@ class _StoriesPageState extends State<StoriesPage> {
 
     if (attempted) {
       if (isCorrectOption) {
-        borderColor = Colors.green;
-        fillColor = Colors.green.withValues(alpha: 0.08);
+        borderColor = isMuhammad ? _gold : Colors.green;
+        fillColor = isMuhammad
+            ? _gold.withValues(alpha: 0.12)
+            : Colors.green.withValues(alpha: 0.08);
         icon = Icons.check_circle;
-        iconColor = Colors.green;
+        iconColor = isMuhammad ? _goldDeep : Colors.green;
         weight = FontWeight.w700;
       } else if (isUserWrong) {
         borderColor = Colors.red;

@@ -17,6 +17,9 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:app_links/app_links.dart';
 import 'pages/reset_password_page.dart';
 
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+
 // 🔔 Push notification utilities
 import 'services/notifications/push_notification_service.dart';
 
@@ -33,31 +36,29 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 Future<void> setupPushNotifications() async {
   final messaging = FirebaseMessaging.instance;
 
-  // Ask for permission (Android 13+ and iOS)
-  final settings = await messaging.requestPermission(
-    alert: true,
-    badge: true,
-    sound: true,
-  );
+  // iOS always needs permission.
+  // Android should not blindly call requestPermission here.
+  if (!kIsWeb && Platform.isIOS) {
+    final settings = await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
 
-  debugPrint(
-    '🔔 Notification permission status: ${settings.authorizationStatus}',
-  );
+    debugPrint(
+      '🔔 Notification permission status: ${settings.authorizationStatus}',
+    );
+  } else {
+    debugPrint('🔔 Skipping requestPermission on this platform');
+  }
 
-  // Optional: log token for debugging
   final token = await messaging.getToken();
   debugPrint('📲 FCM token (from setupPushNotifications): $token');
 
-  // ✅ Sync token once (will no-op if no user yet)
   await PushNotificationService.syncFcmTokenWithSupabase();
-
-  // ✅ Register listener so refreshed tokens are also saved
   PushNotificationService.registerTokenRefreshListener();
-
-  // ✅ IMPORTANT: enable deep-link handling for taps (terminated + background)
   await PushNotificationService.initPushTapHandlers();
 
-  // Foreground messages (only logs)
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
     debugPrint('📩 Foreground message: ${message.messageId}');
     debugPrint('Data: ${message.data}');
@@ -65,11 +66,6 @@ Future<void> setupPushNotifications() async {
       'Notification: ${message.notification?.title} | ${message.notification?.body}',
     );
   });
-
-  // ❌ REMOVE this, PushNotificationService handles tap routing
-  // FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-  //   debugPrint('📬 Notification opened app: ${message.data}');
-  // });
 }
 
 Future<void> main() async {
