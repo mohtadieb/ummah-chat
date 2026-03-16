@@ -11,6 +11,7 @@ Handles all authentication logic with Supabase:
 
 import 'dart:math';
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';                 // 👈 for kIsWeb
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -66,23 +67,27 @@ class AuthService {
 
 
   /// Register new user
-  Future<AuthResponse> registerEmailPassword(
-      String email, String password) async {
+  Future<AuthResponse> registerEmailPassword(String email, String password) async {
     try {
-      // 1️⃣ Sign up user
-      final authResponse = await _auth.signUp(
+      final response = await _auth.signUp(
         email: email,
         password: password,
+        emailRedirectTo: 'https://ummah-chat.com',
       );
 
-      if (authResponse.user == null) {
-        throw Exception("Registration failed.");
+      if (response.user == null) {
+        throw Exception("Registration failed.".tr());
       }
 
-      // Optionally sign in automatically if you want
-      // await _auth.signInWithPassword(email: email, password: password);
+      // If email already exists and is confirmed,
+      // Supabase may still return a user object.
+      // So check identities to detect existing account.
+      if (response.user!.identities != null &&
+          response.user!.identities!.isEmpty) {
+        throw Exception("An account with this email already exists.".tr());
+      }
 
-      return authResponse;
+      return response;
     } on AuthException catch (e) {
       throw Exception(e.message);
     }

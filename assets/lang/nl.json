@@ -596,7 +596,10 @@
   "Join this community to see and share posts.": "Word lid van deze community om berichten te bekijken en te delen.",
   "This community is no longer available.": "This community is no longer available.",
   "community_name_exists": "Er bestaat al een community met deze naam.",
-
+  "Reset link is missing its recovery token. Please use the password reset email link again.": "De resetlink mist de hersteltoken. Gebruik opnieuw de link uit de e-mail om je wachtwoord te resetten.",
+  "Your new password must be different from your old password.": "Je nieuwe wachtwoord moet anders zijn dan je oude wachtwoord.",
+  "Registration failed.": "Registratie mislukt.",
+  "An account with this email already exists.": "Er bestaat al een account met dit e-mailadres.",
   "Create a new password": "Maak een nieuw wachtwoord",
   "Choose a strong password and confirm it below to secure your account.": "Kies een sterk wachtwoord en bevestig het hieronder om je account te beveiligen.",
   "Make sure both password fields match before saving.": "Zorg ervoor dat beide wachtwoordvelden overeenkomen voordat je opslaat.",
@@ -612,6 +615,8 @@
     "one": "{count} bericht • tik om te bekijken",
     "other": "{count} berichten • tik om te bekijken"
   },
+  "Show password": "Wachtwoord tonen",
+  "Hide password": "Wachtwoord verbergen",
   "Linked to a post": "Gekoppeld aan een bericht",
   "Could not open post.": "Kon het bericht niet openen.",
   "Private reflections": "Privé reflecties",

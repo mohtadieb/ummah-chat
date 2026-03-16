@@ -568,11 +568,15 @@
   "Join this community to see and share posts.": "Rejoignez cette communauté pour voir et partager des publications.",
   "This community is no longer available.": "Cette communauté n'est plus disponible.",
   "community_name_exists": "Une communauté avec ce nom existe déjà.",
-
+  "Reset link is missing its recovery token. Please use the password reset email link again.": "Le lien de réinitialisation ne contient pas son jeton de récupération. Veuillez réutiliser le lien de réinitialisation du mot de passe dans l’e-mail.",
+  "Your new password must be different from your old password.": "Votre nouveau mot de passe doit être différent de votre ancien mot de passe.",
+  "Registration failed.": "Échec de l'inscription.",
+  "An account with this email already exists.": "Un compte avec cette adresse e-mail existe déjà.",
   "Create a new password": "Créer un nouveau mot de passe",
   "Choose a strong password and confirm it below to secure your account.": "Choisissez un mot de passe fort et confirmez-le ci-dessous pour sécuriser votre compte.",
-  "Make sure both password fields match before saving.": "Assurez-vous que les deux champs du mot de passe correspondent avant d'enregistrer."
-
+  "Make sure both password fields match before saving.": "Assurez-vous que les deux champs du mot de passe correspondent avant d'enregistrer.",
+  "Show password": "Afficher le mot de passe",
+  "Hide password": "Masquer le mot de passe",
   "Discover people": "Découvrir des personnes",
   "Search by name or username to find people across Ummah Chat.": "Recherchez par nom ou nom d'utilisateur pour trouver des personnes sur Ummah Chat.",
   "You can search by full name or username.": "Vous pouvez rechercher par nom complet ou nom d'utilisateur.",

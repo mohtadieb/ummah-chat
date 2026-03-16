@@ -28,6 +28,8 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController pwController = TextEditingController();
 
+  bool _obscurePassword = true;
+
   bool _isLoggingIn = false;
 
   Future<void> login() async {
@@ -98,7 +100,7 @@ class _LoginPageState extends State<LoginPage> {
     try {
       await Supabase.instance.client.auth.resetPasswordForEmail(
         trimmed,
-        redirectTo: 'ummahchat://reset-password',
+        redirectTo: 'https://ummah-chat.com',
       );
 
       if (!mounted) return;
@@ -297,7 +299,17 @@ class _LoginPageState extends State<LoginPage> {
                           MyTextField(
                             controller: pwController,
                             hintText: "Enter password".tr(),
-                            obscureText: true,
+                            obscureText: _obscurePassword,
+                            suffixIcon: IconButton(
+                              onPressed: () {
+                                setState(() => _obscurePassword = !_obscurePassword);
+                              },
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_off_rounded
+                                    : Icons.visibility_rounded,
+                              ),
+                            ),
                           ),
 
                           const SizedBox(height: 10),

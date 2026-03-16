@@ -3,7 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ResetPasswordPage extends StatefulWidget {
-  const ResetPasswordPage({super.key});
+  final String? recoveryTokenHash;
+  final VoidCallback? onPasswordUpdated;
+
+  const ResetPasswordPage({
+    super.key,
+    this.recoveryTokenHash,
+    this.onPasswordUpdated,
+  });
 
   @override
   State<ResetPasswordPage> createState() => _ResetPasswordPageState();
@@ -16,6 +23,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   bool _isSaving = false;
   bool _obscurePw1 = true;
   bool _obscurePw2 = true;
+  bool _hasVerifiedRecoveryToken = false;
 
   Future<void> _saveNewPassword() async {
     FocusScope.of(context).unfocus();
@@ -41,14 +49,31 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
     try {
       final supabase = Supabase.instance.client;
+      final tokenHash = widget.recoveryTokenHash?.trim();
+
+      if (supabase.auth.currentSession == null &&
+          !_hasVerifiedRecoveryToken &&
+          tokenHash != null &&
+          tokenHash.isNotEmpty) {
+        await supabase.auth.verifyOTP(
+          type: OtpType.recovery,
+          tokenHash: tokenHash,
+        );
+
+        _hasVerifiedRecoveryToken = true;
+      }
 
       if (supabase.auth.currentSession == null) {
-        throw Exception('Reset link expired. Please request a new one.'.tr());
+        throw Exception(
+          'Reset link expired. Please request a new one.'.tr(),
+        );
       }
 
       await supabase.auth.updateUser(
         UserAttributes(password: p1),
       );
+
+      widget.onPasswordUpdated?.call();
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -56,13 +81,37 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       );
 
       Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+    } on AuthException catch (e) {
+      if (!mounted) return;
+
+      String message = e.message;
+
+      if (e.message.toLowerCase().contains('same_password') ||
+          e.message.toLowerCase().contains('new password should be different from the old password')) {
+        message = 'Your new password must be different from your old password.'.tr();
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
     } catch (e) {
       if (!mounted) return;
+
+      final raw = e.toString().toLowerCase();
+      String message = e.toString();
+
+      if (raw.contains('same_password') ||
+          raw.contains('new password should be different from the old password')) {
+        message = 'Your new password must be different from your old password.'.tr();
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
+        SnackBar(content: Text(message)),
       );
     } finally {
-      if (mounted) setState(() => _isSaving = false);
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 

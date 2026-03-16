@@ -28,6 +28,9 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController pwController = TextEditingController();
   final TextEditingController confirmPwController = TextEditingController();
 
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+
   bool _isRegistering = false;
 
   Future<void> register() async {
@@ -84,7 +87,7 @@ class _RegisterPageState extends State<RegisterPage> {
         showAppErrorDialog(
           context,
           title: 'Registration Error'.tr(),
-          message: e.toString(),
+          message: e.toString().replaceFirst("Exception: ", "").tr(),
         );
       }
     } finally {
@@ -149,7 +152,8 @@ class _RegisterPageState extends State<RegisterPage> {
         PopupMenuItem(value: Locale('en'), child: Text('English')),
         PopupMenuItem(value: Locale('nl'), child: Text('Nederlands')),
         PopupMenuItem(value: Locale('ar'), child: Text('العربية')),
-        PopupMenuItem(value: Locale('fr'), child: Text('Français')), // ✅ add this
+        PopupMenuItem(value: Locale('fr'), child: Text('Français')),
+        // ✅ add this
       ],
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -218,7 +222,9 @@ class _RegisterPageState extends State<RegisterPage> {
                 ..onTap = () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()),
+                    MaterialPageRoute(
+                      builder: (_) => const PrivacyPolicyPage(),
+                    ),
                   );
                 },
             ),
@@ -287,7 +293,17 @@ class _RegisterPageState extends State<RegisterPage> {
                           MyTextField(
                             controller: pwController,
                             hintText: "Enter password".tr(),
-                            obscureText: true,
+                            obscureText: _obscurePassword,
+                            suffixIcon: IconButton(
+                              onPressed: () {
+                                setState(() => _obscurePassword = !_obscurePassword);
+                              },
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_off_rounded
+                                    : Icons.visibility_rounded,
+                              ),
+                            ),
                           ),
 
                           const SizedBox(height: 7),
@@ -295,7 +311,17 @@ class _RegisterPageState extends State<RegisterPage> {
                           MyTextField(
                             controller: confirmPwController,
                             hintText: "Confirm password".tr(),
-                            obscureText: true,
+                            obscureText: _obscureConfirmPassword,
+                            suffixIcon: IconButton(
+                              onPressed: () {
+                                setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
+                              },
+                              icon: Icon(
+                                _obscureConfirmPassword
+                                    ? Icons.visibility_off_rounded
+                                    : Icons.visibility_rounded,
+                              ),
+                            ),
                           ),
 
                           const SizedBox(height: 20),
@@ -303,10 +329,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           // ✅ NEW: legal links
                           _legalRow(colorScheme),
 
-                          MyButton(
-                            text: "Register".tr(),
-                            onTap: register,
-                          ),
+                          MyButton(text: "Register".tr(), onTap: register),
 
                           const SizedBox(height: 24),
 
@@ -319,12 +342,15 @@ class _RegisterPageState extends State<RegisterPage> {
                                 ),
                               ),
                               Padding(
-                                padding:
-                                const EdgeInsets.symmetric(horizontal: 8.0),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8.0,
+                                ),
                                 child: Text(
                                   "OR".tr(),
                                   style: TextStyle(
-                                    color: colorScheme.onSurface.withOpacity(0.7),
+                                    color: colorScheme.onSurface.withOpacity(
+                                      0.7,
+                                    ),
                                     fontSize: 12,
                                   ),
                                 ),
@@ -343,11 +369,13 @@ class _RegisterPageState extends State<RegisterPage> {
                           SizedBox(
                             width: double.infinity,
                             child: OutlinedButton(
-                              onPressed:
-                              _isRegistering ? null : registerWithGoogle,
+                              onPressed: _isRegistering
+                                  ? null
+                                  : registerWithGoogle,
                               style: OutlinedButton.styleFrom(
-                                padding:
-                                const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                                 side: BorderSide(
                                   color: colorScheme.primary.withOpacity(0.3),
                                 ),
@@ -378,9 +406,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             children: [
                               Text(
                                 "Already a member? ".tr(),
-                                style: TextStyle(
-                                  color: colorScheme.primary,
-                                ),
+                                style: TextStyle(color: colorScheme.primary),
                               ),
                               const SizedBox(width: 7),
                               GestureDetector(
@@ -415,8 +441,10 @@ class _RegisterPageState extends State<RegisterPage> {
                 color: colorScheme.surface.withValues(alpha: 0.95),
                 elevation: 8,
                 child: Padding(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 20,
+                  ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [

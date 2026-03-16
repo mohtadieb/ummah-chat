@@ -281,10 +281,15 @@
   "onboarding_relationships_subtitle": "ابقَ على تواصل مع من حولك وانمُ من خلال الدعم المتبادل وروح الانتماء.",
   "onboarding_ummah_chat_subtitle": "مساحة للتواصل والمشاركة والشعور بالقرب من مجتمع مسلم عالمي.",
 
+  "Show password": "إظهار كلمة المرور",
+  "Hide password": "إخفاء كلمة المرور",
   "Join this community to see and share posts.": "انضم إلى هذا المجتمع لرؤية المنشورات ومشاركتها.",
   "This community is no longer available.": "هذا المجتمع لم يعد متاحًا.",
   "community_name_exists": "يوجد مجتمع بهذا الاسم بالفعل.",
-
+  "Reset link is missing its recovery token. Please use the password reset email link again.": "رابط إعادة تعيين كلمة المرور لا يحتوي على رمز الاسترداد. يرجى استخدام رابط إعادة تعيين كلمة المرور من البريد الإلكتروني مرة أخرى.",
+  "Your new password must be different from your old password.": "يجب أن تكون كلمة المرور الجديدة مختلفة عن كلمة المرور القديمة.",
+  "Registration failed.": "فشل إنشاء الحساب.",
+  "An account with this email already exists.": "يوجد حساب بالفعل بهذا البريد الإلكتروني.",
   "Discover people": "اكتشف الأشخاص",
   "Search by name or username to find people across Ummah Chat.": "ابحث بالاسم أو باسم المستخدم للعثور على أشخاص على Ummah Chat.",
   "You can search by full name or username.": "يمكنك البحث بالاسم الكامل أو باسم المستخدم.",
