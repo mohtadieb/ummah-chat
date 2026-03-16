@@ -182,7 +182,7 @@ class _ProfilePageState extends State<ProfilePage> {
   bool get _isDark => Theme.of(context).brightness == Brightness.dark;
 
   Color get _pageBg =>
-      _isDark ? const Color(0xFF0B1511) : const Color(0xFFF6FAF7);
+      _cs.surface;
 
   Color get _cardBg =>
       _isDark ? const Color(0xFF13201A) : const Color(0xFFFFFFFF);

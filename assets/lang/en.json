@@ -619,6 +619,7 @@
   "Create a new password": "Create a new password",
   "Choose a strong password and confirm it below to secure your account.": "Choose a strong password and confirm it below to secure your account.",
   "Make sure both password fields match before saving.": "Make sure both password fields match before saving.",
+  "community_name_exists": "A community with this name already exists.",
 
 
   "No comments yet": "No comments yet",

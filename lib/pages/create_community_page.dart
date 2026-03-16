@@ -122,9 +122,11 @@ class _CreateCommunityPageState extends State<CreateCommunityPage> {
     } catch (e) {
       if (!mounted) return;
 
+      final message = e.toString().replaceFirst('Exception: ', '');
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${'Failed to create community'.tr()}: $e'),
+          content: Text(message.tr()),
         ),
       );
     } finally {

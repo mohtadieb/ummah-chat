@@ -15,7 +15,7 @@ ThemeData darkMode = ThemeData(
     onTertiary: const Color(0xFF1A140C),
     error: const Color(0xFFF2B8B5),
     onError: const Color(0xFF601410),
-    surface: const Color(0xFF0F1110),
+    surface: const Color(0xFF0B1511),
     onSurface: const Color(0xFFF2F1ED),
     surfaceContainerLowest: const Color(0xFF0B0D0C),
     surfaceContainer: const Color(0xFF161918),

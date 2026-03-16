@@ -1237,11 +1237,11 @@ class DatabaseProvider extends ChangeNotifier {
   }
 
   Future<void> createCommunity(
-    String name,
-    String desc,
-    String country, {
-    bool isPrivate = false,
-  }) async {
+      String name,
+      String desc,
+      String country, {
+        bool isPrivate = false,
+      }) async {
     final created = await _db.createCommunityInDatabase(
       name,
       desc,
@@ -1250,13 +1250,11 @@ class DatabaseProvider extends ChangeNotifier {
     );
 
     if (created != null) {
-      // Optimistic: show instantly as joined
       created['is_joined'] = true;
       _allCommunities.insert(0, created);
       notifyListeners();
     }
 
-    // Single refresh for server truth
     await getAllCommunities();
   }
 

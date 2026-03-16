@@ -3102,13 +3102,12 @@ class DatabaseService {
 
   // Create new community + auto-join creator
   Future<Map<String, dynamic>?> createCommunityInDatabase(
-    String name,
-    String desc,
-    String country, {
-    bool isPrivate = false,
-  }) async {
+      String name,
+      String desc,
+      String country, {
+        bool isPrivate = false,
+      }) async {
     try {
-      // ✅ Use RPC so private creation + auto-join is always allowed under RLS
       final created = await _db.rpc(
         'create_community',
         params: {
@@ -3121,8 +3120,16 @@ class DatabaseService {
 
       return Map<String, dynamic>.from(created as Map);
     } catch (e, st) {
+      final message = e.toString().toLowerCase();
+
+      if (message.contains('23505') ||
+          message.contains('duplicate key') ||
+          message.contains('communities_name_unique_ci')) {
+        throw Exception('community_name_exists');
+      }
+
       debugPrint("❌ Error creating community (RPC): $e\n$st");
-      return null;
+      rethrow;
     }
   }
 

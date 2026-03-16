@@ -15,7 +15,7 @@ ThemeData lightMode = ThemeData(
     onTertiary: const Color(0xFF2C2114),
     error: const Color(0xFFB3261E),
     onError: Colors.white,
-    surface: const Color(0xFFF7F5F1),
+    surface: const Color(0xFFF6FAF7),
     onSurface: const Color(0xFF1B1C18),
     surfaceContainerLowest: const Color(0xFFF3F0EA),
     surfaceContainer: Colors.white,

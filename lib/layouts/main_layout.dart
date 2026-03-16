@@ -54,8 +54,7 @@ class _MainLayoutState extends State<MainLayout> {
     final selectedIndex = bottomNav.currentIndex;
     final isDark = theme.brightness == Brightness.dark;
 
-    final scaffoldBg =
-    isDark ? const Color(0xFF0B1511) : const Color(0xFFF6FAF7);
+    final scaffoldBg = colorScheme.surface;
 
     final navBg = isDark
         ? const Color(0xFF12201A)
