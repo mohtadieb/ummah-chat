@@ -574,7 +574,9 @@
   "An account with this email already exists.": "Un compte avec cette adresse e-mail existe déjà.",
   "Create a new password": "Créer un nouveau mot de passe",
   "Choose a strong password and confirm it below to secure your account.": "Choisissez un mot de passe fort et confirmez-le ci-dessous pour sécuriser votre compte.",
+  "Email confirmed. You can now log in.": "Email confirmé. Vous pouvez maintenant vous connecter.",
   "Make sure both password fields match before saving.": "Assurez-vous que les deux champs du mot de passe correspondent avant d'enregistrer.",
+
   "Show password": "Afficher le mot de passe",
   "Hide password": "Masquer le mot de passe",
   "Discover people": "Découvrir des personnes",
@@ -3238,7 +3240,7 @@
 
   "terms": {
     "title": "Conditions d’utilisation",
-    "effective_date": "Date d’entrée en vigueur : [à remplir]",
+    "effective_date": "Date d’entrée en vigueur : 03/2026",
     "intro": "Bienvenue sur Ummah Chat. En utilisant l’application, vous acceptez ces conditions d’utilisation.",
 
     "section_1": {
@@ -3285,17 +3287,17 @@
     },
     "section_10": {
       "title": "10. Droit applicable",
-      "body": "[ex. Pays-Bas]"
+      "body": "Pays-Bas"
     },
     "section_11": {
       "title": "11. Contact",
-      "body": "[à renseigner : e-mail de support]"
+      "body": "support@ummah-chat.com"
     }
   },
 
   "privacy": {
     "title": "Politique de confidentialité",
-    "effective_date": "Date d’entrée en vigueur : [à remplir]",
+    "effective_date": "Date d’entrée en vigueur : 03/2026",
     "intro": "Ummah Chat accorde une grande importance à votre vie privée. Cette politique explique comment nous traitons vos données.",
 
     "section_1": {
@@ -3363,7 +3365,7 @@
     },
     "section_10": {
       "title": "10. Contact",
-      "body": "[à renseigner : e-mail de support]"
+      "body": "support@ummah-chat.com"
     }
   }
 }

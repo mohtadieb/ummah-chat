@@ -130,8 +130,8 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
                     width: isActive ? 16 : 6,
                     decoration: BoxDecoration(
                       color: isActive
-                          ? Colors.black.withOpacity(0.8)
-                          : Colors.black.withOpacity(0.3),
+                          ? Colors.black.withValues(alpha: 0.8)
+                          : Colors.black.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(8),
                     ),
                   );

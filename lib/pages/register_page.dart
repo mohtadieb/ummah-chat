@@ -161,7 +161,7 @@ class _RegisterPageState extends State<RegisterPage> {
           Icon(
             Icons.language,
             size: 18,
-            color: colorScheme.primary.withOpacity(0.8),
+            color: colorScheme.primary.withValues(alpha: 0.8),
           ),
           const SizedBox(width: 6),
           Text(
@@ -176,7 +176,7 @@ class _RegisterPageState extends State<RegisterPage> {
           Icon(
             Icons.keyboard_arrow_down_rounded,
             size: 18,
-            color: colorScheme.primary.withOpacity(0.7),
+            color: colorScheme.primary.withValues(alpha: 0.7),
           ),
         ],
       ),
@@ -191,7 +191,7 @@ class _RegisterPageState extends State<RegisterPage> {
         textAlign: TextAlign.center,
         text: TextSpan(
           style: TextStyle(
-            color: colorScheme.onSurface.withOpacity(0.65),
+            color: colorScheme.onSurface.withValues(alpha: 0.65),
             fontSize: 12,
             height: 1.3,
           ),
@@ -302,6 +302,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                 _obscurePassword
                                     ? Icons.visibility_off_rounded
                                     : Icons.visibility_rounded,
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.75),
                               ),
                             ),
                           ),
@@ -320,6 +321,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                 _obscureConfirmPassword
                                     ? Icons.visibility_off_rounded
                                     : Icons.visibility_rounded,
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.75),
                               ),
                             ),
                           ),
@@ -348,9 +350,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                 child: Text(
                                   "OR".tr(),
                                   style: TextStyle(
-                                    color: colorScheme.onSurface.withOpacity(
-                                      0.7,
-                                    ),
+                                    color: colorScheme.onSurface.withValues(alpha: 0.7),
                                     fontSize: 12,
                                   ),
                                 ),
@@ -377,7 +377,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                   vertical: 12,
                                 ),
                                 side: BorderSide(
-                                  color: colorScheme.primary.withOpacity(0.3),
+                                  color: colorScheme.primary.withValues(alpha: 0.3),
                                 ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),

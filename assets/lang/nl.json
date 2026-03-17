@@ -334,6 +334,7 @@
   "Confirm new password": "Bevestig nieuw wachtwoord",
   "Save password": "Wachtwoord opslaan",
 
+  "Email confirmed. You can now log in.": "E-mail bevestigd. Je kunt nu inloggen.",
 
 
 
@@ -3289,7 +3290,7 @@
   },
   "terms": {
     "title": "Gebruiksvoorwaarden",
-    "effective_date": "Ingangsdatum: [datum invullen]",
+    "effective_date": "Ingangsdatum: 03/2026",
     "intro": "Welkom bij Ummah Chat. Door de app te gebruiken, ga je akkoord met deze gebruiksvoorwaarden.",
 
     "section_1": {
@@ -3336,17 +3337,17 @@
     },
     "section_10": {
       "title": "10. Toepasselijk recht",
-      "body": "[bijv. Nederland]"
+      "body": "Nederland"
     },
     "section_11": {
       "title": "11. Contact",
-      "body": "[support e-mailadres invullen]"
+      "body": "support@ummah-chat.com"
     }
   },
 
   "privacy": {
     "title": "Privacybeleid",
-    "effective_date": "Ingangsdatum: [datum invullen]",
+    "effective_date": "Ingangsdatum: 03/2026",
     "intro": "Ummah Chat hecht veel waarde aan je privacy. Dit beleid legt uit hoe wij omgaan met je gegevens.",
 
     "section_1": {
@@ -3414,7 +3415,7 @@
     },
     "section_10": {
       "title": "10. Contact",
-      "body": "[support e-mailadres invullen]"
+      "body": "support@ummah-chat.com"
     }
   }
 

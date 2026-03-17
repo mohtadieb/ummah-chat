@@ -297,8 +297,9 @@
 
   "Create a new password": "أنشئ كلمة مرور جديدة",
   "Choose a strong password and confirm it below to secure your account.": "اختر كلمة مرور قوية وقم بتأكيدها أدناه لتأمين حسابك.",
-  "Make sure both password fields match before saving.": "تأكد من تطابق حقلي كلمة المرور قبل الحفظ."
+  "Email confirmed. You can now log in.": "تم تأكيد البريد الإلكتروني. يمكنك الآن تسجيل الدخول.",
 
+  "Make sure both password fields match before saving.": "تأكد من تطابق حقلي كلمة المرور قبل الحفظ.",
 
   "New community": "مجتمع جديد",
   "Create your community": "أنشئ مجتمعك",
@@ -3339,7 +3340,7 @@
   },
   "terms": {
     "title": "شروط الاستخدام",
-    "effective_date": "تاريخ السريان: [أدخل التاريخ]",
+    "effective_date": "تاريخ السريان: 03/2026",
     "intro": "مرحبًا بك في تطبيق أمة شات. باستخدامك للتطبيق، فإنك توافق على شروط الاستخدام هذه.",
 
     "section_1": {
@@ -3386,17 +3387,17 @@
     },
     "section_10": {
       "title": "10. القانون المعمول به",
-      "body": "[الدولة، مثل هولندا]"
+      "body": "هولندا"
     },
     "section_11": {
       "title": "11. التواصل",
-      "body": "[أدخل بريد الدعم]"
+      "body": "support@ummah-chat.com"
     }
   },
 
   "privacy": {
     "title": "سياسة الخصوصية",
-    "effective_date": "تاريخ السريان: [أدخل التاريخ]",
+    "effective_date": "تاريخ السريان: 03/2026",
     "intro": "نحن نحترم خصوصيتك. توضح هذه السياسة كيفية جمع واستخدام وحماية بياناتك.",
 
     "section_1": {
@@ -3464,7 +3465,7 @@
     },
     "section_10": {
       "title": "10. التواصل",
-      "body": "[أدخل بريد الدعم]"
+      "body": "support@ummah-chat.com"
     }
   },
 

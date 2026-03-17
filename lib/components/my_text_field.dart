@@ -36,7 +36,7 @@ class MyTextField extends StatelessWidget {
         hintText: hintText,
 
         hintStyle: TextStyle(
-          color: colorScheme.onSurface.withOpacity(0.55),
+          color: colorScheme.onSurface.withValues(alpha: 0.55),
         ),
 
         suffixIcon: suffixIcon,
@@ -44,7 +44,7 @@ class MyTextField extends StatelessWidget {
         filled: true,
 
         // ✅ Green-tinted fill instead of pink surface color
-        fillColor: colorScheme.primary.withOpacity(0.06),
+        fillColor: colorScheme.primary.withValues(alpha: 0.06),
 
         // Border when not focused
         enabledBorder: OutlineInputBorder(

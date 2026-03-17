@@ -622,6 +622,7 @@
   "community_name_exists": "A community with this name already exists.",
   "Reset link is missing its recovery token. Please use the password reset email link again.": "Reset link is missing its recovery token. Please use the password reset email link again.",
   "Your new password must be different from your old password.": "Your new password must be different from your old password.",
+  "Email confirmed. You can now log in.": "Email confirmed. You can now log in.",
 
   "Show password": "Show password",
   "Hide password": "Hide password",
@@ -3225,7 +3226,7 @@
   },
   "terms": {
     "title": "Terms of Use",
-    "effective_date": "Effective date: [insert date]",
+    "effective_date": "Effective date: 03/2026",
     "intro": "Welcome to Ummah Chat. By using the App, you agree to these Terms of Use.",
     "section_1": {
       "title": "1. Eligibility",
@@ -3271,16 +3272,16 @@
     },
     "section_10": {
       "title": "10. Governing Law",
-      "body": "[insert country, e.g. Netherlands]"
+      "body": "The Netherlands"
     },
     "section_11": {
       "title": "11. Contact",
-      "body": "[insert support email]"
+      "body": "support@ummah-chat.com"
     }
   },
   "privacy": {
     "title": "Privacy Policy",
-    "effective_date": "Effective date: [insert date]",
+    "effective_date": "Effective date: 03/2026",
     "intro": "Ummah Chat (“we”, “our”, “us”) values your privacy. This policy explains how we collect, use, store, and protect your personal information.",
     "section_1": {
       "title": "1. Information We Collect",
@@ -3347,7 +3348,7 @@
     },
     "section_10": {
       "title": "10. Contact",
-      "body": "[insert support email]"
+      "body": "support@ummah-chat.com"
     }
   },
   "legal": {

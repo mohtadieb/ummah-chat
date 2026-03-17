@@ -18,7 +18,7 @@ class PrivacyPolicyPage extends StatelessWidget {
           child: SelectableText(
             _privacyText(),
             style: TextStyle(
-              color: colorScheme.onSurface.withOpacity(0.9),
+              color: colorScheme.onSurface.withValues(alpha: 0.9),
               height: 1.4,
               fontSize: 14,
             ),
