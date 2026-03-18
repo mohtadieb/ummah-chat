@@ -1207,24 +1207,16 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
     ];
 
     return Scaffold(
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: colorScheme.surface,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
-        centerTitle: false,
-        titleSpacing: 8,
-        title: Text(
-          'Community'.tr(),
-          style: TextStyle(
-            color: colorScheme.onSurface,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.2,
-          ),
-        ),
         actions: [
           Container(
             margin: const EdgeInsets.only(right: 8),
             decoration: BoxDecoration(
-              color: colorScheme.surfaceContainer,
+              color: colorScheme.surfaceContainerHigh,
               shape: BoxShape.circle,
             ),
             child: PopupMenuButton<_CommunityMenuAction>(
@@ -1400,15 +1392,31 @@ class _CommunityPostsPageState extends State<CommunityPostsPage> {
         },
       )
           : null,
-      body: Column(
-        children: [
-          _buildPremiumHeader(colorScheme),
-          _buildInviteBanner(colorScheme),
-          if (!_isJoined && !(_inviteChecked && _hasPendingInvite))
-            _buildJoinHintBanner(colorScheme),
-          const SizedBox(height: 10),
-          Expanded(child: _buildPostList(postsToShow)),
-        ],
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              colorScheme.surface,
+              colorScheme.surface,
+              colorScheme.surfaceContainerLowest,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              _buildPremiumHeader(colorScheme),
+              _buildInviteBanner(colorScheme),
+              if (!_isJoined && !(_inviteChecked && _hasPendingInvite))
+                _buildJoinHintBanner(colorScheme),
+              const SizedBox(height: 10),
+              Expanded(child: _buildPostList(postsToShow)),
+            ],
+          ),
+        ),
       ),
     );
   }

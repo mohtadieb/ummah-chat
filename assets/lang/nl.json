@@ -335,11 +335,29 @@
   "Save password": "Wachtwoord opslaan",
 
   "Email confirmed. You can now log in.": "E-mail bevestigd. Je kunt nu inloggen.",
-
-
-
-
-
+  "Manage your\nUmmah Chat": "Beheer je\nUmmah Chat",
+  "Customize your app, privacy, language, and account preferences in one place.": "Pas je app, privacy, taal en accountvoorkeuren op één plek aan.",
+  "Switch between light and dark appearance.": "Schakel tussen lichte en donkere weergave.",
+  "Manage the people you have blocked.": "Beheer de mensen die je hebt geblokkeerd.",
+  "Manage your personal account details.": "Beheer je persoonlijke accountgegevens.",
+  "Support the continued growth of Ummah Chat.": "Steun de verdere groei van Ummah Chat.",
+  "Share ideas, suggestions, or report issues.": "Deel ideeën, suggesties of meld problemen.",
+  "Sign out from this device.": "Log uit op dit apparaat.",
+  "Start your conversation": "Begin je gesprek",
+  "Send your first message to {name}.": "Stuur je eerste bericht naar {name}.",
+  "Your messages will appear here.": "Je berichten verschijnen hier.",
+  "Start the conversation": "Begin het gesprek",
+  "Send the first message to this group.": "Stuur het eerste bericht naar deze groep.",
+  "Messages will appear here once the chat begins.": "Berichten verschijnen hier zodra de chat begint.",
+  "Manage the people you’ve blocked from interacting with you.": "Beheer de mensen die je hebt geblokkeerd zodat ze geen interactie met je kunnen hebben.",
+  "You haven’t blocked anyone right now.": "Je hebt momenteel niemand geblokkeerd.",
+  "Manage important actions related to your account and security.": "Beheer belangrijke acties met betrekking tot je account en beveiliging.",
+  "Deleting your account will permanently remove your data and cannot be undone.": "Het verwijderen van je account zal je gegevens permanent wissen en kan niet ongedaan worden gemaakt.",
+  "Share ideas, suggestions, or report issues to help improve Ummah Chat.": "Deel ideeën, suggesties of meld problemen om Ummah Chat te helpen verbeteren.",
+  "Community post": "Communitybericht",
+  "Share something with this community using text, photos, or video.": "Deel iets met deze community met tekst, foto's of video.",
+  "Share something with your followers using text, photos, or video.": "Deel iets met je volgers met tekst, foto's of video.",
+  "Discover": "Ontdekken",
 
   "1 reaction": "1 reactie",
   "reactions": "reacties",

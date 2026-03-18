@@ -539,7 +539,9 @@ class _MyPostTileState extends State<MyPostTile>
     if (media.type == 'image') {
       final ratio = _imageAspectRatios[media.url];
       if (ratio == null) return fallback;
-      return ratio.clamp(0.8, 1.25);
+
+      // allow taller portrait images to expand vertically
+      return ratio.clamp(0.45, 1.4);
     }
 
     return fallback;

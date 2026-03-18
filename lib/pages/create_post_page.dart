@@ -10,6 +10,8 @@ import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 import 'package:image_cropper/image_cropper.dart';
 
+import '../models/user_profile.dart';
+import '../services/auth/auth_service.dart';
 import '../services/database/database_provider.dart';
 
 class CreatePostPage extends StatefulWidget {
@@ -28,22 +30,16 @@ class CreatePostPage extends StatefulWidget {
 
 class _CreatePostPageState extends State<CreatePostPage> {
   final TextEditingController _captionController = TextEditingController();
+  final AuthService _authService = AuthService();
 
   late final DatabaseProvider databaseProvider =
   Provider.of<DatabaseProvider>(context, listen: false);
 
   List<AssetEntity> _selectedAssets = [];
-  // if user crops an image, we store the cropped file here at the same index
   List<File?> _editedFiles = [];
 
   bool _isUploading = false;
-  int _currentIndex = 0; // which media is shown big
-
-  @override
-  void initState() {
-    super.initState();
-    // ⛔️ No auto-gallery open anymore – user can post text-only or add media manually.
-  }
+  int _currentIndex = 0;
 
   @override
   void dispose() {
@@ -51,9 +47,6 @@ class _CreatePostPageState extends State<CreatePostPage> {
     super.dispose();
   }
 
-  // ------------------------------------------------------------
-  // GALLERY PICKER
-  // ------------------------------------------------------------
   Future<void> _openGallery() async {
     try {
       final perm = await PhotoManager.requestPermissionExtend();
@@ -69,8 +62,6 @@ class _CreatePostPageState extends State<CreatePostPage> {
             ),
           ),
         );
-
-        // ❌ Do NOT pop the page anymore – user can still make text-only posts.
         return;
       }
 
@@ -78,21 +69,13 @@ class _CreatePostPageState extends State<CreatePostPage> {
         context,
         pickerConfig: AssetPickerConfig(
           maxAssets: 10,
-          requestType: RequestType.common, // images + videos
-
-          // ✅ Best fix:
-          // Always use app-driven translations (EasyLocalization)
-          // so ANY language you add later will be consistent and never fallback to Chinese.
+          requestType: RequestType.common,
           textDelegate: const _AppAssetPickerTextDelegate(),
         ),
       );
 
       if (!mounted) return;
-
-      if (result == null || result.isEmpty) {
-        // User cancelled – just stay on the page, keep any previous selection.
-        return;
-      }
+      if (result == null || result.isEmpty) return;
 
       setState(() {
         _selectedAssets = result;
@@ -109,14 +92,9 @@ class _CreatePostPageState extends State<CreatePostPage> {
           content: Text('Could not open gallery. Check app permissions.'.tr()),
         ),
       );
-
-      // Do NOT pop; user can still do text-only posts.
     }
   }
 
-  // ------------------------------------------------------------
-  // CROPPING
-  // ------------------------------------------------------------
   Future<File?> _cropImage(File imageFile) async {
     final color = Theme.of(context).colorScheme;
 
@@ -171,13 +149,9 @@ class _CreatePostPageState extends State<CreatePostPage> {
     });
   }
 
-  // ------------------------------------------------------------
-  // SHARE: TRUE MULTI-MEDIA UPLOAD + TEXT-ONLY SUPPORT
-  // ------------------------------------------------------------
   Future<void> _sharePost() async {
     final caption = _captionController.text.trim();
 
-    // require at least a small caption
     if (caption.replaceAll(RegExp(r'\s+'), '').length < 5) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Caption must have at least 5 characters.'.tr())),
@@ -200,10 +174,8 @@ class _CreatePostPageState extends State<CreatePostPage> {
             videoFiles.add(file);
           }
         } else {
-          // use cropped version if available, otherwise original gallery file
-          File? file = _editedFiles.length == _selectedAssets.length
-              ? _editedFiles[i]
-              : null;
+          File? file =
+          _editedFiles.length == _selectedAssets.length ? _editedFiles[i] : null;
 
           file ??= await asset.file;
           if (file != null) {
@@ -212,14 +184,10 @@ class _CreatePostPageState extends State<CreatePostPage> {
         }
       }
 
-      // 🔸 Only throw if user DID select something, but we somehow could not resolve any files.
       if (_selectedAssets.isNotEmpty && imageFiles.isEmpty && videoFiles.isEmpty) {
         throw Exception('No media files resolved from gallery selection.'.tr());
       }
 
-      // ✅ This now supports:
-      //  - text + media
-      //  - text-only (imageFiles + videoFiles both empty)
       await databaseProvider.postMultiMediaMessage(
         caption,
         imageFiles: imageFiles,
@@ -248,35 +216,83 @@ class _CreatePostPageState extends State<CreatePostPage> {
     }
   }
 
-  // ------------------------------------------------------------
-  // UI
-  // ------------------------------------------------------------
+  Widget _buildCurrentUserAvatar(ColorScheme color) {
+    final currentUserId = _authService.getCurrentUserId();
+
+    if (currentUserId.isEmpty) {
+      return CircleAvatar(
+        radius: 18,
+        backgroundColor: color.primary.withValues(alpha: 0.15),
+        child: Icon(
+          Icons.person_rounded,
+          color: color.primary,
+        ),
+      );
+    }
+
+    return FutureBuilder<UserProfile?>(
+      future: databaseProvider.getUserProfile(currentUserId),
+      builder: (context, snapshot) {
+        final user = snapshot.data;
+        final photoUrl = user?.profilePhotoUrl.trim() ?? '';
+        final name = user?.name.trim() ?? '';
+
+        String initials = '?';
+        if (name.isNotEmpty) {
+          final parts = name.split(' ').where((e) => e.isNotEmpty).toList();
+          if (parts.length == 1) {
+            initials = parts.first[0].toUpperCase();
+          } else if (parts.length >= 2) {
+            initials = (parts[0][0] + parts[1][0]).toUpperCase();
+          }
+        }
+
+        return CircleAvatar(
+          radius: 18,
+          backgroundColor: color.primary.withValues(alpha: 0.15),
+          backgroundImage: photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
+          child: photoUrl.isEmpty
+              ? Text(
+            initials,
+            style: TextStyle(
+              color: color.primary,
+              fontWeight: FontWeight.w700,
+            ),
+          )
+              : null,
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final color = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    final mediaCardColor = isDark
+        ? color.surfaceContainerHighest.withValues(alpha: 0.6)
+        : color.surfaceContainerHigh;
+
+    final softBorderColor = isDark
+        ? color.outline.withValues(alpha: 0.4)
+        : color.outlineVariant.withValues(alpha: 0.7);
+
     final isGalleryEmpty = _selectedAssets.isEmpty;
 
     return Scaffold(
       backgroundColor: color.surface,
-      // default resizeToAvoidBottomInset = true, good for keyboard
       appBar: AppBar(
         backgroundColor: color.surface,
         elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: const Icon(Icons.close_rounded),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          widget.communityName != null
-              ? 'new_post_in'.tr(namedArgs: {'name': widget.communityName!})
-              : 'New post'.tr(),
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
         actions: [
           TextButton(
-            // Only disabled while uploading; logic/validation is in _sharePost
             onPressed: _isUploading ? null : _sharePost,
             child: _isUploading
                 ? const SizedBox(
@@ -303,11 +319,116 @@ class _CreatePostPageState extends State<CreatePostPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // --- BIG PREVIEW AREA OR "ADD MEDIA" CTA ---
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+                      child: Container(
+                        padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(28),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              color.primary.withValues(alpha: 0.14),
+                              color.secondary.withValues(alpha: 0.55),
+                              color.surfaceContainerHigh,
+                            ],
+                          ),
+                          border: Border.all(
+                            color: color.outlineVariant.withValues(alpha: 0.45),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.06),
+                              blurRadius: 24,
+                              offset: const Offset(0, 12),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 52,
+                              height: 52,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: color.primary.withValues(alpha: 0.14),
+                              ),
+                              child: Icon(
+                                widget.communityName != null
+                                    ? Icons.groups_2_rounded
+                                    : Icons.edit_rounded,
+                                color: color.primary,
+                                size: 26,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    widget.communityName != null
+                                        ? 'Community post'.tr()
+                                        : 'Create'.tr(),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelLarge
+                                        ?.copyWith(
+                                      color: color.onSurface
+                                          .withValues(alpha: 0.65),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    widget.communityName != null
+                                        ? 'new_post_in'.tr(
+                                      namedArgs: {
+                                        'name': widget.communityName!,
+                                      },
+                                    )
+                                        : 'New post'.tr(),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .headlineSmall
+                                        ?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: -0.3,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    widget.communityName != null
+                                        ? 'Share something with this community using text, photos, or video.'
+                                        .tr()
+                                        : 'Share something with your followers using text, photos, or video.'
+                                        .tr(),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                      color: color.onSurface
+                                          .withValues(alpha: 0.72),
+                                      height: 1.25,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
                     if (!isGalleryEmpty)
                       Padding(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
                         child: AspectRatio(
                           aspectRatio: 1,
                           child: ClipRRect(
@@ -316,8 +437,6 @@ class _CreatePostPageState extends State<CreatePostPage> {
                               fit: StackFit.expand,
                               children: [
                                 _buildMainPreview(color, isDark),
-
-                                // Dark gradient overlay (bottom)
                                 Align(
                                   alignment: Alignment.bottomCenter,
                                   child: Container(
@@ -328,25 +447,26 @@ class _CreatePostPageState extends State<CreatePostPage> {
                                         end: Alignment.topCenter,
                                         colors: [
                                           Colors.black.withValues(
-                                              alpha: isDark ? 0.55 : 0.35),
+                                            alpha: isDark ? 0.55 : 0.35,
+                                          ),
                                           Colors.transparent,
                                         ],
                                       ),
                                     ),
                                   ),
                                 ),
-
-                                // Index chip (e.g., 1 / 3)
                                 if (_selectedAssets.length > 1)
                                   Positioned(
                                     top: 8,
                                     right: 8,
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 4),
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: Colors.black
-                                            .withValues(alpha: 0.55),
+                                        color:
+                                        Colors.black.withValues(alpha: 0.55),
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Text(
@@ -359,8 +479,6 @@ class _CreatePostPageState extends State<CreatePostPage> {
                                       ),
                                     ),
                                   ),
-
-                                // Video label
                                 if (_selectedAssets[_currentIndex].type ==
                                     AssetType.video)
                                   Positioned(
@@ -368,17 +486,22 @@ class _CreatePostPageState extends State<CreatePostPage> {
                                     bottom: 8,
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 4),
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: Colors.black
-                                            .withValues(alpha: 0.6),
+                                        color:
+                                        Colors.black.withValues(alpha: 0.6),
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          const Icon(Icons.videocam,
-                                              size: 16, color: Colors.white),
+                                          const Icon(
+                                            Icons.videocam,
+                                            size: 16,
+                                            color: Colors.white,
+                                          ),
                                           const SizedBox(width: 4),
                                           Text(
                                             'Video'.tr(),
@@ -400,20 +523,30 @@ class _CreatePostPageState extends State<CreatePostPage> {
                     else
                       Padding(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 16),
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
                         child: Container(
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 18),
+                            horizontal: 16,
+                            vertical: 18,
+                          ),
                           decoration: BoxDecoration(
-                            color: isDark
-                                ? color.surfaceContainerHighest
-                                .withValues(alpha: 0.6)
-                                : color.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(16),
+                            color: mediaCardColor,
+                            borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: color.outline.withValues(alpha: 0.4),
+                              color: softBorderColor,
                             ),
+                            boxShadow: isDark
+                                ? []
+                                : [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.035),
+                                blurRadius: 14,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
                           ),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -428,7 +561,8 @@ class _CreatePostPageState extends State<CreatePostPage> {
                                 'No photos or videos added'.tr(),
                                 style: TextStyle(
                                   fontWeight: FontWeight.w600,
-                                  color: color.onSurface.withValues(alpha: 0.9),
+                                  color:
+                                  color.onSurface.withValues(alpha: 0.9),
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -438,14 +572,15 @@ class _CreatePostPageState extends State<CreatePostPage> {
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: color.onSurface.withValues(alpha: 0.7),
+                                  color:
+                                  color.onSurface.withValues(alpha: 0.7),
                                 ),
                               ),
                               const SizedBox(height: 12),
                               OutlinedButton.icon(
                                 onPressed: _openGallery,
-                                icon: const Icon(
-                                    Icons.add_photo_alternate_outlined),
+                                icon:
+                                const Icon(Icons.add_photo_alternate_outlined),
                                 label: Text('Add photos / videos'.tr()),
                               ),
                             ],
@@ -453,7 +588,6 @@ class _CreatePostPageState extends State<CreatePostPage> {
                         ),
                       ),
 
-                    // --- TOOLBAR (Crop / Filters / Cover) ---
                     if (!isGalleryEmpty)
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -470,30 +604,30 @@ class _CreatePostPageState extends State<CreatePostPage> {
 
                     if (!isGalleryEmpty) const SizedBox(height: 6),
 
-                    // --- THUMBNAIL STRIP ---
                     if (!isGalleryEmpty)
                       SizedBox(
                         height: 90,
                         child: ListView.separated(
                           scrollDirection: Axis.horizontal,
                           padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: _selectedAssets.length + 1, // +1 for "add more"
-                          separatorBuilder: (_, __) => const SizedBox(width: 8),
+                          itemCount: _selectedAssets.length + 1,
+                          separatorBuilder: (_, __) =>
+                          const SizedBox(width: 8),
                           itemBuilder: (context, index) {
                             if (index == _selectedAssets.length) {
-                              // "Add more" tile
                               return GestureDetector(
                                 onTap: _openGallery,
                                 child: Container(
                                   width: 70,
                                   decoration: BoxDecoration(
                                     color: isDark
-                                        ? color.surfaceVariant
+                                        ? color.surfaceContainerHighest
                                         .withValues(alpha: 0.6)
-                                        : color.surfaceContainerHighest,
+                                        : color.surfaceContainerHigh,
                                     borderRadius: BorderRadius.circular(14),
                                     border: Border.all(
-                                      color: color.outline.withValues(alpha: 0.5),
+                                      color:
+                                      color.outline.withValues(alpha: 0.5),
                                     ),
                                   ),
                                   child: const Center(
@@ -557,21 +691,12 @@ class _CreatePostPageState extends State<CreatePostPage> {
 
                     if (!isGalleryEmpty) const Divider(height: 20),
 
-                    // --- CAPTION AREA (ALWAYS SHOWN) ---
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Placeholder avatar – later you can pass real user photo
-                          CircleAvatar(
-                            radius: 18,
-                            backgroundColor: color.primary.withValues(alpha: 0.15),
-                            child: Icon(
-                              Icons.person_rounded,
-                              color: color.primary,
-                            ),
-                          ),
+                          _buildCurrentUserAvatar(color),
                           const SizedBox(width: 12),
                           Expanded(
                             child: TextField(
@@ -581,15 +706,25 @@ class _CreatePostPageState extends State<CreatePostPage> {
                               decoration: InputDecoration(
                                 hintText: "Write a caption...".tr(),
                                 filled: true,
-                                fillColor: isDark
-                                    ? color.surfaceContainerHighest
-                                    .withValues(alpha: 0.8)
-                                    : color.surfaceContainerHighest,
+                                fillColor: mediaCardColor,
                                 border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(18),
                                   borderSide: BorderSide.none,
                                 ),
-                                contentPadding: const EdgeInsets.all(14),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(18),
+                                  borderSide: BorderSide(
+                                    color: softBorderColor,
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(18),
+                                  borderSide: BorderSide(
+                                    color: color.primary.withValues(alpha: 0.8),
+                                    width: 1.2,
+                                  ),
+                                ),
+                                contentPadding: const EdgeInsets.all(16),
                               ),
                             ),
                           ),
@@ -613,7 +748,6 @@ class _CreatePostPageState extends State<CreatePostPage> {
         : null;
 
     if (asset.type == AssetType.video) {
-      // for now, still show thumbnail for video
       return AssetEntityImage(
         asset,
         isOriginal: false,
@@ -638,20 +772,15 @@ class _CreatePostPageState extends State<CreatePostPage> {
   }
 }
 
-/// ✅ App-driven picker strings (EasyLocalization)
-/// Add these keys in your translation JSONs.
-/// This prevents any fallback-to-Chinese behavior and scales to any language.
 class _AppAssetPickerTextDelegate extends AssetPickerTextDelegate {
   const _AppAssetPickerTextDelegate();
 
-  // Bottom bar
   @override
   String get preview => 'picker_preview'.tr();
 
   @override
   String get confirm => 'picker_confirm'.tr();
 
-  // Common actions
   @override
   String get cancel => 'picker_cancel'.tr();
 
@@ -664,14 +793,12 @@ class _AppAssetPickerTextDelegate extends AssetPickerTextDelegate {
   @override
   String get select => 'picker_select'.tr();
 
-  // Album / path selection
   @override
   String get allAlbums => 'picker_all_albums'.tr();
 
   @override
   String get recent => 'picker_recent'.tr();
 
-  // Empty / errors
   @override
   String get emptyList => 'picker_empty_list'.tr();
 
@@ -681,13 +808,11 @@ class _AppAssetPickerTextDelegate extends AssetPickerTextDelegate {
   @override
   String get unSupportedAssetType => 'picker_unsupported'.tr();
 
-  // Selection limits
   @override
   String maximumAssetsCount(int count) =>
       'picker_max_assets'.tr(namedArgs: {'count': '$count'});
 }
 
-// Small pill-shaped tool buttons under the preview
 class _ToolChip extends StatelessWidget {
   final IconData icon;
   final String label;

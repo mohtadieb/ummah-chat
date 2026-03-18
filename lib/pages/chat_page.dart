@@ -141,7 +141,7 @@ class _ChatPageState extends State<ChatPage> {
     // Periodically refresh friend's status while chat is open
     _statusTimer = Timer.periodic(
       const Duration(seconds: 25),
-          (_) => _loadFriendProfile(),
+      (_) => _loadFriendProfile(),
     );
 
     // Periodically refresh *our* last_seen_at while chat is open
@@ -261,9 +261,9 @@ class _ChatPageState extends State<ChatPage> {
     if (!mounted) return;
 
     if (chatRoomId == null || chatRoomId.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Chat no longer exists.'.tr())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Chat no longer exists.'.tr())));
       Navigator.of(context).pop();
       return;
     }
@@ -312,11 +312,11 @@ class _ChatPageState extends State<ChatPage> {
     _friendTypingSub = _chatProvider
         .friendTypingStream(chatRoomId: chatRoomId, friendId: widget.friendId)
         .listen((isTyping) {
-      if (!mounted) return;
-      setState(() {
-        _isFriendTyping = isTyping;
-      });
-    });
+          if (!mounted) return;
+          setState(() {
+            _isFriendTyping = isTyping;
+          });
+        });
   }
 
   Future<void> _loadFriendProfile() async {
@@ -398,9 +398,9 @@ class _ChatPageState extends State<ChatPage> {
           await db.reportUserFromChat(widget.friendId);
 
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('User reported'.tr())),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('User reported'.tr())));
         },
       ),
     );
@@ -420,9 +420,9 @@ class _ChatPageState extends State<ChatPage> {
 
           if (!mounted) return;
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('User blocked'.tr())),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('User blocked'.tr())));
 
           // ✅ Exit the chat immediately
           Navigator.of(context).pop();
@@ -775,22 +775,22 @@ class _ChatPageState extends State<ChatPage> {
         children: [
           url.isNotEmpty
               ? CircleAvatar(
-            radius: radius,
-            backgroundImage: NetworkImage(url),
-            onBackgroundImageError: (_, __) {},
-          )
+                  radius: radius,
+                  backgroundImage: NetworkImage(url),
+                  onBackgroundImageError: (_, __) {},
+                )
               : CircleAvatar(
-            radius: radius,
-            backgroundColor: cs.primary.withValues(alpha: 0.12),
-            child: Text(
-              initials,
-              style: TextStyle(
-                color: cs.primary,
-                fontWeight: FontWeight.w600,
-                fontSize: size * 0.40,
-              ),
-            ),
-          ),
+                  radius: radius,
+                  backgroundColor: cs.primary.withValues(alpha: 0.12),
+                  child: Text(
+                    initials,
+                    style: TextStyle(
+                      color: cs.primary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: size * 0.40,
+                    ),
+                  ),
+                ),
           if (isOnline)
             Positioned(
               right: 0,
@@ -801,10 +801,7 @@ class _ChatPageState extends State<ChatPage> {
                 decoration: BoxDecoration(
                   color: const Color(0xFF12B981),
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: cs.surface,
-                    width: 2,
-                  ),
+                  border: Border.all(color: cs.surface, width: 2),
                 ),
               ),
             ),
@@ -840,7 +837,6 @@ class _ChatPageState extends State<ChatPage> {
       onCancel: _cancelReply,
     );
   }
-
 
   Future<void> _confirmDeleteMessage(String messageId) async {
     final colorScheme = Theme.of(context).colorScheme;
@@ -943,6 +939,150 @@ class _ChatPageState extends State<ChatPage> {
     _onBubbleLongPress(msg, isCurrentUser);
   }
 
+  Widget _buildEmptyChatState() {
+    final cs = Theme.of(context).colorScheme;
+    final hasPhoto = (_friendProfile?.profilePhotoUrl ?? '').trim().isNotEmpty;
+    final photoUrl = (_friendProfile?.profilePhotoUrl ?? '').trim();
+    final displayName = (_friendProfile?.name ?? widget.friendName).trim();
+    final initials = _getInitialsFromName(displayName);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(24, 26, 24, 24),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                cs.surfaceContainerHigh,
+                cs.surfaceContainer,
+              ],
+            ),
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(
+              color: cs.outlineVariant.withValues(alpha: 0.5),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  hasPhoto
+                      ? CircleAvatar(
+                    radius: 34,
+                    backgroundImage: NetworkImage(photoUrl),
+                  )
+                      : CircleAvatar(
+                    radius: 34,
+                    backgroundColor: cs.primary.withValues(alpha: 0.12),
+                    child: Text(
+                      initials.isEmpty ? '@' : initials,
+                      style: TextStyle(
+                        color: cs.primary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 24,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: -2,
+                    bottom: -2,
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: cs.primary,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: cs.surfaceContainerHigh,
+                          width: 3,
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.chat_bubble_rounded,
+                        size: 12,
+                        color: cs.onPrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Start your conversation'.tr(),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: cs.onSurface,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Send your first message to {name}.'.tr(
+                  namedArgs: {'name': widget.friendName},
+                ),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.45,
+                  color: cs.onSurface.withValues(alpha: 0.68),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: cs.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.lock_outline_rounded,
+                      size: 16,
+                      color: cs.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Your messages will appear here.'.tr(),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: cs.primary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // Build
   // ---------------------------------------------------------------------------
@@ -964,522 +1104,569 @@ class _ChatPageState extends State<ChatPage> {
           });
         }
       },
-      child: Scaffold(
-        resizeToAvoidBottomInset: true,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          foregroundColor: colorScheme.primary,
-          centerTitle: false,
-          title: _isSelectionMode
-              ? Text(
-            "selected_messages".plural(
-              _selectedMessageIds.length,
-              namedArgs: {"count": _selectedMessageIds.length.toString()},
-            ),
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          )
-              : GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ProfilePage(userId: widget.friendId),
-                ),
-              );
-            },
-            child: Row(
-              children: [
-                _buildFriendAvatar(size: 34),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        widget.friendName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
-                          height: 1.1,
-                        ),
-                      ),
-                      if (subtitleWidget != null) subtitleWidget,
-                    ],
-                  ),
-                ),
-              ],
-            ),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              colorScheme.surface,
+              colorScheme.surface,
+              colorScheme.surfaceContainerLowest,
+            ],
           ),
-          actions: _isSelectionMode
-              ? [
-            if (_selectedMessageIds.length == 1)
-              IconButton(
-                icon: const Icon(Icons.reply),
-                onPressed: _replyToSelectedMessage,
-              ),
-            IconButton(
-              icon: const Icon(Icons.delete),
-              onPressed: _selectedMessageIds.isEmpty
-                  ? null
-                  : _confirmDeleteSelectedMessages,
-            ),
-          ]
-              : [
-            PopupMenuButton<_ChatMenuAction>(
-              icon: const Icon(Icons.more_vert),
-              onSelected: _onChatMenuSelected,
-              itemBuilder: (context) => [
-                PopupMenuItem<_ChatMenuAction>(
-                  value: _ChatMenuAction.report,
-                  child: Row(
-                    children: [
-                      const Icon(Icons.report_outlined, size: 20),
-                      const SizedBox(width: 10),
-                      Text('Report'.tr()),
-                    ],
-                  ),
-                ),
-                PopupMenuItem<_ChatMenuAction>(
-                  value: _ChatMenuAction.block,
-                  child: Row(
-                    children: [
-                      const Icon(Icons.block, size: 20),
-                      const SizedBox(width: 10),
-                      Text('Block user'.tr()),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
         ),
-        body: SafeArea(
-          top: false,
-          child: Column(
-            children: [
-              Expanded(
-                child: _chatRoomId == null
-                    ? const Center(child: CircularProgressIndicator())
-                    : Consumer<ChatProvider>(
-                  builder: (context, provider, _) {
-                    final rawMessages =
-                    provider.getMessages(_chatRoomId!);
-
-                    if (rawMessages.isEmpty) {
-                      return Center(child: Text("No messages yet".tr()));
-                    }
-
-                    final messages = rawMessages
-                        .map((m) => MessageModel.fromMap(m))
-                        .toList()
-                      ..sort(
-                            (a, b) => a.createdAt.compareTo(b.createdAt),
+        child: Scaffold(
+          backgroundColor: Colors.transparent, // ⭐ IMPORTANT
+          resizeToAvoidBottomInset: true,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            foregroundColor: colorScheme.primary,
+            centerTitle: false,
+            title: _isSelectionMode
+                ? Text(
+                    "selected_messages".plural(
+                      _selectedMessageIds.length,
+                      namedArgs: {
+                        "count": _selectedMessageIds.length.toString(),
+                      },
+                    ),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  )
+                : GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ProfilePage(userId: widget.friendId),
+                        ),
                       );
-
-                    int unreadCount = 0;
-                    int? firstUnreadIndexFromStart;
-
-                    for (int i = 0; i < messages.length; i++) {
-                      final m = messages[i];
-                      final isMine = m.senderId == _currentUserId;
-                      if (!m.isRead && !isMine) {
-                        unreadCount++;
-                        firstUnreadIndexFromStart ??= i;
-                      }
-                    }
-
-                    final groups = MessageGrouping.build(messages);
-
-                    // ✅ NEW: build mapping from every message id -> rendered bubble id
-                    final map = <String, String>{};
-                    for (final g in groups) {
-                      final renderedId = g.last.id; // you render the group using lastMsg
-                      for (final m in g.messages) {
-                        map[m.id] = renderedId;
-                      }
-                    }
-                    _replyTargetToRenderedBubbleId = map;
-
-                    final messageIndexToGroupIndex =
-                    List<int>.filled(messages.length, 0);
-                    for (int gi = 0; gi < groups.length; gi++) {
-                      final g = groups[gi];
-                      for (final m in g.messages) {
-                        final idx = messages.indexOf(m);
-                        if (idx != -1) {
-                          messageIndexToGroupIndex[idx] = gi;
-                        }
-                      }
-                    }
-
-                    int? firstUnreadGroupIndex;
-                    if (firstUnreadIndexFromStart != null) {
-                      firstUnreadGroupIndex =
-                      messageIndexToGroupIndex[firstUnreadIndexFromStart];
-                    }
-
-                    if (!_hasCapturedInitialUnreadIndex) {
-                      _initialUnreadGroupIndex = firstUnreadGroupIndex;
-                      _initialUnreadCount = unreadCount;
-                      _hasCapturedInitialUnreadIndex = true;
-                    }
-
-                    if (_currentUserId.isNotEmpty &&
-                        messages.length != _lastMessageCount) {
-                      if (_lastMessageCount > 0 &&
-                          messages.length > _lastMessageCount) {
-                        _hideUnreadSeparatorForNewMessages = true;
-                      }
-
-                      if (_isNearBottom()) _scrollDown();
-
-                      _lastMessageCount = messages.length;
-
-                      provider.markRoomMessagesAsRead(
-                        _chatRoomId!,
-                        _currentUserId,
-                      );
-                    }
-
-                    return ListView.builder(
-                      controller: _scrollController,
-                      reverse: true,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: groups.length,
-                      itemBuilder: (context, index) {
-                        final groupIndex = groups.length - 1 - index;
-                        final group = groups[groupIndex];
-
-                        final firstMsg = group.first;
-                        final lastMsg = group.last;
-
-                        final isCurrentUser =
-                            firstMsg.senderId == _currentUserId;
-
-                        final imageUrls = group.messages
-                            .map((m) => m.imageUrl)
-                            .whereType<String>()
-                            .where((u) => u.trim().isNotEmpty)
-                            .toList();
-
-                        final String? groupVideoUrl = group.messages
-                            .map((m) => m.videoUrl)
-                            .whereType<String>()
-                            .firstWhere(
-                              (u) => u.trim().isNotEmpty,
-                          orElse: () => '',
-                        );
-
-                        final String? effectiveVideoUrl =
-                        (groupVideoUrl != null &&
-                            groupVideoUrl.trim().isNotEmpty)
-                            ? groupVideoUrl
-                            : null;
-
-                        final likedBy = lastMsg.likedBy;
-                        final isLikedByMe =
-                        likedBy.contains(_currentUserId);
-                        final likeCount = likedBy.length;
-
-                        final msgDate = firstMsg.createdAt;
-                        DateTime? prevDate;
-                        if (groupIndex > 0) {
-                          prevDate = groups[groupIndex - 1].first.createdAt;
-                        }
-                        final showDayDivider =
-                            prevDate == null || !isSameDay(msgDate, prevDate);
-
-                        final showUnreadSeparator =
-                            _initialUnreadGroupIndex != null &&
-                                groupIndex == _initialUnreadGroupIndex &&
-                                !_hideUnreadSeparatorForNewMessages;
-
-                        MessageModel? repliedTo;
-                        if (lastMsg.replyToMessageId != null &&
-                            lastMsg.replyToMessageId!.trim().isNotEmpty) {
-                          try {
-                            repliedTo = messages.firstWhere(
-                                  (m) => m.id == lastMsg.replyToMessageId,
-                            );
-                          } catch (_) {
-                            repliedTo = null;
-                          }
-                        }
-
-                        String? replyAuthorName;
-                        String? replySnippet;
-                        bool replyHasMedia = false;
-
-                        String? replyImageUrl;
-                        String? replyPostId;
-                        bool replyIsPostShare = false;
-
-                        if (repliedTo != null) {
-                          final isMineReply =
-                              repliedTo.senderId == _currentUserId;
-                          replyAuthorName =
-                          isMineReply ? 'You'.tr() : widget.friendName;
-
-                          if (PostShare.isPostShareMessage(repliedTo.message)) {
-                            replyIsPostShare = true;
-                            replyHasMedia = true;
-                            replyPostId = PostShare.extractPostId(repliedTo.message);
-                            replySnippet = 'Shared post'.tr();
-                          } else if ((repliedTo.imageUrl ?? '')
-                              .trim()
-                              .isNotEmpty) {
-                            replyHasMedia = true;
-                            replyImageUrl = repliedTo.imageUrl!.trim();
-                            replySnippet = 'Photo'.tr();
-                          } else if ((repliedTo.videoUrl ?? '')
-                              .trim()
-                              .isNotEmpty) {
-                            replyHasMedia = true;
-                            replySnippet = 'Video'.tr();
-                          } else if ((repliedTo.audioUrl ?? '')
-                              .trim()
-                              .isNotEmpty ||
-                              repliedTo.isAudio) {
-                            replyHasMedia = true;
-                            replySnippet = 'Voice message'.tr();
-                          } else if (repliedTo.message.trim().isNotEmpty) {
-                            replySnippet = repliedTo.message.trim();
-                          } else {
-                            replySnippet = 'Message'.tr();
-                          }
-                        }
-
-                        Widget innerBubble;
-
-                        if (lastMsg.isAudio &&
-                            (lastMsg.audioUrl ?? '').trim().isNotEmpty) {
-                          innerBubble = MyVoiceMessageBubble(
-                            key: ValueKey(lastMsg.id),
-                            audioUrl: lastMsg.audioUrl!,
-                            isCurrentUser: isCurrentUser,
-                            durationSeconds: lastMsg.audioDurationSeconds,
-                          );
-                        } else if (PostShare.isPostShareMessage(lastMsg.message)) {
-                          final sharedPostId =
-                          PostShare.extractPostId(lastMsg.message);
-
-                          innerBubble = _SharedPostBubble(
-                            postId: sharedPostId ?? '',
-                            isCurrentUser: isCurrentUser,
-                            createdAt: lastMsg.createdAt,
-                            onTap: () {
-                              if (sharedPostId == null ||
-                                  sharedPostId.trim().isEmpty) return;
-
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => PostPage(
-                                    post: null,
-                                    postId: sharedPostId.trim(),
-                                    highlightPost: true,
-                                  ),
-                                ),
-                              );
-                            },
-                          );
-                        } else {
-                          innerBubble = MyChatBubble(
-                            key: ValueKey(lastMsg.id),
-                            message: lastMsg.message,
-                            imageUrls: imageUrls,
-                            imageUrl:
-                            imageUrls.isNotEmpty ? imageUrls.first : null,
-                            videoUrl: effectiveVideoUrl,
-                            isCurrentUser: isCurrentUser,
-                            createdAt: lastMsg.createdAt,
-                            isRead: lastMsg.isRead,
-                            isDelivered: lastMsg.isDelivered,
-                            isLikedByMe: isLikedByMe,
-                            likeCount: likeCount,
-                            isUploading: lastMsg.isUploading,
-                            isDeleted: lastMsg.isDeleted,
-                            senderName: isCurrentUser
-                                ? 'You'.tr()
-                                : widget.friendName,
-                            onDoubleTap: () async {
-                              if (_isSelectionMode) return;
-                              if (_currentUserId.isEmpty) return;
-
-                              await _chatProvider.toggleLikeMessage(
-                                messageId: lastMsg.id,
-                                userId: _currentUserId,
-                              );
-                            },
-                            onLongPress:
-                            !_isSelectionMode && !lastMsg.isDeleted
-                                ? () => _handleBubbleLongPress(
-                              lastMsg,
-                              isCurrentUser,
-                            )
-                                : null,
-                            onLikeTap: likedBy.isEmpty
-                                ? null
-                                : () {
-                              if (_isSelectionMode) return;
-                              _openLikesBottomSheet(
-                                likedBy.map((e) => e.toString()).toList(),
-                              );
-                            },
-
-                            // ✅ Reply preview fields (unchanged)
-                            replyAuthorName: replyAuthorName,
-                            replySnippet: replySnippet,
-                            replyHasMedia: replyHasMedia,
-
-                            // ✅ NEW: tap the reply quote to jump
-                            onReplyTap: (lastMsg.replyToMessageId != null &&
-                                lastMsg.replyToMessageId!
-                                    .trim()
-                                    .isNotEmpty)
-                                ? () => _handleReplyTap(
-                              lastMsg.replyToMessageId!.trim(),
-                            )
-                                : null,
-
-                            // NOTE:
-                            // Your current MyChatBubble you pasted does NOT have these
-                            // fields yet. Keep them here only if your current file
-                            // already supports them. Otherwise remove these 3 lines.
-                            replyImageUrl: replyImageUrl,
-                            replyPostId: replyPostId,
-                            replyIsPostShare: replyIsPostShare,
-                          );
-                        }
-
-                        final bool isSelected =
-                        _selectedMessageIds.contains(lastMsg.id);
-
-                        final selectableBubble = MySelectableBubble(
-                          isSelected: isSelected,
-                          onLongPress: () => _handleBubbleLongPress(
-                            lastMsg,
-                            isCurrentUser,
-                          ),
-                          onTap: () {
-                            if (_isSelectionMode &&
-                                lastMsg.senderId == _currentUserId) {
-                              _toggleSelection(lastMsg);
-                            }
-                          },
-                          child: innerBubble,
-                        );
-
-                        // ✅ NEW: attach a key to the rendered bubble (group bubble)
-                        final bubbleKey = _renderedBubbleKeys.putIfAbsent(
-                          lastMsg.id,
-                              () => GlobalKey(),
-                        );
-
-                        return KeyedSubtree(
-                          key: bubbleKey,
+                    },
+                    child: Row(
+                      children: [
+                        _buildFriendAvatar(size: 34),
+                        const SizedBox(width: 10),
+                        Expanded(
                           child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              if (showDayDivider)
-                                buildDayBubble(context: context, date: msgDate),
-                              if (showUnreadSeparator)
-                                buildUnreadBubble(
-                                  context: context,
-                                  unreadCount:
-                                  _initialUnreadCount ?? unreadCount,
-                                ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 2,
-                                  horizontal: 8,
-                                ),
-                                child: Align(
-                                  alignment: isCurrentUser
-                                      ? Alignment.centerRight
-                                      : Alignment.centerLeft,
-                                  child: selectableBubble,
+                              Text(
+                                widget.friendName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15,
+                                  height: 1.1,
                                 ),
                               ),
+                              if (subtitleWidget != null) subtitleWidget,
                             ],
                           ),
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
-              SafeArea(
-                top: false,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_replyTo != null && _currentUserId.isNotEmpty)
-                      _buildReplyPreviewBar(_replyTo!),
-                    if (_isFriendTyping)
-                      Padding(
-                        padding: const EdgeInsets.only(
-                          left: 16,
-                          right: 16,
-                          bottom: 4,
                         ),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            'typing_indicator'.tr(
-                              namedArgs: {"name": widget.friendName},
-                            ),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontStyle: FontStyle.italic,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurface
-                                  .withValues(alpha: 0.7),
+                      ],
+                    ),
+                  ),
+            actions: _isSelectionMode
+                ? [
+                    if (_selectedMessageIds.length == 1)
+                      IconButton(
+                        icon: const Icon(Icons.reply),
+                        onPressed: _replyToSelectedMessage,
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.delete),
+                      onPressed: _selectedMessageIds.isEmpty
+                          ? null
+                          : _confirmDeleteSelectedMessages,
+                    ),
+                  ]
+                : [
+                    PopupMenuButton<_ChatMenuAction>(
+                      icon: const Icon(Icons.more_vert),
+                      onSelected: _onChatMenuSelected,
+                      itemBuilder: (context) => [
+                        PopupMenuItem<_ChatMenuAction>(
+                          value: _ChatMenuAction.report,
+                          child: Row(
+                            children: [
+                              const Icon(Icons.report_outlined, size: 20),
+                              const SizedBox(width: 10),
+                              Text('Report'.tr()),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem<_ChatMenuAction>(
+                          value: _ChatMenuAction.block,
+                          child: Row(
+                            children: [
+                              const Icon(Icons.block, size: 20),
+                              const SizedBox(width: 10),
+                              Text('Block user'.tr()),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+          ),
+          body: SafeArea(
+            top: false,
+            child: Column(
+              children: [
+                Expanded(
+                  child: _chatRoomId == null
+                      ? const Center(child: CircularProgressIndicator())
+                      : Consumer<ChatProvider>(
+                          builder: (context, provider, _) {
+                            final rawMessages = provider.getMessages(
+                              _chatRoomId!,
+                            );
+
+                            if (rawMessages.isEmpty) {
+                              return _buildEmptyChatState();
+                            }
+
+                            final messages =
+                                rawMessages
+                                    .map((m) => MessageModel.fromMap(m))
+                                    .toList()
+                                  ..sort(
+                                    (a, b) =>
+                                        a.createdAt.compareTo(b.createdAt),
+                                  );
+
+                            int unreadCount = 0;
+                            int? firstUnreadIndexFromStart;
+
+                            for (int i = 0; i < messages.length; i++) {
+                              final m = messages[i];
+                              final isMine = m.senderId == _currentUserId;
+                              if (!m.isRead && !isMine) {
+                                unreadCount++;
+                                firstUnreadIndexFromStart ??= i;
+                              }
+                            }
+
+                            final groups = MessageGrouping.build(messages);
+
+                            // ✅ NEW: build mapping from every message id -> rendered bubble id
+                            final map = <String, String>{};
+                            for (final g in groups) {
+                              final renderedId = g
+                                  .last
+                                  .id; // you render the group using lastMsg
+                              for (final m in g.messages) {
+                                map[m.id] = renderedId;
+                              }
+                            }
+                            _replyTargetToRenderedBubbleId = map;
+
+                            final messageIndexToGroupIndex = List<int>.filled(
+                              messages.length,
+                              0,
+                            );
+                            for (int gi = 0; gi < groups.length; gi++) {
+                              final g = groups[gi];
+                              for (final m in g.messages) {
+                                final idx = messages.indexOf(m);
+                                if (idx != -1) {
+                                  messageIndexToGroupIndex[idx] = gi;
+                                }
+                              }
+                            }
+
+                            int? firstUnreadGroupIndex;
+                            if (firstUnreadIndexFromStart != null) {
+                              firstUnreadGroupIndex =
+                                  messageIndexToGroupIndex[firstUnreadIndexFromStart];
+                            }
+
+                            if (!_hasCapturedInitialUnreadIndex) {
+                              _initialUnreadGroupIndex = firstUnreadGroupIndex;
+                              _initialUnreadCount = unreadCount;
+                              _hasCapturedInitialUnreadIndex = true;
+                            }
+
+                            if (_currentUserId.isNotEmpty &&
+                                messages.length != _lastMessageCount) {
+                              if (_lastMessageCount > 0 &&
+                                  messages.length > _lastMessageCount) {
+                                _hideUnreadSeparatorForNewMessages = true;
+                              }
+
+                              if (_isNearBottom()) _scrollDown();
+
+                              _lastMessageCount = messages.length;
+
+                              provider.markRoomMessagesAsRead(
+                                _chatRoomId!,
+                                _currentUserId,
+                              );
+                            }
+
+                            return ListView.builder(
+                              controller: _scrollController,
+                              reverse: true,
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              itemCount: groups.length,
+                              itemBuilder: (context, index) {
+                                final groupIndex = groups.length - 1 - index;
+                                final group = groups[groupIndex];
+
+                                final firstMsg = group.first;
+                                final lastMsg = group.last;
+
+                                final isCurrentUser =
+                                    firstMsg.senderId == _currentUserId;
+
+                                final imageUrls = group.messages
+                                    .map((m) => m.imageUrl)
+                                    .whereType<String>()
+                                    .where((u) => u.trim().isNotEmpty)
+                                    .toList();
+
+                                final String? groupVideoUrl = group.messages
+                                    .map((m) => m.videoUrl)
+                                    .whereType<String>()
+                                    .firstWhere(
+                                      (u) => u.trim().isNotEmpty,
+                                      orElse: () => '',
+                                    );
+
+                                final String? effectiveVideoUrl =
+                                    (groupVideoUrl != null &&
+                                        groupVideoUrl.trim().isNotEmpty)
+                                    ? groupVideoUrl
+                                    : null;
+
+                                final likedBy = lastMsg.likedBy;
+                                final isLikedByMe = likedBy.contains(
+                                  _currentUserId,
+                                );
+                                final likeCount = likedBy.length;
+
+                                final msgDate = firstMsg.createdAt;
+                                DateTime? prevDate;
+                                if (groupIndex > 0) {
+                                  prevDate =
+                                      groups[groupIndex - 1].first.createdAt;
+                                }
+                                final showDayDivider =
+                                    prevDate == null ||
+                                    !isSameDay(msgDate, prevDate);
+
+                                final showUnreadSeparator =
+                                    _initialUnreadGroupIndex != null &&
+                                    groupIndex == _initialUnreadGroupIndex &&
+                                    !_hideUnreadSeparatorForNewMessages;
+
+                                MessageModel? repliedTo;
+                                if (lastMsg.replyToMessageId != null &&
+                                    lastMsg.replyToMessageId!
+                                        .trim()
+                                        .isNotEmpty) {
+                                  try {
+                                    repliedTo = messages.firstWhere(
+                                      (m) => m.id == lastMsg.replyToMessageId,
+                                    );
+                                  } catch (_) {
+                                    repliedTo = null;
+                                  }
+                                }
+
+                                String? replyAuthorName;
+                                String? replySnippet;
+                                bool replyHasMedia = false;
+
+                                String? replyImageUrl;
+                                String? replyPostId;
+                                bool replyIsPostShare = false;
+
+                                if (repliedTo != null) {
+                                  final isMineReply =
+                                      repliedTo.senderId == _currentUserId;
+                                  replyAuthorName = isMineReply
+                                      ? 'You'.tr()
+                                      : widget.friendName;
+
+                                  if (PostShare.isPostShareMessage(
+                                    repliedTo.message,
+                                  )) {
+                                    replyIsPostShare = true;
+                                    replyHasMedia = true;
+                                    replyPostId = PostShare.extractPostId(
+                                      repliedTo.message,
+                                    );
+                                    replySnippet = 'Shared post'.tr();
+                                  } else if ((repliedTo.imageUrl ?? '')
+                                      .trim()
+                                      .isNotEmpty) {
+                                    replyHasMedia = true;
+                                    replyImageUrl = repliedTo.imageUrl!.trim();
+                                    replySnippet = 'Photo'.tr();
+                                  } else if ((repliedTo.videoUrl ?? '')
+                                      .trim()
+                                      .isNotEmpty) {
+                                    replyHasMedia = true;
+                                    replySnippet = 'Video'.tr();
+                                  } else if ((repliedTo.audioUrl ?? '')
+                                          .trim()
+                                          .isNotEmpty ||
+                                      repliedTo.isAudio) {
+                                    replyHasMedia = true;
+                                    replySnippet = 'Voice message'.tr();
+                                  } else if (repliedTo.message
+                                      .trim()
+                                      .isNotEmpty) {
+                                    replySnippet = repliedTo.message.trim();
+                                  } else {
+                                    replySnippet = 'Message'.tr();
+                                  }
+                                }
+
+                                Widget innerBubble;
+
+                                if (lastMsg.isAudio &&
+                                    (lastMsg.audioUrl ?? '')
+                                        .trim()
+                                        .isNotEmpty) {
+                                  innerBubble = MyVoiceMessageBubble(
+                                    key: ValueKey(lastMsg.id),
+                                    audioUrl: lastMsg.audioUrl!,
+                                    isCurrentUser: isCurrentUser,
+                                    durationSeconds:
+                                        lastMsg.audioDurationSeconds,
+                                  );
+                                } else if (PostShare.isPostShareMessage(
+                                  lastMsg.message,
+                                )) {
+                                  final sharedPostId = PostShare.extractPostId(
+                                    lastMsg.message,
+                                  );
+
+                                  innerBubble = _SharedPostBubble(
+                                    postId: sharedPostId ?? '',
+                                    isCurrentUser: isCurrentUser,
+                                    createdAt: lastMsg.createdAt,
+                                    onTap: () {
+                                      if (sharedPostId == null ||
+                                          sharedPostId.trim().isEmpty)
+                                        return;
+
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => PostPage(
+                                            post: null,
+                                            postId: sharedPostId.trim(),
+                                            highlightPost: true,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  );
+                                } else {
+                                  innerBubble = MyChatBubble(
+                                    key: ValueKey(lastMsg.id),
+                                    message: lastMsg.message,
+                                    imageUrls: imageUrls,
+                                    imageUrl: imageUrls.isNotEmpty
+                                        ? imageUrls.first
+                                        : null,
+                                    videoUrl: effectiveVideoUrl,
+                                    isCurrentUser: isCurrentUser,
+                                    createdAt: lastMsg.createdAt,
+                                    isRead: lastMsg.isRead,
+                                    isDelivered: lastMsg.isDelivered,
+                                    isLikedByMe: isLikedByMe,
+                                    likeCount: likeCount,
+                                    isUploading: lastMsg.isUploading,
+                                    isDeleted: lastMsg.isDeleted,
+                                    senderName: isCurrentUser
+                                        ? 'You'.tr()
+                                        : widget.friendName,
+                                    onDoubleTap: () async {
+                                      if (_isSelectionMode) return;
+                                      if (_currentUserId.isEmpty) return;
+
+                                      await _chatProvider.toggleLikeMessage(
+                                        messageId: lastMsg.id,
+                                        userId: _currentUserId,
+                                      );
+                                    },
+                                    onLongPress:
+                                        !_isSelectionMode && !lastMsg.isDeleted
+                                        ? () => _handleBubbleLongPress(
+                                            lastMsg,
+                                            isCurrentUser,
+                                          )
+                                        : null,
+                                    onLikeTap: likedBy.isEmpty
+                                        ? null
+                                        : () {
+                                            if (_isSelectionMode) return;
+                                            _openLikesBottomSheet(
+                                              likedBy
+                                                  .map((e) => e.toString())
+                                                  .toList(),
+                                            );
+                                          },
+
+                                    // ✅ Reply preview fields (unchanged)
+                                    replyAuthorName: replyAuthorName,
+                                    replySnippet: replySnippet,
+                                    replyHasMedia: replyHasMedia,
+
+                                    // ✅ NEW: tap the reply quote to jump
+                                    onReplyTap:
+                                        (lastMsg.replyToMessageId != null &&
+                                            lastMsg.replyToMessageId!
+                                                .trim()
+                                                .isNotEmpty)
+                                        ? () => _handleReplyTap(
+                                            lastMsg.replyToMessageId!.trim(),
+                                          )
+                                        : null,
+
+                                    // NOTE:
+                                    // Your current MyChatBubble you pasted does NOT have these
+                                    // fields yet. Keep them here only if your current file
+                                    // already supports them. Otherwise remove these 3 lines.
+                                    replyImageUrl: replyImageUrl,
+                                    replyPostId: replyPostId,
+                                    replyIsPostShare: replyIsPostShare,
+                                  );
+                                }
+
+                                final bool isSelected = _selectedMessageIds
+                                    .contains(lastMsg.id);
+
+                                final selectableBubble = MySelectableBubble(
+                                  isSelected: isSelected,
+                                  onLongPress: () => _handleBubbleLongPress(
+                                    lastMsg,
+                                    isCurrentUser,
+                                  ),
+                                  onTap: () {
+                                    if (_isSelectionMode &&
+                                        lastMsg.senderId == _currentUserId) {
+                                      _toggleSelection(lastMsg);
+                                    }
+                                  },
+                                  child: innerBubble,
+                                );
+
+                                // ✅ NEW: attach a key to the rendered bubble (group bubble)
+                                final bubbleKey = _renderedBubbleKeys
+                                    .putIfAbsent(lastMsg.id, () => GlobalKey());
+
+                                return KeyedSubtree(
+                                  key: bubbleKey,
+                                  child: Column(
+                                    children: [
+                                      if (showDayDivider)
+                                        buildDayBubble(
+                                          context: context,
+                                          date: msgDate,
+                                        ),
+                                      if (showUnreadSeparator)
+                                        buildUnreadBubble(
+                                          context: context,
+                                          unreadCount:
+                                              _initialUnreadCount ??
+                                              unreadCount,
+                                        ),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 2,
+                                          horizontal: 8,
+                                        ),
+                                        child: Align(
+                                          alignment: isCurrentUser
+                                              ? Alignment.centerRight
+                                              : Alignment.centerLeft,
+                                          child: selectableBubble,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
+                ),
+                SafeArea(
+                  top: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_replyTo != null && _currentUserId.isNotEmpty)
+                        _buildReplyPreviewBar(_replyTo!),
+                      if (_isFriendTyping)
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            left: 16,
+                            right: 16,
+                            bottom: 4,
+                          ),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'typing_indicator'.tr(
+                                namedArgs: {"name": widget.friendName},
+                              ),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontStyle: FontStyle.italic,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.7),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
-                      child: MyChatTextField(
-                        controller: _messageController,
-                        focusNode: _focusNode,
-                        onSendPressed: _sendMessage,
-                        onEmojiPressed: () => debugPrint('Emoji pressed'),
-                        onAttachmentPressed: () async {
-                          if (_chatRoomId == null) return;
-                          if (_currentUserId.isEmpty) return;
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                        child: MyChatTextField(
+                          controller: _messageController,
+                          focusNode: _focusNode,
+                          onSendPressed: _sendMessage,
+                          onEmojiPressed: () => debugPrint('Emoji pressed'),
+                          onAttachmentPressed: () async {
+                            if (_chatRoomId == null) return;
+                            if (_currentUserId.isEmpty) return;
 
-                          await ChatMediaHelper.openAttachmentSheetForDM(
-                            context: context,
-                            chatRoomId: _chatRoomId!,
-                            currentUserId: _currentUserId,
-                            otherUserId: widget.friendId,
-                          );
-                        },
-                        hasPendingAttachment: false,
-                        isRecording: _voiceRecorder.isRecording,
-                        recordingLabel: _voiceRecorder.isRecording
-                            ? 'recording_label'.tr(
-                          namedArgs: {
-                            "time": _voiceRecorder.formattedDuration,
+                            await ChatMediaHelper.openAttachmentSheetForDM(
+                              context: context,
+                              chatRoomId: _chatRoomId!,
+                              currentUserId: _currentUserId,
+                              otherUserId: widget.friendId,
+                            );
                           },
-                        )
-                            : null,
-                        onMicLongPressStart: _handleMicLongPressStart,
-                        onMicLongPressEnd: _handleMicLongPressEnd,
-                        onMicCancel: _handleMicCancel,
+                          hasPendingAttachment: false,
+                          isRecording: _voiceRecorder.isRecording,
+                          recordingLabel: _voiceRecorder.isRecording
+                              ? 'recording_label'.tr(
+                                  namedArgs: {
+                                    "time": _voiceRecorder.formattedDuration,
+                                  },
+                                )
+                              : null,
+                          onMicLongPressStart: _handleMicLongPressStart,
+                          onMicLongPressEnd: _handleMicLongPressEnd,
+                          onMicCancel: _handleMicCancel,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1558,14 +1745,14 @@ class _SharedPostBubble extends StatelessWidget {
   }
 
   Widget _buildShell(
-      BuildContext context, {
-        required Color bg,
-        required Color fg,
-        required String title,
-        required String subtitle,
-        required List<String> imageUrls,
-        required VoidCallback onTap,
-      }) {
+    BuildContext context, {
+    required Color bg,
+    required Color fg,
+    required String title,
+    required String subtitle,
+    required List<String> imageUrls,
+    required VoidCallback onTap,
+  }) {
     final cs = Theme.of(context).colorScheme;
 
     return GestureDetector(

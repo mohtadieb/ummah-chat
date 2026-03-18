@@ -187,8 +187,11 @@ class _HomePageState extends State<HomePage>
             ),
           );
         },
-        icon: const Icon(Icons.edit_rounded),
-        label: Text('create'.tr()),
+        icon: const Icon(Icons.add_rounded),
+        label: Text(
+          'Post'.tr(),
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
       ),
       body: Container(
         decoration: BoxDecoration(

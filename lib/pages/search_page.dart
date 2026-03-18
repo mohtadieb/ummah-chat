@@ -73,62 +73,6 @@ class _SearchPageState extends State<SearchPage> {
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
-        centerTitle: true,
-        title: Column(
-          children: [
-            Text(
-              "Find people".tr(),
-              style: TextStyle(
-                color: colorScheme.primary,
-                fontWeight: FontWeight.w700,
-                fontSize: 20,
-                letterSpacing: -0.2,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              "Search all users on Ummah Chat".tr(),
-              style: TextStyle(
-                fontSize: 11.5,
-                color: colorScheme.primary.withValues(alpha: 0.68),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(82),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 18,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: MySearchBar(
-                controller: _searchController,
-                hintText: 'search_users'.tr(),
-                onChanged: (value) {
-                  _onSearchChanged(value);
-                },
-                onClear: () {
-                  _searchController.clear();
-                  listeningProvider.clearSearchResults();
-                  setState(() {
-                    _hasSearched = false;
-                    _isSearching = false;
-                  });
-                },
-              ),
-            ),
-          ),
-        ),
       ),
       body: Container(
         decoration: BoxDecoration(
@@ -148,10 +92,38 @@ class _SearchPageState extends State<SearchPage> {
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
             child: Column(
               children: [
-                if (!_hasSearched && !_isSearching) ...[
-                  _buildIntroCard(colorScheme),
-                  const SizedBox(height: 14),
-                ],
+                _buildIntroCard(colorScheme),
+                const SizedBox(height: 14),
+
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: MySearchBar(
+                    controller: _searchController,
+                    hintText: 'search_users'.tr(),
+                    onChanged: (value) {
+                      _onSearchChanged(value);
+                    },
+                    onClear: () {
+                      _searchController.clear();
+                      listeningProvider.clearSearchResults();
+                      setState(() {
+                        _hasSearched = false;
+                        _isSearching = false;
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(height: 14),
+
                 if (_hasSearched && !_isSearching && results.isNotEmpty) ...[
                   _buildResultsHeader(colorScheme, results.length),
                   const SizedBox(height: 10),
@@ -170,34 +142,34 @@ class _SearchPageState extends State<SearchPage> {
   Widget _buildIntroCard(ColorScheme colorScheme) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(28),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            colorScheme.primary.withValues(alpha: 0.11),
-            colorScheme.secondary.withValues(alpha: 0.42),
+            colorScheme.primary.withValues(alpha: 0.14),
+            colorScheme.secondary.withValues(alpha: 0.55),
             colorScheme.surfaceContainerHigh,
           ],
         ),
         border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+          color: colorScheme.outlineVariant.withValues(alpha: 0.45),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
           ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            width: 50,
-            height: 50,
+            width: 52,
+            height: 52,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: colorScheme.primary.withValues(alpha: 0.14),
@@ -205,7 +177,7 @@ class _SearchPageState extends State<SearchPage> {
             child: Icon(
               Icons.person_search_rounded,
               color: colorScheme.primary,
-              size: 25,
+              size: 26,
             ),
           ),
           const SizedBox(width: 14),
@@ -214,19 +186,29 @@ class _SearchPageState extends State<SearchPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  "Discover people".tr(),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  "Discover".tr(),
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: colorScheme.onSurface.withValues(alpha: 0.65),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  "Find people".tr(),
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w800,
-                    color: colorScheme.primary,
+                    letterSpacing: -0.3,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   "Search by name or username to find people across Ummah Chat."
                       .tr(),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colorScheme.primary.withValues(alpha: 0.72),
-                    height: 1.35,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurface.withValues(alpha: 0.72),
+                    height: 1.25,
                   ),
                 ),
               ],

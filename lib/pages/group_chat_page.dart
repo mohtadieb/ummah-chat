@@ -174,7 +174,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
       '🟢 GroupChatPage opened for room=${widget.chatRoomId}, user=$_currentUserId',
     );
 
-    // Cache provider like DM page does
     _chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
     _voiceRecorder = VoiceRecorderController(
@@ -184,28 +183,19 @@ class _GroupChatPageState extends State<GroupChatPage> {
       },
     );
 
-    // Load members list (UI only)
     _loadMembers();
-
-    // Init room (presence + listen) — DO NOT mark read here immediately
     _initGroupRoom();
-
     _groupAvatarUrl = widget.avatarUrl;
 
-    // Auto-scroll when keyboard opens
     _focusNode.addListener(() {
       if (_focusNode.hasFocus) {
         Future.delayed(const Duration(milliseconds: 300), _scrollDown);
       }
     });
 
-    // Watch the textfield to update typing status (like DM)
     _messageController.addListener(_handleTypingChange);
-
-    // Subscribe to group typing users
     _subscribeToGroupTyping(widget.chatRoomId);
 
-    // Periodically refresh *our* last_seen_at while chat is open (same as DM)
     _presenceTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
       if (!mounted) return;
       if (_currentUserId.isEmpty) return;
@@ -221,16 +211,12 @@ class _GroupChatPageState extends State<GroupChatPage> {
   void dispose() {
     _presenceTimer?.cancel();
     _voiceRecorder.dispose();
-
-    // 🟢 NEW: typing subscriptions + debounce
     _groupTypingSub?.cancel();
     _typingDebounce?.cancel();
 
-    // Clear active chat presence for group
     if (_currentUserId.isNotEmpty) {
       _chatProvider.setActiveChatRoom(userId: _currentUserId, chatRoomId: null);
 
-      // 🟢 NEW: ensure our typing flag is cleared for this room
       _chatProvider.setTypingStatus(
         chatRoomId: widget.chatRoomId,
         userId: _currentUserId,
@@ -238,7 +224,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
       );
     }
 
-    // ✅ UI-only suppression: clear when leaving group
     _notifService.setActiveChatRoomId(null);
 
     _focusNode.dispose();
@@ -260,16 +245,13 @@ class _GroupChatPageState extends State<GroupChatPage> {
   void _openProfileFromMembers(UserProfile user) {
     if (user.id.isEmpty) return;
 
-    // close the bottom sheet first (prevents stacked UI weirdness)
     Navigator.of(context).pop();
 
-    // ✅ If it's me, jump to MainLayout -> Profile tab
     if (user.id == _currentUserId) {
       _goToMyProfileInMainLayout();
       return;
     }
 
-    // ✅ Otherwise open other user's profile
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => ProfilePage(userId: user.id)),
@@ -285,16 +267,13 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
-    // ✅ UI-only suppression: hide notif while this group is open
     _notifService.setActiveChatRoomId(widget.chatRoomId);
 
-    // ✅ Presence: mark this room active (like DM)
     await chatProvider.setActiveChatRoom(
       userId: _currentUserId,
       chatRoomId: widget.chatRoomId,
     );
 
-    // ✅ Important: wait for messages to be fetched / ready
     await chatProvider.listenToRoom(widget.chatRoomId);
 
     if (widget.sendDraftOnOpen == true &&
@@ -310,8 +289,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
     if (!mounted) return;
 
-    // ✅ Let first frame build (like DM) — but do NOT mark read here.
-    // Mark read will happen once the unread separator captured in build().
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       _scrollDown();
@@ -419,8 +396,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
       final List<UserProfile> profiles = [];
       bool isAdmin = false;
-
-      // ✅ NEW
       final Set<String> adminIds = {};
 
       for (final row in links) {
@@ -447,7 +422,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
         }
       }
 
-      // ✅ Optional: admins first
       profiles.sort((a, b) {
         final aIsAdmin = adminIds.contains(a.id);
         final bIsAdmin = adminIds.contains(b.id);
@@ -511,14 +485,10 @@ class _GroupChatPageState extends State<GroupChatPage> {
               final name = user.name.isNotEmpty ? user.name : user.username;
               final isAdmin = _adminIds.contains(user.id);
 
-              // ✅ Community-style row + badge
               return GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () {
-                  // close sheet first
                   Navigator.of(sheetCtx).pop();
-
-                  // then navigate next frame
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     if (!mounted) return;
                     _openProfileFromMembers(user);
@@ -570,11 +540,10 @@ class _GroupChatPageState extends State<GroupChatPage> {
                           ),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(999),
-                            color:
-                            colorScheme.primary.withValues(alpha: 0.10),
+                            color: colorScheme.primary.withValues(alpha: 0.10),
                           ),
                           child: Text(
-                            'Admin'.tr(), // optionally: 'group_admin'.tr()
+                            'Admin'.tr(),
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -596,10 +565,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
   Widget _buildGroupAvatar({double size = 34}) {
     final cs = Theme.of(context).colorScheme;
     final url = (_groupAvatarUrl ?? '').trim();
-
-    // ✅ Same fallback logic as MyGroupTile:
-    // - image if available
-    // - else show first letter of group name
     final rawName = widget.groupName.trim();
     final initial = rawName.isNotEmpty ? rawName[0].toUpperCase() : 'G';
 
@@ -769,7 +734,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
       final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
-      // ✅ you will add this method in ChatProvider + ChatService (below)
       final newUrl = await chatProvider.updateGroupAvatar(
         chatRoomId: widget.chatRoomId,
         filePath: picked.path,
@@ -778,7 +742,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
       if (!mounted) return;
 
       setState(() {
-        _groupAvatarUrl = newUrl; // ✅ update appbar instantly
+        _groupAvatarUrl = newUrl;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -842,9 +806,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
     if (_voiceRecorder.isRecording) return;
 
     _voiceRecorder.start().then((_) {
-      if (mounted) {
-        setState(() {});
-      }
+      if (mounted) setState(() {});
     });
   }
 
@@ -856,10 +818,8 @@ class _GroupChatPageState extends State<GroupChatPage> {
     if (!_voiceRecorder.isRecording) return;
 
     try {
-      await _voiceRecorder.stop(); // discard
-      if (mounted) {
-        setState(() {});
-      }
+      await _voiceRecorder.stop();
+      if (mounted) setState(() {});
       debugPrint('🎤 Group voice recording cancelled by slide');
     } catch (e) {
       debugPrint('Error cancelling group voice recording: $e');
@@ -915,7 +875,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
     final provider = Provider.of<ChatProvider>(context, listen: false);
     final replyId = _replyTo?.id;
 
-    // Only clear the input if this was a normal send (not an auto-send marker)
     if (textOverride == null) {
       _messageController.clear();
     }
@@ -1074,7 +1033,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
     );
   }
 
-  // Multi-select helpers
   void _startSelection(MessageModel msg) {
     if (msg.senderId != _currentUserId) {
       _onGroupBubbleLongPress(msg, false);
@@ -1261,7 +1219,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
     String label;
 
-    // ✅ FIX: shared post detection
     if (PostShare.isPostShareMessage(msg.message)) {
       label = 'Shared post'.tr();
     } else if (msg.message.trim().isNotEmpty) {
@@ -1314,7 +1271,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
     final baseTitle = localizeGroupName(widget.groupName);
 
-    // ✅ Compute marriage inquiry title with name (works for GroupsPage + notification taps)
     String computedTitle = baseTitle;
 
     final isMarriageInquiryRoom =
@@ -1327,9 +1283,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
       final manName = (widget.manName ?? '').toString().trim();
       final womanName = (widget.womanName ?? '').toString().trim();
 
-      // Your rule:
-      // - man sees: Marriage inquiry for (woman)
-      // - woman + mahram see: Marriage inquiry for (man)
       final targetName = (_currentUserId == manId) ? womanName : manName;
 
       if (targetName.isNotEmpty) {
@@ -1353,672 +1306,749 @@ class _GroupChatPageState extends State<GroupChatPage> {
           });
         }
       },
-      child: Scaffold(
-        resizeToAvoidBottomInset: true,
-        appBar: AppBar(
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              colorScheme.surface,
+              colorScheme.surface,
+              colorScheme.surfaceContainerLowest,
+            ],
+          ),
+        ),
+        child: Scaffold(
           backgroundColor: Colors.transparent,
-          elevation: 0,
-          foregroundColor: colorScheme.primary,
-          centerTitle: false,
-          title: _isSelectionMode
-              ? Text(
-            '${_selectedMessageIds.length} ${"selected".tr()}',
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          )
-              : Row(
-            children: [
-              _buildGroupAvatar(size: 34),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        appBarTitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15, // ✅ smaller title text
-                          height: 1.1,
+          resizeToAvoidBottomInset: true,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            foregroundColor: colorScheme.primary,
+            centerTitle: false,
+            title: _isSelectionMode
+                ? Text(
+              '${_selectedMessageIds.length} ${"selected".tr()}',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            )
+                : Row(
+              children: [
+                _buildGroupAvatar(size: 34),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          appBarTitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                            height: 1.1,
+                          ),
                         ),
                       ),
-                    ),
-                    Text(
-                      subtitleText,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color:
-                        colorScheme.primary.withValues(alpha: 0.7),
+                      Text(
+                        subtitleText,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color:
+                          colorScheme.primary.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: _isSelectionMode
+                ? [
+              if (_selectedMessageIds.length == 1)
+                IconButton(
+                  icon: const Icon(Icons.reply),
+                  onPressed: _replyToSelectedGroupMessage,
+                ),
+              IconButton(
+                icon: const Icon(Icons.delete),
+                onPressed: _selectedMessageIds.isEmpty
+                    ? null
+                    : _confirmDeleteSelectedGroupMessages,
+              ),
+            ]
+                : [
+              PopupMenuButton<_GroupMenuAction>(
+                icon: const Icon(Icons.more_vert),
+                onSelected: (action) async {
+                  switch (action) {
+                    case _GroupMenuAction.viewMembers:
+                      _showMembersBottomSheet();
+                      break;
+                    case _GroupMenuAction.addMembers:
+                      await _openAddMembers();
+                      break;
+                    case _GroupMenuAction.changeGroupPhoto:
+                      await _changeGroupPhoto();
+                      break;
+                    case _GroupMenuAction.leaveGroup:
+                      await _confirmLeaveGroup();
+                      break;
+                    case _GroupMenuAction.deleteGroup:
+                      await _confirmDeleteGroup();
+                      break;
+                  }
+                },
+                itemBuilder: (context) {
+                  final items = <PopupMenuEntry<_GroupMenuAction>>[];
+
+                  items.add(
+                    PopupMenuItem(
+                      value: _GroupMenuAction.viewMembers,
+                      child: Row(
+                        children: [
+                          Icon(Icons.group_outlined,
+                              size: 20, color: colorScheme.primary),
+                          const SizedBox(width: 12),
+                          Text('View members'.tr()),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  );
+
+                  if (_isCurrentUserAdmin) {
+                    items.add(
+                      PopupMenuItem(
+                        value: _GroupMenuAction.addMembers,
+                        child: Row(
+                          children: [
+                            Icon(Icons.person_add_alt_1,
+                                size: 20, color: colorScheme.primary),
+                            const SizedBox(width: 12),
+                            Text('Add members'.tr()),
+                          ],
+                        ),
+                      ),
+                    );
+
+                    items.add(
+                      PopupMenuItem(
+                        value: _GroupMenuAction.changeGroupPhoto,
+                        child: Row(
+                          children: [
+                            Icon(Icons.photo_camera_back_outlined,
+                                size: 20, color: colorScheme.primary),
+                            const SizedBox(width: 12),
+                            Text('Change group photo'.tr()),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  items.add(
+                    PopupMenuItem(
+                      value: _GroupMenuAction.leaveGroup,
+                      child: Row(
+                        children: [
+                          Icon(Icons.logout,
+                              size: 20, color: Colors.red.shade600),
+                          const SizedBox(width: 12),
+                          Text('Leave group'.tr()),
+                        ],
+                      ),
+                    ),
+                  );
+
+                  if (_isCurrentUserAdmin) {
+                    items.add(
+                      PopupMenuItem(
+                        value: _GroupMenuAction.deleteGroup,
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_forever_outlined,
+                                size: 20, color: Colors.red.shade600),
+                            const SizedBox(width: 12),
+                            Text('Delete group'.tr()),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  return items;
+                },
               ),
             ],
           ),
-          actions: _isSelectionMode
-              ? [
-            if (_selectedMessageIds.length == 1)
-              IconButton(
-                icon: const Icon(Icons.reply),
-                onPressed: _replyToSelectedGroupMessage,
-              ),
-            IconButton(
-              icon: const Icon(Icons.delete),
-              onPressed: _selectedMessageIds.isEmpty
-                  ? null
-                  : _confirmDeleteSelectedGroupMessages,
-            ),
-          ]
-              : [
-            PopupMenuButton<_GroupMenuAction>(
-              icon: const Icon(Icons.more_vert),
-              onSelected: (action) async {
-                switch (action) {
-                  case _GroupMenuAction.viewMembers:
-                    _showMembersBottomSheet();
-                    break;
-                  case _GroupMenuAction.addMembers:
-                    await _openAddMembers();
-                    break;
-                  case _GroupMenuAction.changeGroupPhoto:
-                    await _changeGroupPhoto();
-                    break;
-                  case _GroupMenuAction.leaveGroup:
-                    await _confirmLeaveGroup();
-                    break;
-                  case _GroupMenuAction.deleteGroup:
-                    await _confirmDeleteGroup();
-                    break;
-                }
-              },
-              itemBuilder: (context) {
-                final items = <PopupMenuEntry<_GroupMenuAction>>[];
+          body: SafeArea(
+            top: false,
+            child: Column(
+              children: [
+                Expanded(
+                  child: Consumer<ChatProvider>(
+                    builder: (context, provider, _) {
+                      final rawMessages = provider.getMessages(widget.chatRoomId);
 
-                // 1) Everyone
-                items.add(
-                  PopupMenuItem(
-                    value: _GroupMenuAction.viewMembers,
-                    child: Row(
-                      children: [
-                        Icon(Icons.group_outlined,
-                            size: 20, color: colorScheme.primary),
-                        const SizedBox(width: 12),
-                        Text('View members'.tr()),
-                      ],
-                    ),
-                  ),
-                );
-
-                // 2) Admin-only (safe actions)
-                if (_isCurrentUserAdmin) {
-                  items.add(
-                    PopupMenuItem(
-                      value: _GroupMenuAction.addMembers,
-                      child: Row(
-                        children: [
-                          Icon(Icons.person_add_alt_1,
-                              size: 20, color: colorScheme.primary),
-                          const SizedBox(width: 12),
-                          Text('Add members'.tr()),
-                        ],
-                      ),
-                    ),
-                  );
-
-                  items.add(
-                    PopupMenuItem(
-                      value: _GroupMenuAction.changeGroupPhoto,
-                      child: Row(
-                        children: [
-                          Icon(Icons.photo_camera_back_outlined,
-                              size: 20, color: colorScheme.primary),
-                          const SizedBox(width: 12),
-                          Text('Change group photo'.tr()),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-
-                // 3) Leave (everyone) — BEFORE delete
-                items.add(
-                  PopupMenuItem(
-                    value: _GroupMenuAction.leaveGroup,
-                    child: Row(
-                      children: [
-                        Icon(Icons.logout,
-                            size: 20, color: Colors.red.shade600),
-                        const SizedBox(width: 12),
-                        Text('Leave group'.tr()),
-                      ],
-                    ),
-                  ),
-                );
-
-                // 4) Delete (admin only) — LAST
-                if (_isCurrentUserAdmin) {
-                  items.add(
-                    PopupMenuItem(
-                      value: _GroupMenuAction.deleteGroup,
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete_forever_outlined,
-                              size: 20, color: Colors.red.shade600),
-                          const SizedBox(width: 12),
-                          Text('Delete group'.tr()),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-
-                return items;
-              },
-            ),
-          ],
-        ),
-        body: SafeArea(
-          top: false,
-          child: Column(
-            children: [
-              Expanded(
-                child: Consumer<ChatProvider>(
-                  builder: (context, provider, _) {
-                    final rawMessages = provider.getMessages(widget.chatRoomId);
-
-                    if (rawMessages.isEmpty) {
-                      return Center(child: Text("No messages yet".tr()));
-                    }
-
-                    final messages =
-                    rawMessages.map((m) => MessageModel.fromMap(m)).toList()
-                      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-
-                    int unreadCount = 0;
-                    int? firstUnreadIndexFromStart;
-                    if (_currentUserId.isNotEmpty) {
-                      for (int i = 0; i < messages.length; i++) {
-                        final m = messages[i];
-                        final isMine = m.senderId == _currentUserId;
-                        if (!m.isRead && !isMine) {
-                          unreadCount++;
-                          firstUnreadIndexFromStart ??= i;
-                        }
-                      }
-                    }
-
-                    final groups = MessageGrouping.build(messages);
-
-                    // ✅ NEW: map every message id -> rendered bubble id (group renders by last.id)
-                    final map = <String, String>{};
-                    for (final g in groups) {
-                      final renderedId = g.last.id;
-                      for (final m in g.messages) {
-                        map[m.id] = renderedId;
-                      }
-                    }
-                    _replyTargetToRenderedBubbleId = map;
-
-                    final messageIndexToGroupIndex = List<int>.filled(
-                      messages.length,
-                      0,
-                    );
-                    for (int gi = 0; gi < groups.length; gi++) {
-                      final g = groups[gi];
-                      for (final m in g.messages) {
-                        final idx = messages.indexOf(m);
-                        if (idx != -1) {
-                          messageIndexToGroupIndex[idx] = gi;
-                        }
-                      }
-                    }
-
-                    int? firstUnreadGroupIndex;
-                    if (firstUnreadIndexFromStart != null) {
-                      firstUnreadGroupIndex =
-                      messageIndexToGroupIndex[firstUnreadIndexFromStart];
-                    }
-
-                    // ✅ Capture initial unread index + count ONCE
-                    if (!_hasCapturedInitialUnreadIndex) {
-                      _initialUnreadGroupIndex = firstUnreadGroupIndex;
-                      _initialUnreadCount = unreadCount;
-                      _hasCapturedInitialUnreadIndex = true;
-                    }
-
-                    // ✅ DM-like fix: do initial mark-read ONLY after capture
-                    if (_hasCapturedInitialUnreadIndex && !_didInitialMarkRead) {
-                      _didInitialMarkRead = true;
-                      WidgetsBinding.instance.addPostFrameCallback((_) async {
-                        if (!mounted) return;
-                        if (_currentUserId.isEmpty) return;
-                        await provider.markGroupMessagesAsRead(
-                          widget.chatRoomId,
-                          _currentUserId,
-                        );
-                      });
-                    }
-
-                    // Detect new messages while open
-                    if (_currentUserId.isNotEmpty &&
-                        messages.length != _lastMessageCount) {
-                      if (_lastMessageCount > 0 &&
-                          messages.length > _lastMessageCount) {
-                        _hideUnreadSeparatorForNewMessages = true;
-                      }
-
-                      if (_isNearBottom()) {
-                        _scrollDown();
-                      }
-
-                      _lastMessageCount = messages.length;
-
-                      if (_hasCapturedInitialUnreadIndex) {
-                        provider.markGroupMessagesAsRead(
-                          widget.chatRoomId,
-                          _currentUserId,
-                        );
-                      }
-                    }
-
-                    return ListView.builder(
-                      controller: _scrollController,
-                      reverse: true,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: groups.length,
-                      itemBuilder: (context, index) {
-                        final groupIndex = groups.length - 1 - index;
-                        final group = groups[groupIndex];
-
-                        final firstMsg = group.first;
-                        final lastMsg = group.last;
-
-                        final bool isCurrentUser =
-                            firstMsg.senderId == _currentUserId;
-
-                        final String senderName =
-                        _displayNameForSender(firstMsg.senderId);
-
-                        final Color senderColor =
-                        _colorForSender(firstMsg.senderId, colorScheme);
-
-                        final imageUrls = group.messages
-                            .map((m) => m.imageUrl)
-                            .whereType<String>()
-                            .where((u) => u.trim().isNotEmpty)
-                            .toList();
-
-                        final String? groupVideoUrl = group.messages
-                            .map((m) => m.videoUrl)
-                            .whereType<String>()
-                            .firstWhere(
-                              (u) => u.trim().isNotEmpty,
-                          orElse: () => '',
-                        );
-
-                        final String? effectiveVideoUrl =
-                        (groupVideoUrl != null &&
-                            groupVideoUrl.trim().isNotEmpty)
-                            ? groupVideoUrl
-                            : null;
-
-                        final List<String> likedBy = lastMsg.likedBy;
-                        final bool isLikedByMe = _currentUserId.isNotEmpty &&
-                            likedBy.contains(_currentUserId);
-                        final int likeCount = likedBy.length;
-
-                        final msgDate = firstMsg.createdAt;
-                        DateTime? prevDate;
-                        if (groupIndex > 0) {
-                          prevDate = groups[groupIndex - 1].first.createdAt;
-                        }
-                        final showDayDivider =
-                            prevDate == null || !isSameDay(msgDate, prevDate);
-
-                        final showUnreadSeparator =
-                            _initialUnreadGroupIndex != null &&
-                                groupIndex == _initialUnreadGroupIndex &&
-                                !_hideUnreadSeparatorForNewMessages;
-
-                        MessageModel? repliedTo;
-                        if (lastMsg.replyToMessageId != null &&
-                            lastMsg.replyToMessageId!.trim().isNotEmpty) {
-                          try {
-                            repliedTo = messages.firstWhere(
-                                  (m) => m.id == lastMsg.replyToMessageId,
-                            );
-                          } catch (_) {
-                            repliedTo = null;
-                          }
-                        }
-
-                        String? replyAuthorName;
-                        String? replySnippet;
-                        bool replyHasMedia = false;
-
-                        String? replyImageUrl;
-                        String? replyPostId;
-                        bool replyIsPostShare = false;
-
-                        if (repliedTo != null) {
-                          replyAuthorName =
-                              _displayNameForSender(repliedTo.senderId);
-
-                          if (PostShare.isPostShareMessage(repliedTo.message)) {
-                            replyIsPostShare = true;
-                            replyHasMedia = true;
-                            replyPostId =
-                                PostShare.extractPostId(repliedTo.message);
-                            replySnippet = 'Shared post'.tr();
-                          } else if ((repliedTo.imageUrl ?? '')
-                              .trim()
-                              .isNotEmpty) {
-                            replyHasMedia = true;
-                            replyImageUrl = repliedTo.imageUrl!.trim();
-                            replySnippet = 'Photo'.tr();
-                          } else if ((repliedTo.videoUrl ?? '')
-                              .trim()
-                              .isNotEmpty) {
-                            replyHasMedia = true;
-                            replySnippet = 'Video'.tr();
-                          } else if ((repliedTo.audioUrl ?? '').trim().isNotEmpty ||
-                              repliedTo.isAudio) {
-                            replyHasMedia = true;
-                            replySnippet = 'Voice message'.tr();
-                          } else if (repliedTo.message.trim().isNotEmpty) {
-                            replySnippet = repliedTo.message.trim();
-                          } else {
-                            replySnippet = 'Message'.tr();
-                          }
-                        }
-
-                        // ✅ SYSTEM MESSAGE SUPPORT (Marriage inquiry intro)
-                        final bool isSystemMessage =
-                        (lastMsg.message).trim().startsWith('SYSTEM:');
-
-                        if (isSystemMessage) {
-                          // Format: SYSTEM:<translation_key>
-                          final parts = lastMsg.message.trim().split(':');
-                          final key = parts.length > 1
-                              ? parts.sublist(1).join(':').trim()
-                              : '';
-
-                          final text =
-                          key.isNotEmpty ? key.tr() : lastMsg.message;
-
-                          return Column(
-                            children: [
-                              if (showDayDivider)
-                                buildDayBubble(context: context, date: msgDate),
-                              if (showUnreadSeparator)
-                                buildUnreadBubble(
-                                  context: context,
-                                  unreadCount:
-                                  _initialUnreadCount ?? unreadCount,
-                                ),
-                              // ✅ Centered system bubble
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 10,
-                                  horizontal: 24,
-                                ),
-                                child: Center(
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 14,
-                                      vertical: 10,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: colorScheme.secondary
-                                          .withValues(alpha: 0.8),
-                                      borderRadius: BorderRadius.circular(14),
-                                      border: Border.all(
-                                        color: colorScheme.primary
-                                            .withValues(alpha: 0.12),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      text,
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontStyle: FontStyle.italic,
-                                        color: Colors.white,
-                                        height: 1.25,
-                                      ),
-                                    ),
-                                  ),
-                                ),
+                      if (rawMessages.isEmpty) {
+                        return Center(
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 24),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 28,
+                            ),
+                            decoration: BoxDecoration(
+                              color: colorScheme.surfaceContainerHigh,
+                              borderRadius: BorderRadius.circular(28),
+                              border: Border.all(
+                                color: colorScheme.outlineVariant
+                                    .withValues(alpha: 0.50),
                               ),
-                            ],
-                          );
-                        }
-
-                        Widget innerBubble;
-
-                        // ✅ 1) Voice message bubble stays the same
-                        if (lastMsg.isAudio &&
-                            (lastMsg.audioUrl ?? '').trim().isNotEmpty) {
-                          innerBubble = MyVoiceMessageBubble(
-                            key: ValueKey(lastMsg.id),
-                            audioUrl: lastMsg.audioUrl!,
-                            isCurrentUser: isCurrentUser,
-                            durationSeconds: lastMsg.audioDurationSeconds,
-                          );
-
-                          // ✅ 2) Shared post preview bubble (same solution as ChatPage)
-                        } else if (PostShare.isPostShareMessage(lastMsg.message)) {
-                          final sharedPostId =
-                          PostShare.extractPostId(lastMsg.message);
-
-                          innerBubble = _SharedPostBubble(
-                            postId: sharedPostId ?? '',
-                            isCurrentUser: isCurrentUser,
-                            createdAt: lastMsg.createdAt,
-                            onTap: () {
-                              if (sharedPostId == null ||
-                                  sharedPostId.trim().isEmpty) return;
-
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => PostPage(
-                                    post: null,
-                                    postId: sharedPostId.trim(),
-                                    highlightPost: true,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.04),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 64,
+                                  height: 64,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: colorScheme.primary
+                                        .withValues(alpha: 0.10),
+                                  ),
+                                  child: Icon(
+                                    Icons.forum_outlined,
+                                    size: 30,
+                                    color: colorScheme.primary,
                                   ),
                                 ),
-                              );
-                            },
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Start the conversation'.tr(),
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                    color: colorScheme.onSurface,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Send the first message to this group.'.tr(),
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    height: 1.45,
+                                    color: colorScheme.onSurface
+                                        .withValues(alpha: 0.68),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Messages will appear here once the chat begins.'
+                                      .tr(),
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    height: 1.4,
+                                    color: colorScheme.onSurface
+                                        .withValues(alpha: 0.58),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+
+                      final messages =
+                      rawMessages.map((m) => MessageModel.fromMap(m)).toList()
+                        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+                      int unreadCount = 0;
+                      int? firstUnreadIndexFromStart;
+                      if (_currentUserId.isNotEmpty) {
+                        for (int i = 0; i < messages.length; i++) {
+                          final m = messages[i];
+                          final isMine = m.senderId == _currentUserId;
+                          if (!m.isRead && !isMine) {
+                            unreadCount++;
+                            firstUnreadIndexFromStart ??= i;
+                          }
+                        }
+                      }
+
+                      final groups = MessageGrouping.build(messages);
+
+                      final map = <String, String>{};
+                      for (final g in groups) {
+                        final renderedId = g.last.id;
+                        for (final m in g.messages) {
+                          map[m.id] = renderedId;
+                        }
+                      }
+                      _replyTargetToRenderedBubbleId = map;
+
+                      final messageIndexToGroupIndex =
+                      List<int>.filled(messages.length, 0);
+                      for (int gi = 0; gi < groups.length; gi++) {
+                        final g = groups[gi];
+                        for (final m in g.messages) {
+                          final idx = messages.indexOf(m);
+                          if (idx != -1) {
+                            messageIndexToGroupIndex[idx] = gi;
+                          }
+                        }
+                      }
+
+                      int? firstUnreadGroupIndex;
+                      if (firstUnreadIndexFromStart != null) {
+                        firstUnreadGroupIndex =
+                        messageIndexToGroupIndex[firstUnreadIndexFromStart];
+                      }
+
+                      if (!_hasCapturedInitialUnreadIndex) {
+                        _initialUnreadGroupIndex = firstUnreadGroupIndex;
+                        _initialUnreadCount = unreadCount;
+                        _hasCapturedInitialUnreadIndex = true;
+                      }
+
+                      if (_hasCapturedInitialUnreadIndex && !_didInitialMarkRead) {
+                        _didInitialMarkRead = true;
+                        WidgetsBinding.instance.addPostFrameCallback((_) async {
+                          if (!mounted) return;
+                          if (_currentUserId.isEmpty) return;
+                          await provider.markGroupMessagesAsRead(
+                            widget.chatRoomId,
+                            _currentUserId,
+                          );
+                        });
+                      }
+
+                      if (_currentUserId.isNotEmpty &&
+                          messages.length != _lastMessageCount) {
+                        if (_lastMessageCount > 0 &&
+                            messages.length > _lastMessageCount) {
+                          _hideUnreadSeparatorForNewMessages = true;
+                        }
+
+                        if (_isNearBottom()) {
+                          _scrollDown();
+                        }
+
+                        _lastMessageCount = messages.length;
+
+                        if (_hasCapturedInitialUnreadIndex) {
+                          provider.markGroupMessagesAsRead(
+                            widget.chatRoomId,
+                            _currentUserId,
+                          );
+                        }
+                      }
+
+                      return ListView.builder(
+                        controller: _scrollController,
+                        reverse: true,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        itemCount: groups.length,
+                        itemBuilder: (context, index) {
+                          final groupIndex = groups.length - 1 - index;
+                          final group = groups[groupIndex];
+
+                          final firstMsg = group.first;
+                          final lastMsg = group.last;
+
+                          final bool isCurrentUser =
+                              firstMsg.senderId == _currentUserId;
+
+                          final String senderName =
+                          _displayNameForSender(firstMsg.senderId);
+
+                          final Color senderColor =
+                          _colorForSender(firstMsg.senderId, colorScheme);
+
+                          final imageUrls = group.messages
+                              .map((m) => m.imageUrl)
+                              .whereType<String>()
+                              .where((u) => u.trim().isNotEmpty)
+                              .toList();
+
+                          final String? groupVideoUrl = group.messages
+                              .map((m) => m.videoUrl)
+                              .whereType<String>()
+                              .firstWhere(
+                                (u) => u.trim().isNotEmpty,
+                            orElse: () => '',
                           );
 
-                          // ✅ 3) Normal bubble stays the same
-                        } else {
-                          innerBubble = MyChatBubble(
-                            key: ValueKey(lastMsg.id),
-                            message: lastMsg.message,
-                            imageUrls: imageUrls,
-                            imageUrl:
-                            imageUrls.isNotEmpty ? imageUrls.first : null,
-                            videoUrl: effectiveVideoUrl,
-                            isCurrentUser: isCurrentUser,
-                            createdAt: lastMsg.createdAt,
-                            isRead: lastMsg.isRead,
-                            isDelivered: lastMsg.isDelivered,
-                            isLikedByMe: isLikedByMe,
-                            likeCount: likeCount,
-                            isUploading: lastMsg.isUploading,
-                            isDeleted: lastMsg.isDeleted,
-                            onDoubleTap: () async {
-                              if (_isSelectionMode) return;
-                              if (_currentUserId.isEmpty) return;
+                          final String? effectiveVideoUrl =
+                          (groupVideoUrl != null &&
+                              groupVideoUrl.trim().isNotEmpty)
+                              ? groupVideoUrl
+                              : null;
 
-                              await provider.toggleLikeMessage(
-                                messageId: lastMsg.id,
-                                userId: _currentUserId,
+                          final List<String> likedBy = lastMsg.likedBy;
+                          final bool isLikedByMe = _currentUserId.isNotEmpty &&
+                              likedBy.contains(_currentUserId);
+                          final int likeCount = likedBy.length;
+
+                          final msgDate = firstMsg.createdAt;
+                          DateTime? prevDate;
+                          if (groupIndex > 0) {
+                            prevDate = groups[groupIndex - 1].first.createdAt;
+                          }
+                          final showDayDivider =
+                              prevDate == null || !isSameDay(msgDate, prevDate);
+
+                          final showUnreadSeparator =
+                              _initialUnreadGroupIndex != null &&
+                                  groupIndex == _initialUnreadGroupIndex &&
+                                  !_hideUnreadSeparatorForNewMessages;
+
+                          MessageModel? repliedTo;
+                          if (lastMsg.replyToMessageId != null &&
+                              lastMsg.replyToMessageId!.trim().isNotEmpty) {
+                            try {
+                              repliedTo = messages.firstWhere(
+                                    (m) => m.id == lastMsg.replyToMessageId,
                               );
-                            },
-                            onLongPress: !_isSelectionMode && !lastMsg.isDeleted
-                                ? () => _handleGroupBubbleLongPress(
+                            } catch (_) {
+                              repliedTo = null;
+                            }
+                          }
+
+                          String? replyAuthorName;
+                          String? replySnippet;
+                          bool replyHasMedia = false;
+
+                          String? replyImageUrl;
+                          String? replyPostId;
+                          bool replyIsPostShare = false;
+
+                          if (repliedTo != null) {
+                            replyAuthorName =
+                                _displayNameForSender(repliedTo.senderId);
+
+                            if (PostShare.isPostShareMessage(repliedTo.message)) {
+                              replyIsPostShare = true;
+                              replyHasMedia = true;
+                              replyPostId =
+                                  PostShare.extractPostId(repliedTo.message);
+                              replySnippet = 'Shared post'.tr();
+                            } else if ((repliedTo.imageUrl ?? '')
+                                .trim()
+                                .isNotEmpty) {
+                              replyHasMedia = true;
+                              replyImageUrl = repliedTo.imageUrl!.trim();
+                              replySnippet = 'Photo'.tr();
+                            } else if ((repliedTo.videoUrl ?? '')
+                                .trim()
+                                .isNotEmpty) {
+                              replyHasMedia = true;
+                              replySnippet = 'Video'.tr();
+                            } else if ((repliedTo.audioUrl ?? '')
+                                .trim()
+                                .isNotEmpty ||
+                                repliedTo.isAudio) {
+                              replyHasMedia = true;
+                              replySnippet = 'Voice message'.tr();
+                            } else if (repliedTo.message.trim().isNotEmpty) {
+                              replySnippet = repliedTo.message.trim();
+                            } else {
+                              replySnippet = 'Message'.tr();
+                            }
+                          }
+
+                          final bool isSystemMessage =
+                          (lastMsg.message).trim().startsWith('SYSTEM:');
+
+                          if (isSystemMessage) {
+                            final parts = lastMsg.message.trim().split(':');
+                            final key = parts.length > 1
+                                ? parts.sublist(1).join(':').trim()
+                                : '';
+
+                            final text =
+                            key.isNotEmpty ? key.tr() : lastMsg.message;
+
+                            return Column(
+                              children: [
+                                if (showDayDivider)
+                                  buildDayBubble(context: context, date: msgDate),
+                                if (showUnreadSeparator)
+                                  buildUnreadBubble(
+                                    context: context,
+                                    unreadCount:
+                                    _initialUnreadCount ?? unreadCount,
+                                  ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 10,
+                                    horizontal: 24,
+                                  ),
+                                  child: Center(
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 10,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(context).brightness ==
+                                            Brightness.dark
+                                            ? colorScheme.surfaceContainerHighest
+                                            : colorScheme.primary
+                                            .withValues(alpha: 0.16),
+                                        borderRadius: BorderRadius.circular(14),
+                                        border: Border.all(
+                                          color: colorScheme.primary
+                                              .withValues(alpha: 0.20),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        text,
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontStyle: FontStyle.italic,
+                                          fontWeight: FontWeight.w600,
+                                          color: Theme.of(context).brightness ==
+                                              Brightness.dark
+                                              ? colorScheme.onSurface
+                                              : colorScheme.onSurface
+                                              .withValues(alpha: 0.82),
+                                          height: 1.3,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          }
+
+                          Widget innerBubble;
+
+                          if (lastMsg.isAudio &&
+                              (lastMsg.audioUrl ?? '').trim().isNotEmpty) {
+                            innerBubble = MyVoiceMessageBubble(
+                              key: ValueKey(lastMsg.id),
+                              audioUrl: lastMsg.audioUrl!,
+                              isCurrentUser: isCurrentUser,
+                              durationSeconds: lastMsg.audioDurationSeconds,
+                            );
+                          } else if (PostShare.isPostShareMessage(lastMsg.message)) {
+                            final sharedPostId =
+                            PostShare.extractPostId(lastMsg.message);
+
+                            innerBubble = _SharedPostBubble(
+                              postId: sharedPostId ?? '',
+                              isCurrentUser: isCurrentUser,
+                              createdAt: lastMsg.createdAt,
+                              onTap: () {
+                                if (sharedPostId == null ||
+                                    sharedPostId.trim().isEmpty) {
+                                  return;
+                                }
+
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => PostPage(
+                                      post: null,
+                                      postId: sharedPostId.trim(),
+                                      highlightPost: true,
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          } else {
+                            innerBubble = MyChatBubble(
+                              key: ValueKey(lastMsg.id),
+                              message: lastMsg.message,
+                              imageUrls: imageUrls,
+                              imageUrl:
+                              imageUrls.isNotEmpty ? imageUrls.first : null,
+                              videoUrl: effectiveVideoUrl,
+                              isCurrentUser: isCurrentUser,
+                              createdAt: lastMsg.createdAt,
+                              isRead: lastMsg.isRead,
+                              isDelivered: lastMsg.isDelivered,
+                              isLikedByMe: isLikedByMe,
+                              likeCount: likeCount,
+                              isUploading: lastMsg.isUploading,
+                              isDeleted: lastMsg.isDeleted,
+                              onDoubleTap: () async {
+                                if (_isSelectionMode) return;
+                                if (_currentUserId.isEmpty) return;
+
+                                await provider.toggleLikeMessage(
+                                  messageId: lastMsg.id,
+                                  userId: _currentUserId,
+                                );
+                              },
+                              onLongPress:
+                              !_isSelectionMode && !lastMsg.isDeleted
+                                  ? () => _handleGroupBubbleLongPress(
+                                lastMsg,
+                                isCurrentUser,
+                              )
+                                  : null,
+                              onLikeTap: likedBy.isEmpty
+                                  ? null
+                                  : () {
+                                if (_isSelectionMode) return;
+                                _openLikesBottomSheet(likedBy);
+                              },
+                              senderName: isCurrentUser ? null : senderName,
+                              senderColor: isCurrentUser ? null : senderColor,
+                              replyAuthorName: replyAuthorName,
+                              replySnippet: replySnippet,
+                              replyHasMedia: replyHasMedia,
+                              onReplyTap: (lastMsg.replyToMessageId != null &&
+                                  lastMsg.replyToMessageId!
+                                      .trim()
+                                      .isNotEmpty)
+                                  ? () => _handleReplyTap(
+                                lastMsg.replyToMessageId!.trim(),
+                              )
+                                  : null,
+                              replyImageUrl: replyImageUrl,
+                              replyPostId: replyPostId,
+                              replyIsPostShare: replyIsPostShare,
+                            );
+                          }
+
+                          final bool isSelected =
+                          _selectedMessageIds.contains(lastMsg.id);
+
+                          final selectableBubble = MySelectableBubble(
+                            isSelected: isSelected,
+                            onLongPress: () => _handleGroupBubbleLongPress(
                               lastMsg,
                               isCurrentUser,
-                            )
-                                : null,
-                            onLikeTap: likedBy.isEmpty
-                                ? null
-                                : () {
-                              if (_isSelectionMode) return;
-                              _openLikesBottomSheet(likedBy);
+                            ),
+                            onTap: () {
+                              if (_isSelectionMode &&
+                                  lastMsg.senderId == _currentUserId) {
+                                _toggleSelection(lastMsg);
+                              }
                             },
-                            senderName: isCurrentUser ? null : senderName,
-                            senderColor: isCurrentUser ? null : senderColor,
-
-                            // ✅ Reply preview fields
-                            replyAuthorName: replyAuthorName,
-                            replySnippet: replySnippet,
-                            replyHasMedia: replyHasMedia,
-
-                            // ✅ NEW: tap reply quote to jump
-                            onReplyTap: (lastMsg.replyToMessageId != null &&
-                                lastMsg.replyToMessageId!
-                                    .trim()
-                                    .isNotEmpty)
-                                ? () => _handleReplyTap(
-                              lastMsg.replyToMessageId!.trim(),
-                            )
-                                : null,
-
-                            // NOTE:
-                            // Keep these only if your current MyChatBubble supports them.
-                            replyImageUrl: replyImageUrl,
-                            replyPostId: replyPostId,
-                            replyIsPostShare: replyIsPostShare,
+                            child: innerBubble,
                           );
-                        }
 
-                        final bool isSelected =
-                        _selectedMessageIds.contains(lastMsg.id);
+                          final bubbleKey = _renderedBubbleKeys.putIfAbsent(
+                            lastMsg.id,
+                                () => GlobalKey(),
+                          );
 
-                        final selectableBubble = MySelectableBubble(
-                          isSelected: isSelected,
-                          onLongPress: () => _handleGroupBubbleLongPress(
-                            lastMsg,
-                            isCurrentUser,
-                          ),
-                          onTap: () {
-                            if (_isSelectionMode &&
-                                lastMsg.senderId == _currentUserId) {
-                              _toggleSelection(lastMsg);
-                            }
-                          },
-                          child: innerBubble,
-                        );
-
-                        // ✅ NEW: attach key to the rendered group bubble
-                        final bubbleKey = _renderedBubbleKeys.putIfAbsent(
-                          lastMsg.id,
-                              () => GlobalKey(),
-                        );
-
-                        return KeyedSubtree(
-                          key: bubbleKey,
-                          child: Column(
-                            children: [
-                              if (showDayDivider)
-                                buildDayBubble(context: context, date: msgDate),
-                              if (showUnreadSeparator)
-                                buildUnreadBubble(
-                                  context: context,
-                                  unreadCount:
-                                  _initialUnreadCount ?? unreadCount,
+                          return KeyedSubtree(
+                            key: bubbleKey,
+                            child: Column(
+                              children: [
+                                if (showDayDivider)
+                                  buildDayBubble(context: context, date: msgDate),
+                                if (showUnreadSeparator)
+                                  buildUnreadBubble(
+                                    context: context,
+                                    unreadCount:
+                                    _initialUnreadCount ?? unreadCount,
+                                  ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 2,
+                                    horizontal: 8,
+                                  ),
+                                  child: Align(
+                                    alignment: isCurrentUser
+                                        ? Alignment.centerRight
+                                        : Alignment.centerLeft,
+                                    child: selectableBubble,
+                                  ),
                                 ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 2,
-                                  horizontal: 8,
-                                ),
-                                child: Align(
-                                  alignment: isCurrentUser
-                                      ? Alignment.centerRight
-                                      : Alignment.centerLeft,
-                                  child: selectableBubble,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    );
-                  },
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ),
-              ),
-              SafeArea(
-                top: false,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (typingLabel != null)
-                      Padding(
-                        padding: const EdgeInsets.only(
-                          left: 16,
-                          right: 16,
-                          bottom: 4,
-                        ),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            typingLabel,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontStyle: FontStyle.italic,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurface
-                                  .withValues(alpha: 0.7),
+                SafeArea(
+                  top: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (typingLabel != null)
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            left: 16,
+                            right: 16,
+                            bottom: 4,
+                          ),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              typingLabel,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontStyle: FontStyle.italic,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withValues(alpha: 0.7),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    if (_replyTo != null) _buildReplyPreviewBar(_replyTo!),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
-                      child: MyChatTextField(
-                        controller: _messageController,
-                        focusNode: _focusNode,
-                        onSendPressed: _sendMessage,
-                        onEmojiPressed: () => debugPrint("Emoji pressed"),
-                        onAttachmentPressed: () async {
-                          if (_currentUserId.isEmpty) return;
+                      if (_replyTo != null) _buildReplyPreviewBar(_replyTo!),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                        child: MyChatTextField(
+                          controller: _messageController,
+                          focusNode: _focusNode,
+                          onSendPressed: _sendMessage,
+                          onEmojiPressed: () => debugPrint("Emoji pressed"),
+                          onAttachmentPressed: () async {
+                            if (_currentUserId.isEmpty) return;
 
-                          await ChatMediaHelper.openAttachmentSheetForGroup(
-                            context: context,
-                            chatRoomId: widget.chatRoomId,
-                            currentUserId: _currentUserId,
-                          );
-                        },
-                        hasPendingAttachment: false,
-                        isRecording: _voiceRecorder.isRecording,
-                        recordingLabel: _voiceRecorder.isRecording
-                            ? 'recording_label'.tr(
-                          namedArgs: {
-                            'time': _voiceRecorder.formattedDuration,
+                            await ChatMediaHelper.openAttachmentSheetForGroup(
+                              context: context,
+                              chatRoomId: widget.chatRoomId,
+                              currentUserId: _currentUserId,
+                            );
                           },
-                        )
-                            : null,
-                        onMicLongPressStart: _handleMicLongPressStart,
-                        onMicLongPressEnd: _handleMicLongPressEnd,
-                        onMicCancel: _handleMicCancel,
+                          hasPendingAttachment: false,
+                          isRecording: _voiceRecorder.isRecording,
+                          recordingLabel: _voiceRecorder.isRecording
+                              ? 'recording_label'.tr(
+                            namedArgs: {
+                              'time': _voiceRecorder.formattedDuration,
+                            },
+                          )
+                              : null,
+                          onMicLongPressStart: _handleMicLongPressStart,
+                          onMicLongPressEnd: _handleMicLongPressEnd,
+                          onMicCancel: _handleMicCancel,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

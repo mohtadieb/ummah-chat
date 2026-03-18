@@ -105,10 +105,10 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
     if (currentUserId.isEmpty) {
       return Scaffold(
         appBar: AppBar(
-          title: Text('New group'.tr()),
           backgroundColor: colorScheme.surface,
           elevation: 0,
           scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
         ),
         body: Center(
           child: Text(
@@ -125,16 +125,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
         backgroundColor: colorScheme.surface,
         elevation: 0,
         scrolledUnderElevation: 0,
-        centerTitle: true,
-        title: Text(
-          'New group'.tr(),
-          style: TextStyle(
-            color: colorScheme.primary,
-            fontWeight: FontWeight.w700,
-            fontSize: 20,
-            letterSpacing: -0.2,
-          ),
-        ),
+        surfaceTintColor: Colors.transparent,
       ),
       body: Container(
         decoration: BoxDecoration(
@@ -159,17 +150,17 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
                         child: Container(
-                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                          padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(24),
+                            borderRadius: BorderRadius.circular(28),
                             gradient: LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                               colors: [
-                                colorScheme.primary.withValues(alpha: 0.12),
-                                colorScheme.secondary.withValues(alpha: 0.45),
+                                colorScheme.primary.withValues(alpha: 0.14),
+                                colorScheme.secondary.withValues(alpha: 0.55),
                                 colorScheme.surfaceContainerHigh,
                               ],
                             ),
@@ -178,17 +169,17 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
-                                blurRadius: 18,
-                                offset: const Offset(0, 8),
+                                color: Colors.black.withValues(alpha: 0.06),
+                                blurRadius: 24,
+                                offset: const Offset(0, 12),
                               ),
                             ],
                           ),
                           child: Row(
                             children: [
                               Container(
-                                width: 48,
-                                height: 48,
+                                width: 52,
+                                height: 52,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   color: colorScheme.primary.withValues(alpha: 0.14),
@@ -196,7 +187,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                                 child: Icon(
                                   Icons.groups_2_rounded,
                                   color: colorScheme.primary,
-                                  size: 24,
+                                  size: 26,
                                 ),
                               ),
                               const SizedBox(width: 14),
@@ -205,26 +196,29 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Create your group'.tr(),
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleMedium
-                                          ?.copyWith(
+                                      'Groups'.tr(),
+                                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                        color: colorScheme.onSurface.withValues(alpha: 0.65),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'New group'.tr(),
+                                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                                         fontWeight: FontWeight.w800,
-                                        color: colorScheme.primary,
+                                        letterSpacing: -0.3,
                                       ),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
                                       'Choose a name and select friends or mahrams to start chatting together.'
                                           .tr(),
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                        color: colorScheme.primary
-                                            .withValues(alpha: 0.72),
-                                        height: 1.35,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                        color: colorScheme.onSurface.withValues(alpha: 0.72),
+                                        height: 1.25,
                                       ),
                                     ),
                                   ],
@@ -234,7 +228,6 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                           ),
                         ),
                       ),
-
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                         child: TextField(
