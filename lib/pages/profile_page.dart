@@ -82,6 +82,8 @@ class _ProfilePageState extends State<ProfilePage> {
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _postsSectionKey = GlobalKey();
 
+  Future<List<UserProfile>>? _mahramsFuture;
+
   bool get _isOwnProfile => widget.userId == currentUserId;
 
   List<String> get _effectiveCompletedStoryIds {
@@ -139,6 +141,7 @@ class _ProfilePageState extends State<ProfilePage> {
       '👤 ProfilePage initState | userId=${widget.userId} | stateHash=${identityHashCode(this)}',
     );
 
+    _refreshMahramsSection();
     loadUser();
   }
 
@@ -181,8 +184,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   bool get _isDark => Theme.of(context).brightness == Brightness.dark;
 
-  Color get _pageBg =>
-      _cs.surface;
+  Color get _pageBg => _cs.surface;
 
   Color get _cardBg =>
       _isDark ? const Color(0xFF13201A) : const Color(0xFFFFFFFF);
@@ -207,7 +209,6 @@ class _ProfilePageState extends State<ProfilePage> {
       setState(() => _showPosts = true);
     }
 
-    // Wait for the posts section to expand and the ListView to recalculate height
     WidgetsBinding.instance.addPostFrameCallback((_) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted || !_scrollController.hasClients) return;
@@ -220,6 +221,20 @@ class _ProfilePageState extends State<ProfilePage> {
           curve: Curves.easeOutCubic,
         );
       });
+    });
+  }
+
+  Future<List<UserProfile>> _loadMahramsFuture() {
+    if (_isOwnProfile) {
+      return databaseProvider.getMyMahrams();
+    }
+    return databaseProvider.getMahramsForUser(widget.userId);
+  }
+
+  void _refreshMahramsSection() {
+    if (!mounted) return;
+    setState(() {
+      _mahramsFuture = _loadMahramsFuture();
     });
   }
 
@@ -541,6 +556,8 @@ class _ProfilePageState extends State<ProfilePage> {
     await databaseProvider.getCompletedStoriesForUser(widget.userId);
     if (!mounted) return;
 
+    _refreshMahramsSection();
+
     if (showGlobalLoader) setState(() => _isLoading = false);
   }
 
@@ -739,6 +756,7 @@ class _ProfilePageState extends State<ProfilePage> {
     required String optimisticStatus,
     required Future<void> Function() action,
     String? successRefreshOtherUserId,
+    bool refreshMahrams = false,
   }) async {
     if (_isFriendActionBusy) return;
 
@@ -762,7 +780,9 @@ class _ProfilePageState extends State<ProfilePage> {
         _isFriendActionBusy = false;
       });
 
-      await loadUser(showGlobalLoader: false);
+      if (refreshMahrams) {
+        _refreshMahramsSection();
+      }
     } catch (e, st) {
       debugPrint('❌ optimistic friend action failed: $e\n$st');
       if (!mounted) return;
@@ -832,13 +852,14 @@ class _ProfilePageState extends State<ProfilePage> {
     if (confirm != true) return;
 
     await databaseProvider.unfriendUser(widget.userId);
+
     final updated = await databaseProvider.getCombinedRelationshipStatus(
       widget.userId,
     );
+
     if (!mounted) return;
     setState(() => _friendStatus = updated);
-
-    await loadUser();
+    _refreshMahramsSection();
   }
 
   void _goToMyProfileInMainLayout() {
@@ -848,8 +869,14 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _cancelMahramFromProfile() async {
     await databaseProvider.cancelMahramRequest(widget.userId);
-    setState(() => _friendStatus = 'none');
-    await loadUser();
+
+    final updated = await databaseProvider.getCombinedRelationshipStatus(
+      widget.userId,
+    );
+
+    if (!mounted) return;
+    setState(() => _friendStatus = updated);
+    _refreshMahramsSection();
   }
 
   Future<void> _acceptMahramFromProfile() async {
@@ -890,7 +917,9 @@ class _ProfilePageState extends State<ProfilePage> {
           widget.userId,
         );
         if (!mounted) return;
+
         setState(() => _friendStatus = updated);
+        _refreshMahramsSection();
 
         ScaffoldMessenger.of(
           context,
@@ -904,14 +933,14 @@ class _ProfilePageState extends State<ProfilePage> {
           widget.userId,
         );
         if (!mounted) return;
+
         setState(() => _friendStatus = updated);
+        _refreshMahramsSection();
 
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('mahram_declined'.tr())));
       }
-
-      await loadUser();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -922,13 +951,14 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _declineMahramFromProfile() async {
     await databaseProvider.declineMahramRequest(widget.userId);
+
     final updated = await databaseProvider.getCombinedRelationshipStatus(
       widget.userId,
     );
+
     if (!mounted) return;
     setState(() => _friendStatus = updated);
-
-    await loadUser();
+    _refreshMahramsSection();
   }
 
   bool _isOppositeGender({
@@ -1101,7 +1131,7 @@ class _ProfilePageState extends State<ProfilePage> {
         '✅ Marriage inquiry created: $inquiryId | initiatedBy=$initiatedBy',
       );
 
-      await loadUser();
+      // await loadUser();
     } catch (e, st) {
       debugPrint('❌ _startMarriageInquiry failed: $e\n$st');
       if (!mounted) return;
@@ -1139,7 +1169,7 @@ class _ProfilePageState extends State<ProfilePage> {
         SnackBar(content: Text('mahram_selected_waiting_confirmation'.tr())),
       );
 
-      await loadUser();
+      // await loadUser();
     } catch (e, st) {
       debugPrint('❌ womanAcceptAndSelectMahramForInquiry failed: $e\n$st');
       if (!mounted) return;
@@ -1302,8 +1332,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
     if (!mounted) return;
     setState(() => _friendStatus = updated);
-
-    await loadUser();
   }
 
   Future<void> _confirmAndDeleteMahram({
@@ -1348,7 +1376,7 @@ class _ProfilePageState extends State<ProfilePage> {
     if (!mounted) return;
     setState(() => _friendStatus = updated);
 
-    await loadUser();
+    _refreshMahramsSection();
   }
 
   Widget _buildSectionShell({
@@ -1414,13 +1442,6 @@ class _ProfilePageState extends State<ProfilePage> {
     final colorScheme = Theme.of(context).colorScheme;
     final isOwn = _isOwnProfile;
 
-    Future<List<UserProfile>> loadMahrams() {
-      if (isOwn) {
-        return databaseProvider.getMyMahrams();
-      }
-      return databaseProvider.getMahramsForUser(widget.userId);
-    }
-
     void openMahramsFullScreen() {
       final displayName = (user?.name ?? '').trim();
       final firstName = displayName.isEmpty
@@ -1455,7 +1476,7 @@ class _ProfilePageState extends State<ProfilePage> {
     return Padding(
       padding: const EdgeInsets.only(top: 2.0),
       child: FutureBuilder<List<UserProfile>>(
-        future: loadMahrams(),
+        future: _mahramsFuture,
         builder: (context, snapshot) {
           if (snapshot.hasError) return const SizedBox.shrink();
 
@@ -1525,7 +1546,8 @@ class _ProfilePageState extends State<ProfilePage> {
                           height: 56,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: colorScheme.secondary.withValues(alpha: 0.35),
+                            color:
+                            colorScheme.secondary.withValues(alpha: 0.35),
                           ),
                         ),
                       ],
@@ -1561,11 +1583,13 @@ class _ProfilePageState extends State<ProfilePage> {
                         return ListView.separated(
                           scrollDirection: Axis.horizontal,
                           itemCount: itemCount,
-                          separatorBuilder: (_, __) => const SizedBox(width: 12),
+                          separatorBuilder: (_, __) =>
+                          const SizedBox(width: 12),
                           itemBuilder: (context, index) {
                             if (hasMore && index == itemCount - 1) {
                               return GestureDetector(
-                                onTap: openMahramsFullScreen,                                child: Column(
+                                onTap: openMahramsFullScreen,
+                                child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Container(
@@ -1622,7 +1646,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => ProfilePage(userId: mahram.id),
+                                    builder: (_) =>
+                                        ProfilePage(userId: mahram.id),
                                   ),
                                 );
                               },
@@ -1634,7 +1659,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                     radius: 26,
                                     isOnline: mahram.isOnline,
                                     isMahram: true,
-                                    fallbackIcon: Icons.verified_user_outlined,
+                                    fallbackIcon:
+                                    Icons.verified_user_outlined,
                                   ),
                                   const SizedBox(height: 6),
                                   SizedBox(
@@ -1778,7 +1804,8 @@ class _ProfilePageState extends State<ProfilePage> {
                           height: 56,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: colorScheme.secondary.withValues(alpha: 0.35),
+                            color:
+                            colorScheme.secondary.withValues(alpha: 0.35),
                           ),
                         ),
                       ],
@@ -1814,7 +1841,8 @@ class _ProfilePageState extends State<ProfilePage> {
                         return ListView.separated(
                           scrollDirection: Axis.horizontal,
                           itemCount: itemCount,
-                          separatorBuilder: (_, __) => const SizedBox(width: 12),
+                          separatorBuilder: (_, __) =>
+                          const SizedBox(width: 12),
                           itemBuilder: (context, index) {
                             if (hasMore && index == itemCount - 1) {
                               return GestureDetector(
@@ -2287,7 +2315,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       _isFriendActionBusy = false;
                     });
 
-                    await loadUser();
+                    // await loadUser();
                   } catch (e, st) {
                     debugPrint('❌ inquiry accept failed: $e\n$st');
                     if (!mounted) return;
@@ -2363,6 +2391,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     optimisticStatus: 'none',
                     action: () =>
                         databaseProvider.declineMahramRequest(widget.userId),
+                    refreshMahrams: true,
                   );
                   return;
                 }
