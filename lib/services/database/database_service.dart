@@ -2813,7 +2813,7 @@ class DatabaseService {
 
     final inquiry = await _db
         .from('marriage_inquiries')
-        .select('id, man_id, woman_id, chat_room_id, status')
+        .select('id, man_id, woman_id, mahram_id, chat_room_id, status')
         .eq('id', inquiryId)
         .maybeSingle();
 
@@ -2821,12 +2821,35 @@ class DatabaseService {
 
     final manId = (inquiry['man_id'] ?? '').toString();
     final womanId = (inquiry['woman_id'] ?? '').toString();
+    final mahramId = (inquiry['mahram_id'] ?? '').toString();
     final chatRoomId = (inquiry['chat_room_id'] ?? '').toString();
 
     final isParty = currentUserId == manId || currentUserId == womanId;
     if (!isParty) {
       throw Exception('Only man or woman can cancel/end the inquiry.');
     }
+
+    final bool endedByMan = currentUserId == manId;
+
+    final actorProfile = await getUserFromDatabase(currentUserId);
+    final actorName = (actorProfile?.name ?? '').trim().isNotEmpty
+        ? actorProfile!.name.trim()
+        : ((actorProfile?.username ?? '').trim().isNotEmpty
+        ? actorProfile!.username.trim()
+        : 'Someone');
+
+    // Notify everyone except the actor
+    final List<String> targets = <String>[
+      if (manId.isNotEmpty && manId != currentUserId) manId,
+      if (womanId.isNotEmpty && womanId != currentUserId) womanId,
+      if (mahramId.isNotEmpty && mahramId != currentUserId) mahramId,
+    ].toSet().toList();
+
+    // This id is used by NotificationPage tap -> ProfilePage(...)
+    // For the cleanest behavior:
+    // - if man ended, open the man's profile for the others
+    // - if woman ended, open the woman's profile for the others
+    final profileToOpenId = endedByMan ? manId : womanId;
 
     // ✅ If group exists -> delete group + end inquiry via secure RPC
     if (chatRoomId.isNotEmpty) {
@@ -2840,6 +2863,28 @@ class DatabaseService {
         params: {'p_inquiry_id': inquiryId},
       );
 
+      for (final targetUserId in targets) {
+        await NotificationService().createNotificationForUser(
+          targetUserId: targetUserId,
+          title: 'notif_marriage_inquiry_ended'.tr(namedArgs: {
+            'name': actorName,
+          }),
+          body: 'MARRIAGE_INQUIRY_ENDED:$inquiryId::$profileToOpenId',
+          sendPush: true,
+          data: {
+            'type': 'MARRIAGE_INQUIRY_ENDED',
+            'inquiryId': inquiryId,
+            'otherUserId': profileToOpenId,
+            'endedByUserId': currentUserId,
+            'endedByName': actorName,
+          },
+          fromUserId: currentUserId,
+          type: 'social',
+          unreadCount: 1,
+          isRead: false,
+        );
+      }
+
       return;
     }
 
@@ -2847,17 +2892,14 @@ class DatabaseService {
     final updated = await _db
         .from('marriage_inquiries')
         .update({
-          'status': 'cancelled',
-          // you can omit updated_at if you have trigger set_updated_at()
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        })
+      'status': 'cancelled',
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    })
         .eq('id', inquiryId)
-        // ✅ IMPORTANT: force RETURNING so RLS issues don't fail silently
         .select('id, status, updated_at')
         .maybeSingle();
 
     if (updated == null) {
-      // This almost always means UPDATE was blocked by RLS (0 rows affected)
       throw Exception(
         'Cancel failed: update blocked (RLS) or inquiry not found.',
       );
@@ -2867,6 +2909,28 @@ class DatabaseService {
       'delete_marriage_inquiry_notifications_for_all',
       params: {'p_inquiry_id': inquiryId},
     );
+
+    for (final targetUserId in targets) {
+      await NotificationService().createNotificationForUser(
+        targetUserId: targetUserId,
+        title: 'notif_marriage_inquiry_ended'.tr(namedArgs: {
+          'name': actorName,
+        }),
+        body: 'MARRIAGE_INQUIRY_ENDED:$inquiryId::$profileToOpenId',
+        sendPush: true,
+        data: {
+          'type': 'MARRIAGE_INQUIRY_ENDED',
+          'inquiryId': inquiryId,
+          'otherUserId': profileToOpenId,
+          'endedByUserId': currentUserId,
+          'endedByName': actorName,
+        },
+        fromUserId: currentUserId,
+        type: 'social',
+        unreadCount: 1,
+        isRead: false,
+      );
+    }
   }
 
   Future<Map<String, dynamic>?> getInquiryByIdInDatabase(

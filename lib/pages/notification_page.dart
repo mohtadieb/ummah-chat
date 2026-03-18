@@ -487,6 +487,14 @@ class _NotificationPageState extends State<NotificationPage> {
       return 'notif_marriage_inquiry_declined'.tr(namedArgs: {'name': name});
     }
 
+    if (body.startsWith('MARRIAGE_INQUIRY_ENDED:')) {
+      final rest = body.substring('MARRIAGE_INQUIRY_ENDED:'.length);
+      final parts = rest.split('::');
+      final otherUserId = parts.length > 1 ? parts[1].trim() : '';
+      final name = _nameFromIdOrFallback(otherUserId, legacyName);
+      return 'notif_marriage_inquiry_ended'.tr(namedArgs: {'name': name});
+    }
+
     return rawTitle.isNotEmpty ? rawTitle : 'Notifications'.tr();
   }
 
@@ -706,6 +714,10 @@ class _NotificationPageState extends State<NotificationPage> {
           'MARRIAGE_INQUIRY_MAHRAM_ACCEPTED_SENT_TO:',
         );
 
+        final isMarriageInquiryEnded = body.startsWith(
+          'MARRIAGE_INQUIRY_ENDED:',
+        );
+
         String? friendRequesterId;
         String? friendAcceptedUserId;
         String? followUserId;
@@ -741,6 +753,7 @@ class _NotificationPageState extends State<NotificationPage> {
 
         String? inquiryMahramAcceptedManId;
         String? inquiryAcceptedOtherUserId;
+        String? inquiryEndedOtherUserId;
 
         if (isFriendRequest) {
           final parts = body.split(':');
@@ -928,6 +941,16 @@ class _NotificationPageState extends State<NotificationPage> {
           }
         }
 
+        if (isMarriageInquiryEnded) {
+          final rest = body.substring('MARRIAGE_INQUIRY_ENDED:'.length);
+          final parts = rest.split('::');
+          if (parts.isNotEmpty) inquiryId = parts[0].trim();
+          if (parts.length > 1) {
+            inquiryEndedOtherUserId = parts[1].trim();
+            _cacheName(inquiryEndedOtherUserId!);
+          }
+        }
+
         String? subtitleText;
         if (isLike) {
           subtitleText = likePreview;
@@ -952,6 +975,7 @@ class _NotificationPageState extends State<NotificationPage> {
             !isMarriageInquiryDeclined &&
             !isMarriageInquiryMahramAccepted &&
             !isMarriageInquiryMahramAcceptedSentTo &&
+            !isMarriageInquiryEnded &&
             rawBody.isNotEmpty &&
             !rawBody.contains(':')) {
           subtitleText = rawBody;
@@ -979,6 +1003,7 @@ class _NotificationPageState extends State<NotificationPage> {
           isMarriageInquiryMahramAccepted: isMarriageInquiryMahramAccepted,
           isMarriageInquiryMahramAcceptedSentTo:
           isMarriageInquiryMahramAcceptedSentTo,
+          isMarriageInquiryEnded: isMarriageInquiryEnded,
         );
 
         final leading = _PremiumLeadingIcon(
@@ -1367,6 +1392,27 @@ class _NotificationPageState extends State<NotificationPage> {
                 setState(() {});
                 return;
               }
+              if (isMarriageInquiryEnded &&
+                  inquiryEndedOtherUserId != null &&
+                  inquiryEndedOtherUserId!.isNotEmpty &&
+                  inquiryId != null &&
+                  inquiryId!.isNotEmpty) {
+                if (!mounted) return;
+
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProfilePage(
+                      userId: inquiryEndedOtherUserId!,
+                      inquiryId: inquiryId!,
+                    ),
+                  ),
+                );
+
+                if (!mounted) return;
+                setState(() {});
+                return;
+              }
             },
             child: Ink(
               decoration: BoxDecoration(
@@ -1491,6 +1537,7 @@ class _NotificationPageState extends State<NotificationPage> {
     required bool isMarriageInquiryDeclined,
     required bool isMarriageInquiryMahramAccepted,
     required bool isMarriageInquiryMahramAcceptedSentTo,
+    required bool isMarriageInquiryEnded,
     required bool isCommunityInvite,
   }) {
     if (isFriendRequest) return Icons.person_add_alt_1_rounded;
@@ -1516,6 +1563,7 @@ class _NotificationPageState extends State<NotificationPage> {
     if (isMarriageInquiryManDecision) return Icons.how_to_reg_rounded;
     if (isMarriageInquiryMahram) return Icons.admin_panel_settings_rounded;
     if (isMarriageInquiryRequest) return Icons.favorite_border_rounded;
+    if (isMarriageInquiryEnded) return Icons.event_busy_rounded;
 
     return Icons.notifications_rounded;
   }

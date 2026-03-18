@@ -374,6 +374,7 @@
   "notif_marriage_inquiry_mahram_chosen": "{name} has chosen you to be her mahram.",
   "end_marriage_inquiry_title": "End marriage inquiry",
   "end_marriage_inquiry_confirm": "Are you sure you want to end this inquiry?",
+  "notif_marriage_inquiry_ended": "{name} ended the marriage inquiry",
   "End": "End",
   "group_no_longer_available": "This group is no longer available.",
   "Last seen": "Last seen",

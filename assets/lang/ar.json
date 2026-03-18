@@ -188,6 +188,8 @@
   "notif_marriage_inquiry_mahram_chosen": "لقد اختارتك {name} لتكون مَحْرَمها.",
   "end_marriage_inquiry_title": "إنهاء طلب الزواج",
   "end_marriage_inquiry_confirm": "هل أنت متأكد أنك تريد إنهاء هذا الطلب؟",
+  "notif_marriage_inquiry_ended": "قام {name} بإنهاء طلب الزواج",
+
   "End": "إنهاء",
   "group_no_longer_available": "هذه المجموعة لم تعد متاحة.",
 

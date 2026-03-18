@@ -237,6 +237,8 @@
 
   "end_marriage_inquiry_title": "Huwelijksaanvraag beëindigen",
   "end_marriage_inquiry_confirm": "Weet je zeker dat je deze huwelijksaanvraag wilt beëindigen?",
+  "notif_marriage_inquiry_ended": "{name} heeft de huwelijksaanvraag beëindigd",
+
   "End": "Beëindigen",
 
 

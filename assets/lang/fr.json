@@ -228,6 +228,7 @@
   "marriage_inquiry_for": "Demande de mariage pour {name}",
   "end_marriage_inquiry_title": "Mettre fin à la demande de mariage",
   "end_marriage_inquiry_confirm": "Êtes-vous sûr de vouloir mettre fin à cette demande de mariage ?",
+  "notif_marriage_inquiry_ended": "{name} a mis fin à la demande de mariage",
   "End": "Terminer",
   "accept": "Accepter",
   "decline": "Refuser",
