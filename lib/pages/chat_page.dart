@@ -1094,7 +1094,7 @@ class _ChatPageState extends State<ChatPage> {
 
     return PopScope(
       canPop: !_isSelectionMode,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
 
         if (_isSelectionMode) {
