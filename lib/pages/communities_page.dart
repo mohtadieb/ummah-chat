@@ -11,10 +11,14 @@ import 'community_posts_page.dart';
 
 class CommunitiesPage extends StatefulWidget {
   final bool embeddedMode;
+  final ValueChanged<double>? onEmbeddedScrollOffsetChanged;
+  final double embeddedListTopCompensation;
 
   const CommunitiesPage({
     super.key,
     this.embeddedMode = false,
+    this.onEmbeddedScrollOffsetChanged,
+    this.embeddedListTopCompensation = 0,
   });
 
   @override
@@ -36,6 +40,13 @@ class _CommunitiesPageState extends State<CommunitiesPage>
 
   @override
   bool get wantKeepAlive => true;
+
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (!widget.embeddedMode) return false;
+    if (notification.depth != 0) return false;
+    widget.onEmbeddedScrollOffsetChanged?.call(notification.metrics.pixels);
+    return false;
+  }
 
   @override
   void initState() {
@@ -111,94 +122,12 @@ class _CommunitiesPageState extends State<CommunitiesPage>
     final searchResults = listeningProvider.communitySearchResults;
     final hasSearchResults = searchResults.isNotEmpty;
 
-    if (!widget.embeddedMode) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-        child: Column(
-          children: [
-            _buildTopSection(
-              context,
-              title: 'Your communities'.tr(),
-              count: joinedCommunities.length,
-            ),
-            Expanded(
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  joinedCommunities.isEmpty
-                      ? _buildSimpleState(
-                    context,
-                    icon: Icons.groups_2_outlined,
-                    title: "You haven't joined any communities yet".tr(),
-                    subtitle:
-                    "Explore communities above or create your own to connect with others."
-                        .tr(),
-                  )
-                      : ScrollConfiguration(
-                    behavior: ScrollConfiguration.of(context)
-                        .copyWith(overscroll: false),
-                    child: ListView.builder(
-                      key: const PageStorageKey<String>(
-                        'communities_normal_list',
-                      ),
-                      physics: const ClampingScrollPhysics(),
-                      keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
-                      padding: const EdgeInsets.only(top: 0, bottom: 96),
-                      itemCount: joinedCommunities.length,
-                      itemBuilder: (context, index) {
-                        final community = joinedCommunities[index];
-
-                        return MyCommunityTile(
-                          name: community['name'] ?? '',
-                          description: community['description'],
-                          country: community['country'],
-                          avatarUrl: community['avatar_url'],
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => CommunityPostsPage(
-                                  communityId: community['id'],
-                                  communityName:
-                                  community['name'] ?? '',
-                                  communityDescription:
-                                  community['description'],
-                                  communityAvatarUrl:
-                                  community['avatar_url'],
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                  if (hasSearchText)
-                    Positioned(
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      child: _buildSearchDropdown(
-                        context,
-                        isSearching: _isSearching,
-                        hasSearchResults: hasSearchResults,
-                        hasCompletedSearch: _hasCompletedSearch,
-                        searchResults: searchResults,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+          padding: widget.embeddedMode
+              ? const EdgeInsets.fromLTRB(16, 8, 16, 6)
+              : const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: _buildTopSection(
             context,
             title: 'Your communities'.tr(),
@@ -218,56 +147,67 @@ class _CommunitiesPageState extends State<CommunitiesPage>
                 "Explore communities above or create your own to connect with others."
                     .tr(),
               )
-                  : ScrollConfiguration(
-                behavior: ScrollConfiguration.of(context)
-                    .copyWith(overscroll: false),
-                child: ListView.builder(
-                  key: const PageStorageKey<String>(
-                    'communities_embedded_list',
-                  ),
-                  physics: const ClampingScrollPhysics(),
-                  keyboardDismissBehavior:
-                  ScrollViewKeyboardDismissBehavior.onDrag,
-                  padding: EdgeInsets.only(
-                    top: 0,
-                    bottom: MediaQuery.of(context).padding.bottom + 96,
-                  ),
-                  itemCount: joinedCommunities.length,
-                  itemBuilder: (context, index) {
-                    final community = joinedCommunities[index];
+                  : NotificationListener<ScrollNotification>(
+                onNotification: _handleScrollNotification,
+                child: ScrollConfiguration(
+                  behavior: ScrollConfiguration.of(context)
+                      .copyWith(overscroll: false),
+                  child: ListView.builder(
+                    key: PageStorageKey<String>(
+                      widget.embeddedMode
+                          ? 'communities_embedded_list'
+                          : 'communities_normal_list',
+                    ),
+                    physics: const ClampingScrollPhysics(),
+                    keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: EdgeInsets.only(
+                      top: widget.embeddedMode
+                          ? widget.embeddedListTopCompensation
+                          : 0,
+                      bottom: widget.embeddedMode
+                          ? MediaQuery.of(context).size.height
+                          : MediaQuery.of(context).padding.bottom + 96,
+                    ),
+                    itemCount: joinedCommunities.length,
+                    itemBuilder: (context, index) {
+                      final community = joinedCommunities[index];
 
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: MyCommunityTile(
-                        name: community['name'] ?? '',
-                        description: community['description'],
-                        country: community['country'],
-                        avatarUrl: community['avatar_url'],
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => CommunityPostsPage(
-                                communityId: community['id'],
-                                communityName: community['name'] ?? '',
-                                communityDescription:
-                                community['description'],
-                                communityAvatarUrl:
-                                community['avatar_url'],
+                      return Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: widget.embeddedMode ? 16 : 0,
+                        ),
+                        child: MyCommunityTile(
+                          name: community['name'] ?? '',
+                          description: community['description'],
+                          country: community['country'],
+                          avatarUrl: community['avatar_url'],
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => CommunityPostsPage(
+                                  communityId: community['id'],
+                                  communityName: community['name'] ?? '',
+                                  communityDescription:
+                                  community['description'],
+                                  communityAvatarUrl:
+                                  community['avatar_url'],
+                                ),
                               ),
-                            ),
-                          );
-                        },
-                      ),
-                    );
-                  },
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
               if (hasSearchText)
                 Positioned(
                   top: 0,
-                  left: 16,
-                  right: 16,
+                  left: widget.embeddedMode ? 16 : 0,
+                  right: widget.embeddedMode ? 16 : 0,
                   child: _buildSearchDropdown(
                     context,
                     isSearching: _isSearching,
@@ -475,8 +415,7 @@ class _CommunitiesPageState extends State<CommunitiesPage>
                     MaterialPageRoute(
                       builder: (_) => CommunityPostsPage(
                         communityId: community['id'],
-                        communityName:
-                        community['name'] ?? '',
+                        communityName: community['name'] ?? '',
                         communityDescription:
                         community['description'],
                         communityAvatarUrl:

@@ -14,10 +14,14 @@ import '../services/notifications/notification_service.dart';
 
 class GroupsPage extends StatefulWidget {
   final bool embeddedMode;
+  final ValueChanged<double>? onEmbeddedScrollOffsetChanged;
+  final double embeddedListTopCompensation;
 
   const GroupsPage({
     super.key,
     this.embeddedMode = false,
+    this.onEmbeddedScrollOffsetChanged,
+    this.embeddedListTopCompensation = 0,
   });
 
   @override
@@ -39,6 +43,13 @@ class _GroupsPageState extends State<GroupsPage>
 
   @override
   bool get wantKeepAlive => true;
+
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (!widget.embeddedMode) return false;
+    if (notification.depth != 0) return false;
+    widget.onEmbeddedScrollOffsetChanged?.call(notification.metrics.pixels);
+    return false;
+  }
 
   @override
   void initState() {
@@ -151,34 +162,6 @@ class _GroupsPageState extends State<GroupsPage>
         final noMatches =
             _searchQuery.trim().isNotEmpty && filteredGroups.isEmpty;
 
-        if (!widget.embeddedMode) {
-          return Column(
-            children: [
-              _buildTopSection(
-                context,
-                title: "Your groups".tr(),
-                count: groups.length,
-                hintText: 'Search groups'.tr(),
-              ),
-              Expanded(
-                child: noMatches
-                    ? _buildSimpleState(
-                  context,
-                  icon: Icons.search_off_rounded,
-                  title: 'No groups match your search'.tr(),
-                  subtitle: '',
-                  compact: true,
-                )
-                    : _buildGroupsList(
-                  filteredGroups,
-                  currentUserId,
-                  activeChatRoomId,
-                ),
-              ),
-            ],
-          );
-        }
-
         return Column(
           children: [
             _buildTopSection(
@@ -186,7 +169,7 @@ class _GroupsPageState extends State<GroupsPage>
               title: "Your groups".tr(),
               count: groups.length,
               hintText: 'Search groups'.tr(),
-              embedded: true,
+              embedded: widget.embeddedMode,
             ),
             Expanded(
               child: noMatches
@@ -197,11 +180,15 @@ class _GroupsPageState extends State<GroupsPage>
                 subtitle: '',
                 compact: true,
               )
-                  : _buildGroupsList(
-                filteredGroups,
-                currentUserId,
-                activeChatRoomId,
-                storageKey: 'groups_embedded_list',
+                  : NotificationListener<ScrollNotification>(
+                onNotification: _handleScrollNotification,
+                child: _buildGroupsList(
+                  filteredGroups,
+                  currentUserId,
+                  activeChatRoomId,
+                  storageKey:
+                  widget.embeddedMode ? 'groups_embedded_list' : null,
+                ),
               ),
             ),
           ],
@@ -222,8 +209,10 @@ class _GroupsPageState extends State<GroupsPage>
         key: storageKey == null ? null : PageStorageKey<String>(storageKey),
         physics: const ClampingScrollPhysics(),
         padding: EdgeInsets.only(
-          top: 0,
-          bottom: MediaQuery.of(context).padding.bottom + 96,
+          top: widget.embeddedMode ? widget.embeddedListTopCompensation : 0,
+          bottom: widget.embeddedMode
+              ? MediaQuery.of(context).size.height
+              : MediaQuery.of(context).padding.bottom + 96,
         ),
         itemCount: filteredGroups.length,
         itemBuilder: (context, index) {

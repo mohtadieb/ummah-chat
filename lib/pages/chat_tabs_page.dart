@@ -2,15 +2,16 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'create_community_page.dart';
-import 'friends_page.dart';
-import 'groups_page.dart';
-import 'create_group_page.dart';
-import 'communities_page.dart';
-import 'search_page.dart';
 import '../services/database/database_provider.dart';
+import 'communities_page.dart' as communities_page;
+import 'create_community_page.dart';
+import 'create_group_page.dart';
+import 'friends_page.dart' as friends_page;
+import 'groups_page.dart' as groups_page;
+import 'search_page.dart';
 
 const double kChatsHeaderCardHeight = 126.0;
+const double kChatsHeaderOuterHeight = 148.0;
 const double kChatsPinnedAreaHeight = 62.0;
 
 class ChatTabsPage extends StatefulWidget {
@@ -25,6 +26,21 @@ class _ChatTabsPageState extends State<ChatTabsPage>
   late TabController _tabController;
   int _currentTabIndex = 0;
 
+  final List<double> _tabOffsets = [0, 0, 0];
+
+  double get _currentHeaderCollapse {
+    return _tabOffsets[_currentTabIndex].clamp(0.0, kChatsHeaderOuterHeight);
+  }
+
+  double get _currentHeaderVisibleHeight {
+    final h = kChatsHeaderOuterHeight - _currentHeaderCollapse;
+    return h.clamp(0.0, kChatsHeaderOuterHeight);
+  }
+
+  double _tabListCompensation(int index) {
+    return _tabOffsets[index].clamp(0.0, kChatsHeaderOuterHeight);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -38,6 +54,16 @@ class _ChatTabsPageState extends State<ChatTabsPage>
 
     setState(() {
       _currentTabIndex = _tabController.index;
+    });
+  }
+
+  void _handleTabScrollOffsetChanged(int tabIndex, double offset) {
+    if (!mounted) return;
+    final normalized = offset < 0 ? 0.0 : offset;
+    if ((_tabOffsets[tabIndex] - normalized).abs() < 0.5) return;
+
+    setState(() {
+      _tabOffsets[tabIndex] = normalized;
     });
   }
 
@@ -64,9 +90,7 @@ class _ChatTabsPageState extends State<ChatTabsPage>
     if (_currentTabIndex == 0) {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => const SearchPage(),
-        ),
+        MaterialPageRoute(builder: (_) => const SearchPage()),
       );
       return;
     }
@@ -74,18 +98,14 @@ class _ChatTabsPageState extends State<ChatTabsPage>
     if (_currentTabIndex == 1) {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => const CreateGroupPage(),
-        ),
+        MaterialPageRoute(builder: (_) => const CreateGroupPage()),
       );
       return;
     }
 
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const CreateCommunityPage(),
-      ),
+      MaterialPageRoute(builder: (_) => const CreateCommunityPage()),
     );
 
     if (!mounted) return;
@@ -95,6 +115,7 @@ class _ChatTabsPageState extends State<ChatTabsPage>
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final visibleHeight = _currentHeaderVisibleHeight;
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
@@ -118,55 +139,70 @@ class _ChatTabsPageState extends State<ChatTabsPage>
           ),
         ),
         child: SafeArea(
-          child: NestedScrollView(
-            floatHeaderSlivers: false,
-            headerSliverBuilder: (context, innerBoxIsScrolled) {
-              return [
-                const SliverToBoxAdapter(
-                  child: _ChatsHeaderArea(),
-                ),
-                SliverPersistentHeader(
-                  pinned: true,
-                  delegate: _PinnedChatsTopAreaDelegate(
-                    minExtentValue: kChatsPinnedAreaHeight,
-                    maxExtentValue: kChatsPinnedAreaHeight,
-                    child: Container(
-                      color: cs.surface,
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                      child: _PremiumTabBar(
-                        controller: _tabController,
-                        tabs: [
-                          "Friends".tr(),
-                          "Groups".tr(),
-                          "Communities".tr(),
-                        ],
-                      ),
+          child: Column(
+            children: [
+              SizedBox(
+                height: visibleHeight,
+                child: ClipRect(
+                  child: OverflowBox(
+                    alignment: Alignment.topCenter,
+                    minHeight: kChatsHeaderOuterHeight,
+                    maxHeight: kChatsHeaderOuterHeight,
+                    child: Transform.translate(
+                      offset: Offset(0, -_currentHeaderCollapse),
+                      child: const _ChatsHeaderArea(),
                     ),
                   ),
                 ),
-              ];
-            },
-            body: TabBarView(
-              controller: _tabController,
-              children: const [
-                _ChatsKeepAlive(
-                  child: FriendsPage(
-                    includeMahrams: true,
-                    embeddedMode: true,
-                  ),
+              ),
+              Container(
+                color: cs.surface,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: _PremiumTabBar(
+                  controller: _tabController,
+                  tabs: [
+                    "Friends".tr(),
+                    "Groups".tr(),
+                    "Communities".tr(),
+                  ],
                 ),
-                _ChatsKeepAlive(
-                  child: GroupsPage(
-                    embeddedMode: true,
-                  ),
+              ),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _ChatsKeepAlive(
+                      child: friends_page.FriendsPage(
+                        includeMahrams: true,
+                        embeddedMode: true,
+                        embeddedListTopCompensation: _tabListCompensation(0),
+                        onEmbeddedScrollOffsetChanged: (offset) {
+                          _handleTabScrollOffsetChanged(0, offset);
+                        },
+                      ),
+                    ),
+                    _ChatsKeepAlive(
+                      child: groups_page.GroupsPage(
+                        embeddedMode: true,
+                        embeddedListTopCompensation: _tabListCompensation(1),
+                        onEmbeddedScrollOffsetChanged: (offset) {
+                          _handleTabScrollOffsetChanged(1, offset);
+                        },
+                      ),
+                    ),
+                    _ChatsKeepAlive(
+                      child: communities_page.CommunitiesPage(
+                        embeddedMode: true,
+                        embeddedListTopCompensation: _tabListCompensation(2),
+                        onEmbeddedScrollOffsetChanged: (offset) {
+                          _handleTabScrollOffsetChanged(2, offset);
+                        },
+                      ),
+                    ),
+                  ],
                 ),
-                _ChatsKeepAlive(
-                  child: CommunitiesPage(
-                    embeddedMode: true,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -362,39 +398,5 @@ class _PremiumTabBar extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _PinnedChatsTopAreaDelegate extends SliverPersistentHeaderDelegate {
-  final double minExtentValue;
-  final double maxExtentValue;
-  final Widget child;
-
-  _PinnedChatsTopAreaDelegate({
-    required this.minExtentValue,
-    required this.maxExtentValue,
-    required this.child,
-  });
-
-  @override
-  double get minExtent => minExtentValue;
-
-  @override
-  double get maxExtent => maxExtentValue;
-
-  @override
-  Widget build(
-      BuildContext context,
-      double shrinkOffset,
-      bool overlapsContent,
-      ) {
-    return child;
-  }
-
-  @override
-  bool shouldRebuild(covariant _PinnedChatsTopAreaDelegate oldDelegate) {
-    return oldDelegate.minExtentValue != minExtentValue ||
-        oldDelegate.maxExtentValue != maxExtentValue ||
-        oldDelegate.child != child;
   }
 }

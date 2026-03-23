@@ -19,12 +19,16 @@ class FriendsPage extends StatefulWidget {
   final String? userId;
   final bool includeMahrams;
   final bool embeddedMode;
+  final ValueChanged<double>? onEmbeddedScrollOffsetChanged;
+  final double embeddedListTopCompensation;
 
   const FriendsPage({
     super.key,
     this.userId,
     this.includeMahrams = false,
     this.embeddedMode = false,
+    this.onEmbeddedScrollOffsetChanged,
+    this.embeddedListTopCompensation = 0,
   });
 
   @override
@@ -40,6 +44,13 @@ class _FriendsPageState extends State<FriendsPage>
 
   @override
   bool get wantKeepAlive => true;
+
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (!widget.embeddedMode) return false;
+    if (notification.depth != 0) return false;
+    widget.onEmbeddedScrollOffsetChanged?.call(notification.metrics.pixels);
+    return false;
+  }
 
   @override
   void dispose() {
@@ -115,54 +126,18 @@ class _FriendsPageState extends State<FriendsPage>
           final noMatches =
               _searchQuery.trim().isNotEmpty && filteredFriends.isEmpty;
 
-          if (!widget.embeddedMode) {
-            return Column(
-              children: [
-                _buildTopSection(
-                  context,
-                  title: "Friends".tr(),
-                  count: allFriends.length,
-                  hintText: 'Search friends'.tr(),
-                ),
-                Expanded(
-                  child: noMatches
-                      ? _buildSimpleState(
-                    context,
-                    icon: Icons.search_off_rounded,
-                    title: 'No friends match your search'.tr(),
-                    subtitle: '',
-                    compact: true,
-                  )
-                      : _buildOtherUserList(filteredFriends),
-                ),
-              ],
-            );
-          }
-
-          return Column(
-            children: [
-              _buildTopSection(
-                context,
-                title: "Friends".tr(),
-                count: allFriends.length,
-                hintText: 'Search friends'.tr(),
-                embedded: true,
-              ),
-              Expanded(
-                child: noMatches
-                    ? _buildSimpleState(
-                  context,
-                  icon: Icons.search_off_rounded,
-                  title: 'No friends match your search'.tr(),
-                  subtitle: '',
-                  compact: true,
-                )
-                    : _buildOtherUserList(
-                  filteredFriends,
-                  storageKey: 'friends_other_user_embedded_list',
-                ),
-              ),
-            ],
+          return _buildEmbeddedOrNormalLayout(
+            title: "Friends".tr(),
+            count: allFriends.length,
+            hintText: 'Search friends'.tr(),
+            noMatches: noMatches,
+            noMatchesTitle: 'No friends match your search'.tr(),
+            listChild: _buildOtherUserList(
+              filteredFriends,
+              storageKey: widget.embeddedMode
+                  ? 'friends_other_user_embedded_list'
+                  : null,
+            ),
           );
         },
       );
@@ -236,10 +211,8 @@ class _FriendsPageState extends State<FriendsPage>
                   if (timeA == null && timeB == null) {
                     return a.username.compareTo(b.username);
                   }
-
                   if (timeA == null) return 1;
                   if (timeB == null) return -1;
-
                   return timeB.compareTo(timeA);
                 });
 
@@ -249,84 +222,71 @@ class _FriendsPageState extends State<FriendsPage>
                 final String? activeDmFriendId =
                     notificationService.activeDmFriendId;
 
-                if (!widget.embeddedMode) {
-                  return Column(
-                    children: [
-                      _buildTopSection(
-                        context,
-                        title: widget.includeMahrams
-                            ? "Your chats".tr()
-                            : "Your friends".tr(),
-                        count: allFriends.length,
-                        hintText: widget.includeMahrams
-                            ? 'Search chats'.tr()
-                            : 'Search friends'.tr(),
-                      ),
-                      Expanded(
-                        child: noMatches
-                            ? _buildSimpleState(
-                          context,
-                          icon: Icons.search_off_rounded,
-                          title: widget.includeMahrams
-                              ? 'No chats match your search'.tr()
-                              : 'No friends match your search'.tr(),
-                          subtitle: '',
-                          compact: true,
-                        )
-                            : _buildChatsList(
-                          filteredFriends: filteredFriends,
-                          unreadByFriend: unreadByFriend,
-                          lastMessageByFriend: lastMessageByFriend,
-                          activeDmFriendId: activeDmFriendId,
-                          dbProvider: dbProvider,
-                        ),
-                      ),
-                    ],
-                  );
-                }
-
-                return Column(
-                  children: [
-                    _buildTopSection(
-                      context,
-                      title: widget.includeMahrams
-                          ? "Your chats".tr()
-                          : "Your friends".tr(),
-                      count: allFriends.length,
-                      hintText: widget.includeMahrams
-                          ? 'Search chats'.tr()
-                          : 'Search friends'.tr(),
-                      embedded: true,
-                    ),
-                    Expanded(
-                      child: noMatches
-                          ? _buildSimpleState(
-                        context,
-                        icon: Icons.search_off_rounded,
-                        title: widget.includeMahrams
-                            ? 'No chats match your search'.tr()
-                            : 'No friends match your search'.tr(),
-                        subtitle: '',
-                        compact: true,
-                      )
-                          : _buildChatsList(
-                        filteredFriends: filteredFriends,
-                        unreadByFriend: unreadByFriend,
-                        lastMessageByFriend: lastMessageByFriend,
-                        activeDmFriendId: activeDmFriendId,
-                        dbProvider: dbProvider,
-                        storageKey: widget.includeMahrams
-                            ? 'friends_embedded_chats_list'
-                            : 'friends_embedded_friends_list',
-                      ),
-                    ),
-                  ],
+                return _buildEmbeddedOrNormalLayout(
+                  title: widget.includeMahrams
+                      ? "Your chats".tr()
+                      : "Your friends".tr(),
+                  count: allFriends.length,
+                  hintText: widget.includeMahrams
+                      ? 'Search chats'.tr()
+                      : 'Search friends'.tr(),
+                  noMatches: noMatches,
+                  noMatchesTitle: widget.includeMahrams
+                      ? 'No chats match your search'.tr()
+                      : 'No friends match your search'.tr(),
+                  listChild: _buildChatsList(
+                    filteredFriends: filteredFriends,
+                    unreadByFriend: unreadByFriend,
+                    lastMessageByFriend: lastMessageByFriend,
+                    activeDmFriendId: activeDmFriendId,
+                    dbProvider: dbProvider,
+                    storageKey: widget.embeddedMode
+                        ? (widget.includeMahrams
+                        ? 'friends_embedded_chats_list'
+                        : 'friends_embedded_friends_list')
+                        : null,
+                  ),
                 );
               },
             );
           },
         );
       },
+    );
+  }
+
+  Widget _buildEmbeddedOrNormalLayout({
+    required String title,
+    required int count,
+    required String hintText,
+    required bool noMatches,
+    required String noMatchesTitle,
+    required Widget listChild,
+  }) {
+    return Column(
+      children: [
+        _buildTopSection(
+          context,
+          title: title,
+          count: count,
+          hintText: hintText,
+          embedded: widget.embeddedMode,
+        ),
+        Expanded(
+          child: noMatches
+              ? _buildSimpleState(
+            context,
+            icon: Icons.search_off_rounded,
+            title: noMatchesTitle,
+            subtitle: '',
+            compact: true,
+          )
+              : NotificationListener<ScrollNotification>(
+            onNotification: _handleScrollNotification,
+            child: listChild,
+          ),
+        ),
+      ],
     );
   }
 
@@ -340,8 +300,10 @@ class _FriendsPageState extends State<FriendsPage>
         key: storageKey == null ? null : PageStorageKey<String>(storageKey),
         physics: const ClampingScrollPhysics(),
         padding: EdgeInsets.only(
-          top: 0,
-          bottom: MediaQuery.of(context).padding.bottom + 96,
+          top: widget.embeddedMode ? widget.embeddedListTopCompensation : 0,
+          bottom: widget.embeddedMode
+              ? MediaQuery.of(context).size.height
+              : MediaQuery.of(context).padding.bottom + 96,
         ),
         itemCount: filteredFriends.length,
         itemBuilder: (context, index) {
@@ -406,8 +368,10 @@ class _FriendsPageState extends State<FriendsPage>
         key: storageKey == null ? null : PageStorageKey<String>(storageKey),
         physics: const ClampingScrollPhysics(),
         padding: EdgeInsets.only(
-          top: 0,
-          bottom: MediaQuery.of(context).padding.bottom + 96,
+          top: widget.embeddedMode ? widget.embeddedListTopCompensation : 0,
+          bottom: widget.embeddedMode
+              ? MediaQuery.of(context).size.height
+              : MediaQuery.of(context).padding.bottom + 96,
         ),
         itemCount: filteredFriends.length,
         itemBuilder: (context, index) {
