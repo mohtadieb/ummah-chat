@@ -122,12 +122,8 @@ class _ChatTabsPageState extends State<ChatTabsPage>
             floatHeaderSlivers: false,
             headerSliverBuilder: (context, innerBoxIsScrolled) {
               return [
-                SliverOverlapAbsorber(
-                  handle:
-                  NestedScrollView.sliverOverlapAbsorberHandleFor(context),
-                  sliver: const SliverToBoxAdapter(
-                    child: _ChatsHeaderArea(),
-                  ),
+                const SliverToBoxAdapter(
+                  child: _ChatsHeaderArea(),
                 ),
                 SliverPersistentHeader(
                   pinned: true,
@@ -400,51 +396,5 @@ class _PinnedChatsTopAreaDelegate extends SliverPersistentHeaderDelegate {
     return oldDelegate.minExtentValue != minExtentValue ||
         oldDelegate.maxExtentValue != maxExtentValue ||
         oldDelegate.child != child;
-  }
-}
-
-class _PremiumDialogField extends StatelessWidget {
-  final TextEditingController controller;
-  final String label;
-  final int maxLines;
-
-  const _PremiumDialogField({
-    required this.controller,
-    required this.label,
-    this.maxLines = 1,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    return TextField(
-      controller: controller,
-      maxLines: maxLines,
-      decoration: InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: cs.surfaceContainer,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(
-            color: cs.outlineVariant.withValues(alpha: 0.45),
-          ),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(
-            color: cs.outlineVariant.withValues(alpha: 0.45),
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(
-            color: cs.primary,
-            width: 1.2,
-          ),
-        ),
-      ),
-    );
   }
 }

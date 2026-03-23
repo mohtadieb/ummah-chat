@@ -37,8 +37,6 @@ class _GroupsPageState extends State<GroupsPage>
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
-  static const double _embeddedHeaderHeight = 126;
-
   @override
   bool get wantKeepAlive => true;
 
@@ -171,262 +169,150 @@ class _GroupsPageState extends State<GroupsPage>
                   subtitle: '',
                   compact: true,
                 )
-                    : ScrollConfiguration(
-                  behavior: ScrollConfiguration.of(context)
-                      .copyWith(overscroll: false),
-                  child: ListView.builder(
-                    physics: const ClampingScrollPhysics(),
-                    padding: EdgeInsets.only(
-                      top: 4,
-                      bottom: MediaQuery.of(context).padding.bottom + 96,
-                    ),
-                    itemCount: filteredGroups.length,
-                    itemBuilder: (context, index) {
-                      final group = filteredGroups[index];
-                      final groupId = group['id']?.toString() ?? '';
-                      final rawGroupName =
-                      (group['name'] as String?)?.trim().isNotEmpty ==
-                          true
-                          ? (group['name'] as String)
-                          : 'Group'.tr();
-
-                      final baseGroupName =
-                      localizeGroupName(rawGroupName);
-
-                      final contextType =
-                      (group['context_type'] ?? '').toString().trim();
-                      final isMarriageInquiryRoom =
-                          contextType == 'marriage_inquiry';
-
-                      String displayGroupName = baseGroupName;
-
-                      if (isMarriageInquiryRoom) {
-                        final manId =
-                        (group['man_id'] ?? '').toString().trim();
-                        final womanId =
-                        (group['woman_id'] ?? '').toString().trim();
-
-                        final manName =
-                        (group['man_name'] ?? '').toString().trim();
-                        final womanName =
-                        (group['woman_name'] ?? '').toString().trim();
-
-                        final targetName =
-                        (currentUserId == manId) ? womanName : manName;
-
-                        if (targetName.isNotEmpty) {
-                          displayGroupName = 'marriage_inquiry_for'.tr(
-                            namedArgs: {'name': targetName},
-                          );
-                        } else {
-                          displayGroupName = baseGroupName;
-                        }
-                      }
-
-                      final avatarUrl = group['avatar_url'] as String?;
-                      final MessageModel? lastMsg =
-                      _lastGroupMessages[groupId];
-
-                      final int rawUnread =
-                          _groupUnreadCounts[groupId] ?? 0;
-
-                      final int unread =
-                      (activeChatRoomId != null &&
-                          activeChatRoomId == groupId)
-                          ? 0
-                          : rawUnread;
-
-                      final String subtitle = lastMsg != null
-                          ? _buildLastMessagePreview(
-                        msg: lastMsg,
-                        currentUserId: currentUserId,
-                      )
-                          : 'No messages yet'.tr();
-
-                      final String? lastTimeLabel = lastMsg != null
-                          ? formatLastMessageTime(lastMsg.createdAt)
-                          : null;
-
-                      return MyGroupTile(
-                        groupName: displayGroupName,
-                        avatarUrl: avatarUrl,
-                        lastMessagePreview: subtitle,
-                        lastMessageTimeLabel: lastTimeLabel,
-                        unreadCount: unread,
-                        onTap: groupId.isEmpty
-                            ? null
-                            : () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => GroupChatPage(
-                                chatRoomId: groupId,
-                                groupName: rawGroupName,
-                                avatarUrl: avatarUrl,
-                                contextType:
-                                group['context_type']?.toString(),
-                                manId: group['man_id']?.toString(),
-                                womanId:
-                                group['woman_id']?.toString(),
-                                mahramId:
-                                group['mahram_id']?.toString(),
-                                manName:
-                                group['man_name']?.toString(),
-                                womanName:
-                                group['woman_name']?.toString(),
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
+                    : _buildGroupsList(
+                  filteredGroups,
+                  currentUserId,
+                  activeChatRoomId,
                 ),
               ),
             ],
           );
         }
 
-        return CustomScrollView(
-          key: const PageStorageKey<String>('groups_embedded'),
-          physics: const ClampingScrollPhysics(),
-          slivers: [
-            SliverOverlapInjector(
-              handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context),
+        return Column(
+          children: [
+            _buildTopSection(
+              context,
+              title: "Your groups".tr(),
+              count: groups.length,
+              hintText: 'Search groups'.tr(),
+              embedded: true,
             ),
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: _GroupsTopHeaderDelegate(
-                minExtentValue: _embeddedHeaderHeight,
-                maxExtentValue: _embeddedHeaderHeight,
-                child: ColoredBox(
-                  color: Theme.of(context).colorScheme.surface,
-                  child: _buildTopSection(
-                    context,
-                    title: "Your groups".tr(),
-                    count: groups.length,
-                    hintText: 'Search groups'.tr(),
-                    embedded: true,
-                  ),
-                ),
-              ),
-            ),
-            if (noMatches)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: _buildSimpleState(
-                  context,
-                  icon: Icons.search_off_rounded,
-                  title: 'No groups match your search'.tr(),
-                  subtitle: '',
-                  compact: true,
-                ),
+            Expanded(
+              child: noMatches
+                  ? _buildSimpleState(
+                context,
+                icon: Icons.search_off_rounded,
+                title: 'No groups match your search'.tr(),
+                subtitle: '',
+                compact: true,
               )
-            else
-              SliverPadding(
-                padding: EdgeInsets.only(
-                  top: 2,
-                  bottom: MediaQuery.of(context).padding.bottom + 96,
-                ),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                      final group = filteredGroups[index];
-                      final groupId = group['id']?.toString() ?? '';
-                      final rawGroupName =
-                      (group['name'] as String?)?.trim().isNotEmpty == true
-                          ? (group['name'] as String)
-                          : 'Group'.tr();
-
-                      final baseGroupName = localizeGroupName(rawGroupName);
-
-                      final contextType =
-                      (group['context_type'] ?? '').toString().trim();
-                      final isMarriageInquiryRoom =
-                          contextType == 'marriage_inquiry';
-
-                      String displayGroupName = baseGroupName;
-
-                      if (isMarriageInquiryRoom) {
-                        final manId =
-                        (group['man_id'] ?? '').toString().trim();
-                        final womanId =
-                        (group['woman_id'] ?? '').toString().trim();
-
-                        final manName =
-                        (group['man_name'] ?? '').toString().trim();
-                        final womanName =
-                        (group['woman_name'] ?? '').toString().trim();
-
-                        final targetName =
-                        (currentUserId == manId) ? womanName : manName;
-
-                        if (targetName.isNotEmpty) {
-                          displayGroupName = 'marriage_inquiry_for'.tr(
-                            namedArgs: {'name': targetName},
-                          );
-                        } else {
-                          displayGroupName = baseGroupName;
-                        }
-                      }
-
-                      final avatarUrl = group['avatar_url'] as String?;
-                      final MessageModel? lastMsg = _lastGroupMessages[groupId];
-
-                      final int rawUnread = _groupUnreadCounts[groupId] ?? 0;
-
-                      final int unread =
-                      (activeChatRoomId != null &&
-                          activeChatRoomId == groupId)
-                          ? 0
-                          : rawUnread;
-
-                      final String subtitle = lastMsg != null
-                          ? _buildLastMessagePreview(
-                        msg: lastMsg,
-                        currentUserId: currentUserId,
-                      )
-                          : 'No messages yet'.tr();
-
-                      final String? lastTimeLabel = lastMsg != null
-                          ? formatLastMessageTime(lastMsg.createdAt)
-                          : null;
-
-                      return MyGroupTile(
-                        groupName: displayGroupName,
-                        avatarUrl: avatarUrl,
-                        lastMessagePreview: subtitle,
-                        lastMessageTimeLabel: lastTimeLabel,
-                        unreadCount: unread,
-                        onTap: groupId.isEmpty
-                            ? null
-                            : () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => GroupChatPage(
-                                chatRoomId: groupId,
-                                groupName: rawGroupName,
-                                avatarUrl: avatarUrl,
-                                contextType:
-                                group['context_type']?.toString(),
-                                manId: group['man_id']?.toString(),
-                                womanId: group['woman_id']?.toString(),
-                                mahramId: group['mahram_id']?.toString(),
-                                manName: group['man_name']?.toString(),
-                                womanName:
-                                group['woman_name']?.toString(),
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                    childCount: filteredGroups.length,
-                  ),
-                ),
+                  : _buildGroupsList(
+                filteredGroups,
+                currentUserId,
+                activeChatRoomId,
+                storageKey: 'groups_embedded_list',
               ),
+            ),
           ],
+        );
+      },
+    );
+  }
+
+  Widget _buildGroupsList(
+      List<Map<String, dynamic>> filteredGroups,
+      String currentUserId,
+      String? activeChatRoomId, {
+        String? storageKey,
+      }) {
+    return ScrollConfiguration(
+      behavior: ScrollConfiguration.of(context).copyWith(overscroll: false),
+      child: ListView.builder(
+        key: storageKey == null ? null : PageStorageKey<String>(storageKey),
+        physics: const ClampingScrollPhysics(),
+        padding: EdgeInsets.only(
+          top: 0,
+          bottom: MediaQuery.of(context).padding.bottom + 96,
+        ),
+        itemCount: filteredGroups.length,
+        itemBuilder: (context, index) {
+          final group = filteredGroups[index];
+          return _buildGroupTile(
+            context: context,
+            group: group,
+            currentUserId: currentUserId,
+            activeChatRoomId: activeChatRoomId,
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildGroupTile({
+    required BuildContext context,
+    required Map<String, dynamic> group,
+    required String currentUserId,
+    required String? activeChatRoomId,
+  }) {
+    final groupId = group['id']?.toString() ?? '';
+    final rawGroupName =
+    (group['name'] as String?)?.trim().isNotEmpty == true
+        ? (group['name'] as String)
+        : 'Group'.tr();
+
+    final baseGroupName = localizeGroupName(rawGroupName);
+
+    final contextType = (group['context_type'] ?? '').toString().trim();
+    final isMarriageInquiryRoom = contextType == 'marriage_inquiry';
+
+    String displayGroupName = baseGroupName;
+
+    if (isMarriageInquiryRoom) {
+      final manId = (group['man_id'] ?? '').toString().trim();
+      final manName = (group['man_name'] ?? '').toString().trim();
+      final womanName = (group['woman_name'] ?? '').toString().trim();
+
+      final targetName = (currentUserId == manId) ? womanName : manName;
+
+      if (targetName.isNotEmpty) {
+        displayGroupName = 'marriage_inquiry_for'.tr(
+          namedArgs: {'name': targetName},
+        );
+      }
+    }
+
+    final avatarUrl = group['avatar_url'] as String?;
+    final MessageModel? lastMsg = _lastGroupMessages[groupId];
+
+    final int rawUnread = _groupUnreadCounts[groupId] ?? 0;
+    final int unread =
+    (activeChatRoomId != null && activeChatRoomId == groupId) ? 0 : rawUnread;
+
+    final String subtitle = lastMsg != null
+        ? _buildLastMessagePreview(
+      msg: lastMsg,
+      currentUserId: currentUserId,
+    )
+        : 'No messages yet'.tr();
+
+    final String? lastTimeLabel =
+    lastMsg != null ? formatLastMessageTime(lastMsg.createdAt) : null;
+
+    return MyGroupTile(
+      groupName: displayGroupName,
+      avatarUrl: avatarUrl,
+      lastMessagePreview: subtitle,
+      lastMessageTimeLabel: lastTimeLabel,
+      unreadCount: unread,
+      onTap: groupId.isEmpty
+          ? null
+          : () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => GroupChatPage(
+              chatRoomId: groupId,
+              groupName: rawGroupName,
+              avatarUrl: avatarUrl,
+              contextType: group['context_type']?.toString(),
+              manId: group['man_id']?.toString(),
+              womanId: group['woman_id']?.toString(),
+              mahramId: group['mahram_id']?.toString(),
+              manName: group['man_name']?.toString(),
+              womanName: group['woman_name']?.toString(),
+            ),
+          ),
         );
       },
     );
@@ -477,7 +363,10 @@ class _GroupsPageState extends State<GroupsPage>
                 setState(() => _searchQuery = value);
               },
               onClear: () {
-                setState(() => _searchQuery = '');
+                setState(() {
+                  _searchController.clear();
+                  _searchQuery = '';
+                });
               },
             ),
             const SizedBox(height: 12),
@@ -594,15 +483,6 @@ class _GroupsPageState extends State<GroupsPage>
     return raw;
   }
 
-  String localizeLastMessagePreview(String raw) {
-    final s = raw.trim();
-    if (s.startsWith('SYSTEM:')) {
-      final key = s.substring('SYSTEM:'.length).trim();
-      return key.isEmpty ? '' : key.tr();
-    }
-    return raw;
-  }
-
   String _buildLastMessagePreview({
     required MessageModel msg,
     required String currentUserId,
@@ -621,39 +501,5 @@ class _GroupsPageState extends State<GroupsPage>
     const maxLen = 40;
     if (base.length <= maxLen) return base;
     return '${base.substring(0, maxLen)}…';
-  }
-}
-
-class _GroupsTopHeaderDelegate extends SliverPersistentHeaderDelegate {
-  final double minExtentValue;
-  final double maxExtentValue;
-  final Widget child;
-
-  _GroupsTopHeaderDelegate({
-    required this.minExtentValue,
-    required this.maxExtentValue,
-    required this.child,
-  });
-
-  @override
-  double get minExtent => minExtentValue;
-
-  @override
-  double get maxExtent => maxExtentValue;
-
-  @override
-  Widget build(
-      BuildContext context,
-      double shrinkOffset,
-      bool overlapsContent,
-      ) {
-    return child;
-  }
-
-  @override
-  bool shouldRebuild(covariant _GroupsTopHeaderDelegate oldDelegate) {
-    return oldDelegate.minExtentValue != minExtentValue ||
-        oldDelegate.maxExtentValue != maxExtentValue ||
-        oldDelegate.child != child;
   }
 }

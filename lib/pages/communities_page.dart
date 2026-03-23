@@ -34,10 +34,6 @@ class _CommunitiesPageState extends State<CommunitiesPage>
   bool _isSearching = false;
   bool _hasCompletedSearch = false;
 
-  static const double _embeddedHeaderHeight = 126;
-  static const double _embeddedDropdownTop = 84;
-  static const double _normalDropdownTop = 92;
-
   @override
   bool get wantKeepAlive => true;
 
@@ -94,6 +90,7 @@ class _CommunitiesPageState extends State<CommunitiesPage>
   void _clearSearch(DatabaseProvider provider) {
     _searchDebounce?.cancel();
     setState(() {
+      _searchController.clear();
       _searchQuery = '';
       _isSearching = false;
       _hasCompletedSearch = false;
@@ -114,57 +111,42 @@ class _CommunitiesPageState extends State<CommunitiesPage>
     final searchResults = listeningProvider.communitySearchResults;
     final hasSearchResults = searchResults.isNotEmpty;
 
-    if (widget.embeddedMode) {
-      return Stack(
-        clipBehavior: Clip.none,
-        children: [
-          CustomScrollView(
-            key: const PageStorageKey<String>('communities_embedded'),
-            physics: const ClampingScrollPhysics(),
-            slivers: [
-              SliverOverlapInjector(
-                handle:
-                NestedScrollView.sliverOverlapAbsorberHandleFor(context),
-              ),
-              SliverPersistentHeader(
-                pinned: true,
-                delegate: _CommunitiesTopHeaderDelegate(
-                  minExtentValue: _embeddedHeaderHeight,
-                  maxExtentValue: _embeddedHeaderHeight,
-                  child: ColoredBox(
-                    color: Theme.of(context).colorScheme.surface,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
-                      child: _buildTopSection(
-                        context,
-                        title: 'Your communities'.tr(),
-                        count: joinedCommunities.length,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              if (joinedCommunities.isEmpty)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: _buildSimpleState(
+    if (!widget.embeddedMode) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: Column(
+          children: [
+            _buildTopSection(
+              context,
+              title: 'Your communities'.tr(),
+              count: joinedCommunities.length,
+            ),
+            Expanded(
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  joinedCommunities.isEmpty
+                      ? _buildSimpleState(
                     context,
                     icon: Icons.groups_2_outlined,
                     title: "You haven't joined any communities yet".tr(),
                     subtitle:
                     "Explore communities above or create your own to connect with others."
                         .tr(),
-                  ),
-                )
-              else
-                SliverPadding(
-                  padding: EdgeInsets.only(
-                    top: 2,
-                    bottom: MediaQuery.of(context).padding.bottom + 96,
-                  ),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                          (context, index) {
+                  )
+                      : ScrollConfiguration(
+                    behavior: ScrollConfiguration.of(context)
+                        .copyWith(overscroll: false),
+                    child: ListView.builder(
+                      key: const PageStorageKey<String>(
+                        'communities_normal_list',
+                      ),
+                      physics: const ClampingScrollPhysics(),
+                      keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: const EdgeInsets.only(top: 0, bottom: 96),
+                      itemCount: joinedCommunities.length,
+                      itemBuilder: (context, index) {
                         final community = joinedCommunities[index];
 
                         return MyCommunityTile(
@@ -178,7 +160,8 @@ class _CommunitiesPageState extends State<CommunitiesPage>
                               MaterialPageRoute(
                                 builder: (_) => CommunityPostsPage(
                                   communityId: community['id'],
-                                  communityName: community['name'] ?? '',
+                                  communityName:
+                                  community['name'] ?? '',
                                   communityDescription:
                                   community['description'],
                                   communityAvatarUrl:
@@ -189,66 +172,73 @@ class _CommunitiesPageState extends State<CommunitiesPage>
                           },
                         );
                       },
-                      childCount: joinedCommunities.length,
                     ),
                   ),
-                ),
-            ],
-          ),
-          if (hasSearchText)
-            Positioned(
-              top: _embeddedDropdownTop,
-              left: 16,
-              right: 16,
-              child: _buildSearchDropdown(
-                context,
-                isSearching: _isSearching,
-                hasSearchResults: hasSearchResults,
-                hasCompletedSearch: _hasCompletedSearch,
-                searchResults: searchResults,
+                  if (hasSearchText)
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: _buildSearchDropdown(
+                        context,
+                        isSearching: _isSearching,
+                        hasSearchResults: hasSearchResults,
+                        hasCompletedSearch: _hasCompletedSearch,
+                        searchResults: searchResults,
+                      ),
+                    ),
+                ],
               ),
             ),
-        ],
+          ],
+        ),
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Column(
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+          child: _buildTopSection(
+            context,
+            title: 'Your communities'.tr(),
+            count: joinedCommunities.length,
+          ),
+        ),
+        Expanded(
+          child: Stack(
+            clipBehavior: Clip.none,
             children: [
-              _buildTopSection(
+              joinedCommunities.isEmpty
+                  ? _buildSimpleState(
                 context,
-                title: 'Your communities'.tr(),
-                count: joinedCommunities.length,
-              ),
-              Expanded(
-                child: joinedCommunities.isEmpty
-                    ? _buildSimpleState(
-                  context,
-                  icon: Icons.groups_2_outlined,
-                  title: "You haven't joined any communities yet".tr(),
-                  subtitle:
-                  "Explore communities above or create your own to connect with others."
-                      .tr(),
-                )
-                    : ScrollConfiguration(
-                  behavior: ScrollConfiguration.of(context)
-                      .copyWith(overscroll: false),
-                  child: ListView.separated(
-                    physics: const ClampingScrollPhysics(),
-                    keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                    padding: const EdgeInsets.only(top: 4, bottom: 96),
-                    itemCount: joinedCommunities.length,
-                    separatorBuilder: (_, __) =>
-                    const SizedBox(height: 0),
-                    itemBuilder: (context, index) {
-                      final community = joinedCommunities[index];
+                icon: Icons.groups_2_outlined,
+                title: "You haven't joined any communities yet".tr(),
+                subtitle:
+                "Explore communities above or create your own to connect with others."
+                    .tr(),
+              )
+                  : ScrollConfiguration(
+                behavior: ScrollConfiguration.of(context)
+                    .copyWith(overscroll: false),
+                child: ListView.builder(
+                  key: const PageStorageKey<String>(
+                    'communities_embedded_list',
+                  ),
+                  physics: const ClampingScrollPhysics(),
+                  keyboardDismissBehavior:
+                  ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: EdgeInsets.only(
+                    top: 0,
+                    bottom: MediaQuery.of(context).padding.bottom + 96,
+                  ),
+                  itemCount: joinedCommunities.length,
+                  itemBuilder: (context, index) {
+                    final community = joinedCommunities[index];
 
-                      return MyCommunityTile(
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: MyCommunityTile(
                         name: community['name'] ?? '',
                         description: community['description'],
                         country: community['country'],
@@ -259,8 +249,7 @@ class _CommunitiesPageState extends State<CommunitiesPage>
                             MaterialPageRoute(
                               builder: (_) => CommunityPostsPage(
                                 communityId: community['id'],
-                                communityName:
-                                community['name'] ?? '',
+                                communityName: community['name'] ?? '',
                                 communityDescription:
                                 community['description'],
                                 communityAvatarUrl:
@@ -269,28 +258,28 @@ class _CommunitiesPageState extends State<CommunitiesPage>
                             ),
                           );
                         },
-                      );
-                    },
-                  ),
+                      ),
+                    );
+                  },
                 ),
               ),
+              if (hasSearchText)
+                Positioned(
+                  top: 0,
+                  left: 16,
+                  right: 16,
+                  child: _buildSearchDropdown(
+                    context,
+                    isSearching: _isSearching,
+                    hasSearchResults: hasSearchResults,
+                    hasCompletedSearch: _hasCompletedSearch,
+                    searchResults: searchResults,
+                  ),
+                ),
             ],
           ),
-          if (hasSearchText)
-            Positioned(
-              top: _normalDropdownTop,
-              left: 0,
-              right: 0,
-              child: _buildSearchDropdown(
-                context,
-                isSearching: _isSearching,
-                hasSearchResults: hasSearchResults,
-                hasCompletedSearch: _hasCompletedSearch,
-                searchResults: searchResults,
-              ),
-            ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -642,39 +631,5 @@ class _CommunitiesPageState extends State<CommunitiesPage>
         ),
       ),
     );
-  }
-}
-
-class _CommunitiesTopHeaderDelegate extends SliverPersistentHeaderDelegate {
-  final double minExtentValue;
-  final double maxExtentValue;
-  final Widget child;
-
-  _CommunitiesTopHeaderDelegate({
-    required this.minExtentValue,
-    required this.maxExtentValue,
-    required this.child,
-  });
-
-  @override
-  double get minExtent => minExtentValue;
-
-  @override
-  double get maxExtent => maxExtentValue;
-
-  @override
-  Widget build(
-      BuildContext context,
-      double shrinkOffset,
-      bool overlapsContent,
-      ) {
-    return child;
-  }
-
-  @override
-  bool shouldRebuild(covariant _CommunitiesTopHeaderDelegate oldDelegate) {
-    return oldDelegate.minExtentValue != minExtentValue ||
-        oldDelegate.maxExtentValue != maxExtentValue ||
-        oldDelegate.child != child;
   }
 }
