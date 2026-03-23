@@ -13,13 +13,19 @@ import '../components/my_group_tile.dart';
 import '../services/notifications/notification_service.dart';
 
 class GroupsPage extends StatefulWidget {
-  const GroupsPage({super.key});
+  final bool embeddedMode;
+
+  const GroupsPage({
+    super.key,
+    this.embeddedMode = false,
+  });
 
   @override
   State<GroupsPage> createState() => _GroupsPageState();
 }
 
-class _GroupsPageState extends State<GroupsPage> {
+class _GroupsPageState extends State<GroupsPage>
+    with AutomaticKeepAliveClientMixin<GroupsPage> {
   final AuthService _authService = AuthService();
 
   Map<String, MessageModel> _lastGroupMessages = {};
@@ -30,6 +36,11 @@ class _GroupsPageState extends State<GroupsPage> {
 
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+
+  static const double _embeddedHeaderHeight = 126;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -83,6 +94,8 @@ class _GroupsPageState extends State<GroupsPage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+
     final colorScheme = Theme.of(context).colorScheme;
     final currentUserId = _authService.getCurrentUserId();
 
@@ -122,7 +135,8 @@ class _GroupsPageState extends State<GroupsPage> {
             context,
             icon: Icons.group_outlined,
             title: 'No groups yet'.tr(),
-            subtitle: 'Create a group to start chatting with multiple friends at once.'
+            subtitle:
+            'Create a group to start chatting with multiple friends at once.'
                 .tr(),
           );
         }
@@ -139,127 +153,279 @@ class _GroupsPageState extends State<GroupsPage> {
         final noMatches =
             _searchQuery.trim().isNotEmpty && filteredGroups.isEmpty;
 
-        return Column(
-          children: [
-            _buildTopSection(
-              context,
-              title: "Your groups".tr(),
-              count: groups.length,
-              hintText: 'Search groups'.tr(),
-            ),
-            Expanded(
-              child: noMatches
-                  ? _buildSimpleState(
+        if (!widget.embeddedMode) {
+          return Column(
+            children: [
+              _buildTopSection(
                 context,
-                icon: Icons.search_off_rounded,
-                title: 'No groups match your search'.tr(),
-                subtitle: '',
-                compact: true,
-              )
-                  : ScrollConfiguration(
-                behavior: ScrollConfiguration.of(context)
-                    .copyWith(overscroll: false),
-                child: ListView.builder(
-                  physics: const ClampingScrollPhysics(),
-                  padding: EdgeInsets.only(
-                    top: 6,
-                    bottom: MediaQuery.of(context).padding.bottom + 96,
-                  ),
-                  itemCount: filteredGroups.length,
-                  itemBuilder: (context, index) {
-                    final group = filteredGroups[index];
-                    final groupId = group['id']?.toString() ?? '';
-                    final rawGroupName =
-                    (group['name'] as String?)?.trim().isNotEmpty == true
-                        ? (group['name'] as String)
-                        : 'Group'.tr();
+                title: "Your groups".tr(),
+                count: groups.length,
+                hintText: 'Search groups'.tr(),
+              ),
+              Expanded(
+                child: noMatches
+                    ? _buildSimpleState(
+                  context,
+                  icon: Icons.search_off_rounded,
+                  title: 'No groups match your search'.tr(),
+                  subtitle: '',
+                  compact: true,
+                )
+                    : ScrollConfiguration(
+                  behavior: ScrollConfiguration.of(context)
+                      .copyWith(overscroll: false),
+                  child: ListView.builder(
+                    physics: const ClampingScrollPhysics(),
+                    padding: EdgeInsets.only(
+                      top: 4,
+                      bottom: MediaQuery.of(context).padding.bottom + 96,
+                    ),
+                    itemCount: filteredGroups.length,
+                    itemBuilder: (context, index) {
+                      final group = filteredGroups[index];
+                      final groupId = group['id']?.toString() ?? '';
+                      final rawGroupName =
+                      (group['name'] as String?)?.trim().isNotEmpty ==
+                          true
+                          ? (group['name'] as String)
+                          : 'Group'.tr();
 
-                    final baseGroupName = localizeGroupName(rawGroupName);
+                      final baseGroupName =
+                      localizeGroupName(rawGroupName);
 
-                    final contextType =
-                    (group['context_type'] ?? '').toString().trim();
-                    final isMarriageInquiryRoom =
-                        contextType == 'marriage_inquiry';
+                      final contextType =
+                      (group['context_type'] ?? '').toString().trim();
+                      final isMarriageInquiryRoom =
+                          contextType == 'marriage_inquiry';
 
-                    String displayGroupName = baseGroupName;
+                      String displayGroupName = baseGroupName;
 
-                    if (isMarriageInquiryRoom) {
-                      final manId = (group['man_id'] ?? '').toString().trim();
-                      final womanId =
-                      (group['woman_id'] ?? '').toString().trim();
+                      if (isMarriageInquiryRoom) {
+                        final manId =
+                        (group['man_id'] ?? '').toString().trim();
+                        final womanId =
+                        (group['woman_id'] ?? '').toString().trim();
 
-                      final manName =
-                      (group['man_name'] ?? '').toString().trim();
-                      final womanName =
-                      (group['woman_name'] ?? '').toString().trim();
+                        final manName =
+                        (group['man_name'] ?? '').toString().trim();
+                        final womanName =
+                        (group['woman_name'] ?? '').toString().trim();
 
-                      final targetName =
-                      (currentUserId == manId) ? womanName : manName;
+                        final targetName =
+                        (currentUserId == manId) ? womanName : manName;
 
-                      if (targetName.isNotEmpty) {
-                        displayGroupName = 'marriage_inquiry_for'.tr(
-                          namedArgs: {'name': targetName},
-                        );
-                      } else {
-                        displayGroupName = baseGroupName;
+                        if (targetName.isNotEmpty) {
+                          displayGroupName = 'marriage_inquiry_for'.tr(
+                            namedArgs: {'name': targetName},
+                          );
+                        } else {
+                          displayGroupName = baseGroupName;
+                        }
                       }
-                    }
 
-                    final avatarUrl = group['avatar_url'] as String?;
-                    final MessageModel? lastMsg = _lastGroupMessages[groupId];
+                      final avatarUrl = group['avatar_url'] as String?;
+                      final MessageModel? lastMsg =
+                      _lastGroupMessages[groupId];
 
-                    final int rawUnread = _groupUnreadCounts[groupId] ?? 0;
+                      final int rawUnread =
+                          _groupUnreadCounts[groupId] ?? 0;
 
-                    final int unread =
-                    (activeChatRoomId != null && activeChatRoomId == groupId)
-                        ? 0
-                        : rawUnread;
+                      final int unread =
+                      (activeChatRoomId != null &&
+                          activeChatRoomId == groupId)
+                          ? 0
+                          : rawUnread;
 
-                    final String subtitle = lastMsg != null
-                        ? _buildLastMessagePreview(
-                      msg: lastMsg,
-                      currentUserId: currentUserId,
-                    )
-                        : 'No messages yet'.tr();
+                      final String subtitle = lastMsg != null
+                          ? _buildLastMessagePreview(
+                        msg: lastMsg,
+                        currentUserId: currentUserId,
+                      )
+                          : 'No messages yet'.tr();
 
-                    final String? lastTimeLabel = lastMsg != null
-                        ? formatLastMessageTime(lastMsg.createdAt)
-                        : null;
+                      final String? lastTimeLabel = lastMsg != null
+                          ? formatLastMessageTime(lastMsg.createdAt)
+                          : null;
 
-                    return MyGroupTile(
-                      groupName: displayGroupName,
-                      avatarUrl: avatarUrl,
-                      lastMessagePreview: subtitle,
-                      lastMessageTimeLabel: lastTimeLabel,
-                      unreadCount: unread,
-                      onTap: groupId.isEmpty
-                          ? null
-                          : () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => GroupChatPage(
-                              chatRoomId: groupId,
-                              groupName: rawGroupName,
-                              avatarUrl: avatarUrl,
-                              contextType:
-                              group['context_type']?.toString(),
-                              manId: group['man_id']?.toString(),
-                              womanId: group['woman_id']?.toString(),
-                              mahramId:
-                              group['mahram_id']?.toString(),
-                              manName: group['man_name']?.toString(),
-                              womanName:
-                              group['woman_name']?.toString(),
+                      return MyGroupTile(
+                        groupName: displayGroupName,
+                        avatarUrl: avatarUrl,
+                        lastMessagePreview: subtitle,
+                        lastMessageTimeLabel: lastTimeLabel,
+                        unreadCount: unread,
+                        onTap: groupId.isEmpty
+                            ? null
+                            : () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => GroupChatPage(
+                                chatRoomId: groupId,
+                                groupName: rawGroupName,
+                                avatarUrl: avatarUrl,
+                                contextType:
+                                group['context_type']?.toString(),
+                                manId: group['man_id']?.toString(),
+                                womanId:
+                                group['woman_id']?.toString(),
+                                mahramId:
+                                group['mahram_id']?.toString(),
+                                manName:
+                                group['man_name']?.toString(),
+                                womanName:
+                                group['woman_name']?.toString(),
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                    );
-                  },
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+
+        return CustomScrollView(
+          key: const PageStorageKey<String>('groups_embedded'),
+          physics: const ClampingScrollPhysics(),
+          slivers: [
+            SliverOverlapInjector(
+              handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context),
+            ),
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _GroupsTopHeaderDelegate(
+                minExtentValue: _embeddedHeaderHeight,
+                maxExtentValue: _embeddedHeaderHeight,
+                child: ColoredBox(
+                  color: Theme.of(context).colorScheme.surface,
+                  child: _buildTopSection(
+                    context,
+                    title: "Your groups".tr(),
+                    count: groups.length,
+                    hintText: 'Search groups'.tr(),
+                    embedded: true,
+                  ),
                 ),
               ),
             ),
+            if (noMatches)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: _buildSimpleState(
+                  context,
+                  icon: Icons.search_off_rounded,
+                  title: 'No groups match your search'.tr(),
+                  subtitle: '',
+                  compact: true,
+                ),
+              )
+            else
+              SliverPadding(
+                padding: EdgeInsets.only(
+                  top: 2,
+                  bottom: MediaQuery.of(context).padding.bottom + 96,
+                ),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                      final group = filteredGroups[index];
+                      final groupId = group['id']?.toString() ?? '';
+                      final rawGroupName =
+                      (group['name'] as String?)?.trim().isNotEmpty == true
+                          ? (group['name'] as String)
+                          : 'Group'.tr();
+
+                      final baseGroupName = localizeGroupName(rawGroupName);
+
+                      final contextType =
+                      (group['context_type'] ?? '').toString().trim();
+                      final isMarriageInquiryRoom =
+                          contextType == 'marriage_inquiry';
+
+                      String displayGroupName = baseGroupName;
+
+                      if (isMarriageInquiryRoom) {
+                        final manId =
+                        (group['man_id'] ?? '').toString().trim();
+                        final womanId =
+                        (group['woman_id'] ?? '').toString().trim();
+
+                        final manName =
+                        (group['man_name'] ?? '').toString().trim();
+                        final womanName =
+                        (group['woman_name'] ?? '').toString().trim();
+
+                        final targetName =
+                        (currentUserId == manId) ? womanName : manName;
+
+                        if (targetName.isNotEmpty) {
+                          displayGroupName = 'marriage_inquiry_for'.tr(
+                            namedArgs: {'name': targetName},
+                          );
+                        } else {
+                          displayGroupName = baseGroupName;
+                        }
+                      }
+
+                      final avatarUrl = group['avatar_url'] as String?;
+                      final MessageModel? lastMsg = _lastGroupMessages[groupId];
+
+                      final int rawUnread = _groupUnreadCounts[groupId] ?? 0;
+
+                      final int unread =
+                      (activeChatRoomId != null &&
+                          activeChatRoomId == groupId)
+                          ? 0
+                          : rawUnread;
+
+                      final String subtitle = lastMsg != null
+                          ? _buildLastMessagePreview(
+                        msg: lastMsg,
+                        currentUserId: currentUserId,
+                      )
+                          : 'No messages yet'.tr();
+
+                      final String? lastTimeLabel = lastMsg != null
+                          ? formatLastMessageTime(lastMsg.createdAt)
+                          : null;
+
+                      return MyGroupTile(
+                        groupName: displayGroupName,
+                        avatarUrl: avatarUrl,
+                        lastMessagePreview: subtitle,
+                        lastMessageTimeLabel: lastTimeLabel,
+                        unreadCount: unread,
+                        onTap: groupId.isEmpty
+                            ? null
+                            : () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => GroupChatPage(
+                                chatRoomId: groupId,
+                                groupName: rawGroupName,
+                                avatarUrl: avatarUrl,
+                                contextType:
+                                group['context_type']?.toString(),
+                                manId: group['man_id']?.toString(),
+                                womanId: group['woman_id']?.toString(),
+                                mahramId: group['mahram_id']?.toString(),
+                                manName: group['man_name']?.toString(),
+                                womanName:
+                                group['woman_name']?.toString(),
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                    childCount: filteredGroups.length,
+                  ),
+                ),
+              ),
           ],
         );
       },
@@ -271,11 +437,14 @@ class _GroupsPageState extends State<GroupsPage> {
         required String title,
         required int count,
         required String hintText,
+        bool embedded = false,
       }) {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: embedded
+          ? const EdgeInsets.fromLTRB(16, 8, 16, 6)
+          : const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Container(
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
         decoration: BoxDecoration(
@@ -452,5 +621,39 @@ class _GroupsPageState extends State<GroupsPage> {
     const maxLen = 40;
     if (base.length <= maxLen) return base;
     return '${base.substring(0, maxLen)}…';
+  }
+}
+
+class _GroupsTopHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final double minExtentValue;
+  final double maxExtentValue;
+  final Widget child;
+
+  _GroupsTopHeaderDelegate({
+    required this.minExtentValue,
+    required this.maxExtentValue,
+    required this.child,
+  });
+
+  @override
+  double get minExtent => minExtentValue;
+
+  @override
+  double get maxExtent => maxExtentValue;
+
+  @override
+  Widget build(
+      BuildContext context,
+      double shrinkOffset,
+      bool overlapsContent,
+      ) {
+    return child;
+  }
+
+  @override
+  bool shouldRebuild(covariant _GroupsTopHeaderDelegate oldDelegate) {
+    return oldDelegate.minExtentValue != minExtentValue ||
+        oldDelegate.maxExtentValue != maxExtentValue ||
+        oldDelegate.child != child;
   }
 }

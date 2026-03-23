@@ -23,36 +23,45 @@ class ChatTabsPage extends StatefulWidget {
 class _ChatTabsPageState extends State<ChatTabsPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  int _currentTabIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _tabController.addListener(() {
-      if (mounted) setState(() {});
+    _tabController.addListener(_handleTabChanged);
+  }
+
+  void _handleTabChanged() {
+    if (!mounted) return;
+    if (_currentTabIndex == _tabController.index) return;
+
+    setState(() {
+      _currentTabIndex = _tabController.index;
     });
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_handleTabChanged);
     _tabController.dispose();
     super.dispose();
   }
 
   String _currentFabLabel() {
-    if (_tabController.index == 0) return "Find people".tr();
-    if (_tabController.index == 1) return "New group".tr();
+    if (_currentTabIndex == 0) return "Find people".tr();
+    if (_currentTabIndex == 1) return "New group".tr();
     return "Add community".tr();
   }
 
   IconData _currentFabIcon() {
-    if (_tabController.index == 0) return Icons.person_search;
-    if (_tabController.index == 1) return Icons.group_add;
+    if (_currentTabIndex == 0) return Icons.person_search;
+    if (_currentTabIndex == 1) return Icons.group_add;
     return Icons.group_add;
   }
 
   Future<void> _onFabPressed() async {
-    if (_tabController.index == 0) {
+    if (_currentTabIndex == 0) {
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -62,7 +71,7 @@ class _ChatTabsPageState extends State<ChatTabsPage>
       return;
     }
 
-    if (_tabController.index == 1) {
+    if (_currentTabIndex == 1) {
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -144,17 +153,21 @@ class _ChatTabsPageState extends State<ChatTabsPage>
             body: TabBarView(
               controller: _tabController,
               children: const [
-                _ChatsTabBody(
-                  storageKey: 'chats_friends_tab',
-                  child: FriendsPage(includeMahrams: true),
+                _ChatsKeepAlive(
+                  child: FriendsPage(
+                    includeMahrams: true,
+                    embeddedMode: true,
+                  ),
                 ),
-                _ChatsTabBody(
-                  storageKey: 'chats_groups_tab',
-                  child: GroupsPage(),
+                _ChatsKeepAlive(
+                  child: GroupsPage(
+                    embeddedMode: true,
+                  ),
                 ),
-                _ChatsTabBody(
-                  storageKey: 'chats_communities_tab',
-                  child: CommunitiesPage(),
+                _ChatsKeepAlive(
+                  child: CommunitiesPage(
+                    embeddedMode: true,
+                  ),
                 ),
               ],
             ),
@@ -165,47 +178,24 @@ class _ChatTabsPageState extends State<ChatTabsPage>
   }
 }
 
-class _ChatsTabBody extends StatefulWidget {
-  final String storageKey;
+class _ChatsKeepAlive extends StatefulWidget {
   final Widget child;
 
-  const _ChatsTabBody({
-    required this.storageKey,
-    required this.child,
-  });
+  const _ChatsKeepAlive({required this.child});
 
   @override
-  State<_ChatsTabBody> createState() => _ChatsTabBodyState();
+  State<_ChatsKeepAlive> createState() => _ChatsKeepAliveState();
 }
 
-class _ChatsTabBodyState extends State<_ChatsTabBody>
-    with AutomaticKeepAliveClientMixin<_ChatsTabBody> {
+class _ChatsKeepAliveState extends State<_ChatsKeepAlive>
+    with AutomaticKeepAliveClientMixin<_ChatsKeepAlive> {
   @override
   bool get wantKeepAlive => true;
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
-
-    return Builder(
-      builder: (context) {
-        return CustomScrollView(
-          key: PageStorageKey<String>(widget.storageKey),
-          physics: const AlwaysScrollableScrollPhysics(
-            parent: BouncingScrollPhysics(),
-          ),
-          slivers: [
-            SliverOverlapInjector(
-              handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context),
-            ),
-            SliverFillRemaining(
-              hasScrollBody: true,
-              child: widget.child,
-            ),
-          ],
-        );
-      },
-    );
+    return widget.child;
   }
 }
 
