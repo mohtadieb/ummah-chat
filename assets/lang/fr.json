@@ -229,6 +229,37 @@
   "end_marriage_inquiry_title": "Mettre fin à la demande de mariage",
   "end_marriage_inquiry_confirm": "Êtes-vous sûr de vouloir mettre fin à cette demande de mariage ?",
   "notif_marriage_inquiry_ended": "{name} a mis fin à la demande de mariage",
+
+
+  "relationship_onboarding": {
+    "header": "Comment fonctionnent les relations",
+    "skip": "Passer",
+    "next": "Suivant",
+    "start": "Commencer",
+    "page1": {
+      "title": "Des relations respectueuses",
+      "body": "Sur Ummah Chat, les interactions suivent les principes islamiques.\n\nMême genre : vous pouvez ajouter des amis.\nGenre opposé : l’amitié n’est pas disponible."
+    },
+    "page2": {
+      "title": "Trouver un partenaire",
+      "body": "Pour les genres opposés, les échanges se font avec un mahram.\n\nAppuyez sur \"Demande\" sur un profil. La femme choisit d’abord son mahram avant d’envoyer une demande de mariage."
+    },
+    "page3": {
+      "title": "Vous gardez le contrôle",
+      "body": "Les demandes de mariage peuvent être acceptées ou refusées.\nLes demandes de mahram doivent être confirmées.\n\nLes relations restent claires et respectueuses."
+    }
+  },
+
+
+
+  "Username": "Nom d'utilisateur",
+  "Only lowercase letters, numbers, dots and underscores": "Uniquement des lettres minuscules, des chiffres, des points et des underscores",
+
+
+  "Log out?": "Se déconnecter ?",
+  "Are you sure you want to log out of your Ummah Chat account on this device?": "Êtes-vous sûr de vouloir vous déconnecter de votre compte Ummah Chat sur cet appareil ?",
+
+
   "End": "Terminer",
   "accept": "Accepter",
   "decline": "Refuser",

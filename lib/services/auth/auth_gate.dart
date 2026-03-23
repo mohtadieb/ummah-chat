@@ -1,10 +1,11 @@
-// lib/services/auth/auth_gate.dart
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:ummah_chat/layouts/main_layout.dart';
 import 'package:ummah_chat/services/auth/login_or_register.dart';
 import 'package:ummah_chat/pages/complete_profile_page.dart';
+import 'package:ummah_chat/pages/relationship_onboarding_page.dart';
 
 import '../localization/locale_sync_service.dart';
 import '../notifications/push_notification_service.dart';
@@ -12,7 +13,8 @@ import '../notifications/push_notification_service.dart';
 /// AUTH GATE
 ///
 /// - If there is a Supabase session:
-///     -> go to _ProfileGate (which decides MainLayout vs CompleteProfilePage)
+///     -> go to _ProfileGate (which decides CompleteProfilePage vs
+///        RelationshipOnboardingPage vs MainLayout)
 /// - If no session:
 ///     -> show LoginOrRegister
 ///
@@ -63,7 +65,7 @@ class _AuthGateState extends State<AuthGate> {
         Widget currentScreen;
 
         if (session != null) {
-          // ✅ Logged in → check if profile is complete
+          // ✅ Logged in → check if profile is complete, then relationship onboarding
           currentScreen = const _ProfileGate(
             key: ValueKey('profile_gate'),
           );
@@ -96,7 +98,8 @@ class _AuthGateState extends State<AuthGate> {
 }
 
 // ------------------------------
-// _ProfileGate: decides between MainLayout and CompleteProfilePage
+// _ProfileGate: decides between
+// CompleteProfilePage -> RelationshipOnboardingPage -> MainLayout
 // ------------------------------
 
 class _ProfileGate extends StatefulWidget {
@@ -107,37 +110,41 @@ class _ProfileGate extends StatefulWidget {
 }
 
 class _ProfileGateState extends State<_ProfileGate> {
+  static const String _seenRelationshipOnboardingKey =
+      'seen_relationship_onboarding';
+
   bool _loading = true;
   bool _profileComplete = false;
+  bool _relationshipOnboardingSeen = false;
 
   @override
   void initState() {
     super.initState();
-    _checkProfile();
+    _checkProfileAndOnboarding();
   }
 
-  Future<void> _checkProfile() async {
+  Future<void> _checkProfileAndOnboarding() async {
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
 
     if (user == null) {
+      if (!mounted) return;
       setState(() {
         _profileComplete = false;
+        _relationshipOnboardingSeen = false;
         _loading = false;
       });
       return;
     }
 
-    // 🔔 NEW: make sure FCM token is synced now that we know who the user is
+    // 🔔 Make sure FCM token is synced now that we know who the user is
     await PushNotificationService.syncFcmTokenWithSupabase();
 
-    // 🌍 NEW: sync selected app language to Supabase (so pushes can localize)
+    // 🌍 Sync selected app language to Supabase (so pushes can localize)
     await LocaleSyncService.syncLocaleToSupabase(context);
 
-
     try {
-      // 👇 Make sure these columns exist in your "profiles" table:
-      // country (text), gender (text)
+      // Check profile completion
       final data = await supabase
           .from('profiles')
           .select('country, gender')
@@ -149,23 +156,48 @@ class _ProfileGateState extends State<_ProfileGate> {
           (data['country'] ?? '').toString().trim().isNotEmpty &&
           (data['gender'] ?? '').toString().trim().isNotEmpty;
 
+      // Only check relationship onboarding if profile is complete
+      bool relationshipSeen = false;
+      if (complete) {
+        final prefs = await SharedPreferences.getInstance();
+        relationshipSeen =
+            prefs.getBool(_seenRelationshipOnboardingKey) ?? false;
+      }
+
+      if (!mounted) return;
       setState(() {
         _profileComplete = complete;
+        _relationshipOnboardingSeen = relationshipSeen;
         _loading = false;
       });
     } catch (e) {
-      debugPrint('Error checking profile: $e');
+      debugPrint('Error checking profile/onboarding: $e');
+
+      if (!mounted) return;
       setState(() {
         _profileComplete = false;
+        _relationshipOnboardingSeen = false;
         _loading = false;
       });
     }
   }
 
-  void _onProfileCompleted() {
-    // Called by CompleteProfilePage after successful save.
+  void _onProfileCompleted() async {
+    final prefs = await SharedPreferences.getInstance();
+    final relationshipSeen =
+        prefs.getBool(_seenRelationshipOnboardingKey) ?? false;
+
+    if (!mounted) return;
     setState(() {
       _profileComplete = true;
+      _relationshipOnboardingSeen = relationshipSeen;
+    });
+  }
+
+  void _onRelationshipOnboardingFinished() {
+    if (!mounted) return;
+    setState(() {
+      _relationshipOnboardingSeen = true;
     });
   }
 
@@ -180,14 +212,21 @@ class _ProfileGateState extends State<_ProfileGate> {
       );
     }
 
-    if (_profileComplete) {
-      // ✅ User logged in + profile complete → show main app
-      return const MainLayout();
+    if (!_profileComplete) {
+      // ❗ Profile incomplete → show CompleteProfilePage
+      return CompleteProfilePage(
+        onCompleted: _onProfileCompleted,
+      );
     }
 
-    // ❗ Profile incomplete → show CompleteProfilePage
-    return CompleteProfilePage(
-      onCompleted: _onProfileCompleted,
-    );
+    if (!_relationshipOnboardingSeen) {
+      // ✅ Profile complete, but relationship onboarding not seen yet
+      return RelationshipOnboardingPage(
+        onFinished: _onRelationshipOnboardingFinished,
+      );
+    }
+
+    // ✅ User logged in + profile complete + relationship onboarding seen
+    return const MainLayout();
   }
 }

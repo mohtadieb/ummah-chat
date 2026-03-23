@@ -4,18 +4,26 @@
 // ✅ Daily Ayah removed from HomePage
 // ✅ For You remains frozen for session
 // ✅ Local tile theme added so text posts have better contrast
+// ✅ Top card scrolls away fluently
+// ✅ Tab selector stays pinned
+// ✅ Each tab keeps its own independent scroll position
+// ✅ Other tabs do not scroll along
+// ✅ Sliver/NestedScrollView architecture for proper scroll handoff
 
 import 'package:easy_localization/easy_localization.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../components/my_post_tile.dart';
 import '../helper/for_you_ranker.dart';
+import '../helper/navigate_pages.dart';
 import '../models/post.dart';
 import '../services/database/database_provider.dart';
-import '../components/my_post_tile.dart';
-import '../helper/navigate_pages.dart';
 import 'create_post_page.dart';
+
+const double kHomeHeaderCardHeight = 126.0;
+const double kHomeHeaderOuterHeight = 148.0;
+const double kHomeTabBarAreaHeight = 66.0;
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -26,6 +34,9 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage>
     with SingleTickerProviderStateMixin {
+  static const double _headerCardHeight = kHomeHeaderCardHeight;
+  static const double _tabBarHeaderHeight = kHomeTabBarAreaHeight;
+
   @override
   void setState(VoidCallback fn) {
     if (!mounted) return;
@@ -45,41 +56,6 @@ class _HomePageState extends State<HomePage>
   bool _initialFeedLoading = true;
 
   Set<String> _lastAllPostIds = {};
-
-  void _onDbChanged() {
-    final currentPosts = databaseProvider.posts
-        .where((p) => p.communityId == null)
-        .toList();
-
-    final currentIds = currentPosts.map((p) => p.id).whereType<String>().toSet();
-
-    if (_lastAllPostIds.isEmpty) {
-      _lastAllPostIds = currentIds;
-      return;
-    }
-
-    final newIds = currentIds.difference(_lastAllPostIds);
-    _lastAllPostIds = currentIds;
-
-    if (!mounted) return;
-
-    setState(() {
-      _frozenForYou.removeWhere((p) => !currentIds.contains(p.id));
-
-      if (newIds.isNotEmpty) {
-        final newPosts = currentPosts.where((p) => newIds.contains(p.id)).toList();
-        newPosts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-        final existing = _frozenForYou.map((p) => p.id).toSet();
-        _frozenForYou = [
-          ...newPosts.where((p) => !existing.contains(p.id)),
-          ..._frozenForYou,
-        ];
-
-        _forYouFrozenReady = true;
-      }
-    });
-  }
 
   @override
   void initState() {
@@ -103,6 +79,41 @@ class _HomePageState extends State<HomePage>
         setState(() {
           _initialFeedLoading = false;
         });
+      }
+    });
+  }
+
+  void _onDbChanged() {
+    final currentPosts =
+    databaseProvider.posts.where((p) => p.communityId == null).toList();
+
+    final currentIds = currentPosts.map((p) => p.id).whereType<String>().toSet();
+
+    if (_lastAllPostIds.isEmpty) {
+      _lastAllPostIds = currentIds;
+      return;
+    }
+
+    final newIds = currentIds.difference(_lastAllPostIds);
+    _lastAllPostIds = currentIds;
+
+    if (!mounted) return;
+
+    setState(() {
+      _frozenForYou.removeWhere((p) => !currentIds.contains(p.id));
+
+      if (newIds.isNotEmpty) {
+        final newPosts =
+        currentPosts.where((p) => newIds.contains(p.id)).toList();
+        newPosts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+        final existing = _frozenForYou.map((p) => p.id).toSet();
+        _frozenForYou = [
+          ...newPosts.where((p) => !existing.contains(p.id)),
+          ..._frozenForYou,
+        ];
+
+        _forYouFrozenReady = true;
       }
     });
   }
@@ -155,10 +166,113 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildPostsSliver(
+      List<Post> posts, {
+        bool isForYou = false,
+      }) {
+    final loadingPost = context.watch<DatabaseProvider>().loadingPost;
+
+    final list = [
+      if (!isForYou && loadingPost != null) loadingPost,
+      ...posts,
+    ];
+
+    if (_initialFeedLoading) {
+      return const SliverFillRemaining(
+        hasScrollBody: false,
+        child: _FeedLoadingState(),
+      );
+    }
+
+    if (list.isEmpty) {
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: _EmptyFeedState(
+          title: 'Nothing here..'.tr(),
+        ),
+      );
+    }
+
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 100),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+              (context, index) {
+            final post = list[index];
+
+            if (post.id == 'loading') {
+              return _buildLoadingPostTile();
+            }
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Theme(
+                data: _postTileTheme(context),
+                child: MyPostTile(
+                  key: ValueKey(post.id),
+                  post: post,
+                  onUserTap: () => goUserPage(context, post.userId),
+                  onPostTap: () => goPostPage(context, post),
+                  scaffoldContext: context,
+                ),
+              ),
+            );
+          },
+          childCount: list.length,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingPostTile() {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: cs.outlineVariant.withValues(alpha: 0.55),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.2,
+              color: cs.primary,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              "Posting your content…".tr(),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface.withValues(alpha: 0.85),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final db = context.watch<DatabaseProvider>();
 
     final forYouPosts = _forYouFrozenReady ? _frozenForYou : const <Post>[];
@@ -206,152 +320,138 @@ class _HomePageState extends State<HomePage>
           ),
         ),
         child: SafeArea(
-          child: Column(
-            children: [
-              _PremiumHomeHeader(
-                title: 'Ummah Chat',
-                subtitle: 'home_feed_subtitle'.tr(),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: _PremiumTabBar(
-                  controller: _tabController,
-                  tabs: [
-                    "For You".tr(),
-                    "Following".tr(),
-                    "Communities".tr(),
-                  ],
+          child: NestedScrollView(
+            floatHeaderSlivers: false,
+            headerSliverBuilder: (context, innerBoxIsScrolled) {
+              return [
+                SliverOverlapAbsorber(
+                  handle:
+                  NestedScrollView.sliverOverlapAbsorberHandleFor(context),
+                  sliver: const SliverToBoxAdapter(
+                    child: _HeaderArea(),
+                  ),
                 ),
-              ),
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildPostList(forYouPosts, isForYou: true),
-                    _buildPostList(followingGlobalPosts),
-                    _buildPostList(communityPosts),
-                  ],
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _PinnedTabBarDelegate(
+                    minExtentValue: _tabBarHeaderHeight,
+                    maxExtentValue: _tabBarHeaderHeight,
+                    child: Container(
+                      color: cs.surface,
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      child: Align(
+                        alignment: Alignment.center,
+                        child: _PremiumTabBar(
+                          controller: _tabController,
+                          tabs: [
+                            "For You".tr(),
+                            "Following".tr(),
+                            "Communities".tr(),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
+              ];
+            },
+            body: TabBarView(
+              controller: _tabController,
+              children: [
+                _HomeTabView(
+                  storageKey: 'home_for_you',
+                  onRefresh: () async {
+                    await databaseProvider.reloadPosts();
+                    await _rebuildFrozenForYou();
+                  },
+                  sliver: _buildPostsSliver(
+                    forYouPosts,
+                    isForYou: true,
+                  ),
+                ),
+                _HomeTabView(
+                  storageKey: 'home_following',
+                  onRefresh: () async {
+                    await databaseProvider.reloadPosts();
+                  },
+                  sliver: _buildPostsSliver(followingGlobalPosts),
+                ),
+                _HomeTabView(
+                  storageKey: 'home_communities',
+                  onRefresh: () async {
+                    await databaseProvider.reloadPosts();
+                  },
+                  sliver: _buildPostsSliver(communityPosts),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeTabView extends StatefulWidget {
+  final String storageKey;
+  final Future<void> Function() onRefresh;
+  final Widget sliver;
+
+  const _HomeTabView({
+    required this.storageKey,
+    required this.onRefresh,
+    required this.sliver,
+  });
+
+  @override
+  State<_HomeTabView> createState() => _HomeTabViewState();
+}
+
+class _HomeTabViewState extends State<_HomeTabView>
+    with AutomaticKeepAliveClientMixin<_HomeTabView> {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+
+    return Builder(
+      builder: (context) {
+        return RefreshIndicator(
+          onRefresh: widget.onRefresh,
+          child: CustomScrollView(
+            key: PageStorageKey<String>(widget.storageKey),
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            slivers: [
+              SliverOverlapInjector(
+                handle:
+                NestedScrollView.sliverOverlapAbsorberHandleFor(context),
               ),
+              widget.sliver,
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPostList(List<Post> posts, {bool isForYou = false}) {
-    final loadingPost = context.watch<DatabaseProvider>().loadingPost;
-
-    final list = [
-      if (!isForYou && loadingPost != null) loadingPost,
-      ...posts,
-    ];
-
-    return RefreshIndicator(
-      onRefresh: () async {
-        await databaseProvider.reloadPosts();
-        if (isForYou) {
-          await _rebuildFrozenForYou();
-        }
+        );
       },
-      child: _initialFeedLoading
-          ? LayoutBuilder(
-        builder: (context, constraints) {
-          return SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: constraints.maxHeight),
-              child: const _FeedLoadingState(),
-            ),
-          );
-        },
-      )
-          : list.isEmpty
-          ? LayoutBuilder(
-        builder: (context, constraints) {
-          return SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: constraints.maxHeight),
-              child: _EmptyFeedState(
-                title: 'Nothing here..'.tr(),
-              ),
-            ),
-          );
-        },
-      )
-          : ListView.builder(
-        physics: const AlwaysScrollableScrollPhysics(
-          parent: BouncingScrollPhysics(),
-        ),
-        padding: const EdgeInsets.fromLTRB(12, 4, 12, 100),
-        itemCount: list.length,
-        itemBuilder: (context, index) {
-          final post = list[index];
-
-          if (post.id == 'loading') {
-            return _buildLoadingPostTile();
-          }
-
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Theme(
-              data: _postTileTheme(context),
-              child: MyPostTile(
-                key: ValueKey(post.id),
-                post: post,
-                onUserTap: () => goUserPage(context, post.userId),
-                onPostTap: () => goPostPage(context, post),
-                scaffoldContext: context,
-              ),
-            ),
-          );
-        },
-      ),
     );
   }
+}
 
-  Widget _buildLoadingPostTile() {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+class _HeaderArea extends StatelessWidget {
+  const _HeaderArea();
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.55)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 22,
-            height: 22,
-            child: CircularProgressIndicator(
-              strokeWidth: 2.2,
-              color: cs.primary,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              "Posting your content…".tr(),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: cs.onSurface.withValues(alpha: 0.85),
-              ),
-            ),
-          ),
-        ],
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+      child: SizedBox(
+        height: kHomeHeaderCardHeight,
+        child: _PremiumHomeHeader(
+          title: 'Ummah Chat',
+          subtitle: 'home_feed_subtitle'.tr(),
+        ),
       ),
     );
   }
@@ -378,82 +478,85 @@ class _PremiumHomeHeader extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              cs.primary.withValues(alpha: 0.14),
-              cs.secondary.withValues(alpha: 0.55),
-              cs.surfaceContainerHigh,
-            ],
-          ),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: 0.45),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 24,
-              offset: const Offset(0, 12),
-            ),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            cs.primary.withValues(alpha: 0.14),
+            cs.secondary.withValues(alpha: 0.55),
+            cs.surfaceContainerHigh,
           ],
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: cs.primary.withValues(alpha: 0.14),
-              ),
-              child: Icon(
-                Icons.auto_awesome_rounded,
-                color: cs.primary,
-                size: 26,
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _greeting(),
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: cs.onSurface.withValues(alpha: 0.65),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    title,
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: cs.onSurface.withValues(alpha: 0.72),
-                      height: 1.25,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+        border: Border.all(
+          color: cs.outlineVariant.withValues(alpha: 0.45),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: cs.primary.withValues(alpha: 0.14),
+            ),
+            child: Icon(
+              Icons.auto_awesome_rounded,
+              color: cs.primary,
+              size: 26,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _greeting(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: cs.onSurface.withValues(alpha: 0.65),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: cs.onSurface.withValues(alpha: 0.72),
+                    height: 1.18,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -473,52 +576,89 @@ class _PremiumTabBar extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    return Container(
-      padding: const EdgeInsets.all(5),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: 0.5),
-        ),
-      ),
-      child: TabBar(
-        controller: controller,
-        dividerColor: Colors.transparent,
-        indicatorSize: TabBarIndicatorSize.tab,
-        indicator: BoxDecoration(
-          color: cs.primary,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: cs.primary.withValues(alpha: 0.22),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        labelColor: cs.onPrimary,
-        unselectedLabelColor: cs.onSurface.withValues(alpha: 0.72),
-        labelStyle: theme.textTheme.labelLarge?.copyWith(
-          fontWeight: FontWeight.w700,
-        ),
-        unselectedLabelStyle: theme.textTheme.labelLarge?.copyWith(
-          fontWeight: FontWeight.w600,
-        ),
-        splashBorderRadius: BorderRadius.circular(14),
-        tabs: tabs
-            .map(
-              (tab) => Tab(
-            height: 42,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(tab),
-            ),
+    return SizedBox(
+      height: kHomeTabBarAreaHeight - 12,
+      child: Container(
+        padding: const EdgeInsets.all(5),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: cs.outlineVariant.withValues(alpha: 0.5),
           ),
-        )
-            .toList(),
+        ),
+        child: TabBar(
+          controller: controller,
+          dividerColor: Colors.transparent,
+          indicatorSize: TabBarIndicatorSize.tab,
+          indicator: BoxDecoration(
+            color: cs.primary,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(
+                color: cs.primary.withValues(alpha: 0.22),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          labelColor: cs.onPrimary,
+          unselectedLabelColor: cs.onSurface.withValues(alpha: 0.72),
+          labelStyle: theme.textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+          unselectedLabelStyle: theme.textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+          splashBorderRadius: BorderRadius.circular(14),
+          tabs: tabs
+              .map(
+                (tab) => Tab(
+              height: 42,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(tab),
+              ),
+            ),
+          )
+              .toList(),
+        ),
       ),
     );
+  }
+}
+
+class _PinnedTabBarDelegate extends SliverPersistentHeaderDelegate {
+  final double minExtentValue;
+  final double maxExtentValue;
+  final Widget child;
+
+  _PinnedTabBarDelegate({
+    required this.minExtentValue,
+    required this.maxExtentValue,
+    required this.child,
+  });
+
+  @override
+  double get minExtent => minExtentValue;
+
+  @override
+  double get maxExtent => maxExtentValue;
+
+  @override
+  Widget build(
+      BuildContext context,
+      double shrinkOffset,
+      bool overlapsContent,
+      ) {
+    return child;
+  }
+
+  @override
+  bool shouldRebuild(covariant _PinnedTabBarDelegate oldDelegate) {
+    return oldDelegate.minExtentValue != minExtentValue ||
+        oldDelegate.maxExtentValue != maxExtentValue ||
+        oldDelegate.child != child;
   }
 }
 

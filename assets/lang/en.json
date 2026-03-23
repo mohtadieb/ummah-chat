@@ -374,6 +374,33 @@
   "notif_marriage_inquiry_mahram_chosen": "{name} has chosen you to be her mahram.",
   "end_marriage_inquiry_title": "End marriage inquiry",
   "end_marriage_inquiry_confirm": "Are you sure you want to end this inquiry?",
+
+  "relationship_onboarding": {
+    "header": "How connections work",
+    "skip": "Skip",
+    "next": "Next",
+    "start": "Start",
+    "page1": {
+      "title": "Respectful connections",
+      "body": "In Ummah Chat, interactions follow Islamic guidelines.\n\nSame gender: you can add friends.\nOpposite gender: friendship is not available."
+    },
+    "page2": {
+      "title": "Finding a spouse",
+      "body": "For opposite genders, connections are made with a mahram.\n\nPress \"Request\" on a profile. The woman selects her mahram before a marriage inquiry can be sent."
+    },
+    "page3": {
+      "title": "You stay in control",
+      "body": "Marriage inquiries can be accepted or declined.\nMahram requests must be confirmed.\n\nConnections stay clear and respectful."
+    }
+  },
+
+  "Username": "Username",
+  "Only lowercase letters, numbers, dots and underscores": "Only lowercase letters, numbers, dots and underscores",
+
+  "Log out?": "Log out?",
+  "Are you sure you want to log out of your Ummah Chat account on this device?": "Are you sure you want to log out of your Ummah Chat account on this device?",
+
+
   "notif_marriage_inquiry_ended": "{name} ended the marriage inquiry",
   "End": "End",
   "group_no_longer_available": "This group is no longer available.",

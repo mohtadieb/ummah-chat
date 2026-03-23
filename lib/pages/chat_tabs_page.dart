@@ -10,6 +10,9 @@ import 'communities_page.dart';
 import 'search_page.dart';
 import '../services/database/database_provider.dart';
 
+const double kChatsHeaderCardHeight = 126.0;
+const double kChatsPinnedAreaHeight = 62.0;
+
 class ChatTabsPage extends StatefulWidget {
   const ChatTabsPage({super.key});
 
@@ -106,40 +109,119 @@ class _ChatTabsPageState extends State<ChatTabsPage>
           ),
         ),
         child: SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-                child: _PremiumChatsHeader(
-                  title: "Chats".tr(),
-                  subtitle: "Stay connected with friends, groups, and communities."
-                      .tr(),
+          child: NestedScrollView(
+            floatHeaderSlivers: false,
+            headerSliverBuilder: (context, innerBoxIsScrolled) {
+              return [
+                SliverOverlapAbsorber(
+                  handle:
+                  NestedScrollView.sliverOverlapAbsorberHandleFor(context),
+                  sliver: const SliverToBoxAdapter(
+                    child: _ChatsHeaderArea(),
+                  ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: _PremiumTabBar(
-                  controller: _tabController,
-                  tabs: [
-                    "Friends".tr(),
-                    "Groups".tr(),
-                    "Communities".tr(),
-                  ],
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _PinnedChatsTopAreaDelegate(
+                    minExtentValue: kChatsPinnedAreaHeight,
+                    maxExtentValue: kChatsPinnedAreaHeight,
+                    child: Container(
+                      color: cs.surface,
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      child: _PremiumTabBar(
+                        controller: _tabController,
+                        tabs: [
+                          "Friends".tr(),
+                          "Groups".tr(),
+                          "Communities".tr(),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  physics: const BouncingScrollPhysics(),
-                  children: const [
-                    FriendsPage(includeMahrams: true,),
-                    GroupsPage(),
-                    CommunitiesPage(),
-                  ],
+              ];
+            },
+            body: TabBarView(
+              controller: _tabController,
+              children: const [
+                _ChatsTabBody(
+                  storageKey: 'chats_friends_tab',
+                  child: FriendsPage(includeMahrams: true),
                 ),
-              ),
-            ],
+                _ChatsTabBody(
+                  storageKey: 'chats_groups_tab',
+                  child: GroupsPage(),
+                ),
+                _ChatsTabBody(
+                  storageKey: 'chats_communities_tab',
+                  child: CommunitiesPage(),
+                ),
+              ],
+            ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ChatsTabBody extends StatefulWidget {
+  final String storageKey;
+  final Widget child;
+
+  const _ChatsTabBody({
+    required this.storageKey,
+    required this.child,
+  });
+
+  @override
+  State<_ChatsTabBody> createState() => _ChatsTabBodyState();
+}
+
+class _ChatsTabBodyState extends State<_ChatsTabBody>
+    with AutomaticKeepAliveClientMixin<_ChatsTabBody> {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+
+    return Builder(
+      builder: (context) {
+        return CustomScrollView(
+          key: PageStorageKey<String>(widget.storageKey),
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          slivers: [
+            SliverOverlapInjector(
+              handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context),
+            ),
+            SliverFillRemaining(
+              hasScrollBody: true,
+              child: widget.child,
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ChatsHeaderArea extends StatelessWidget {
+  const _ChatsHeaderArea();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+      child: SizedBox(
+        height: kChatsHeaderCardHeight,
+        child: _PremiumChatsHeader(
+          title: "Chats".tr(),
+          subtitle:
+          "Stay connected with friends, groups, and communities.".tr(),
         ),
       ),
     );
@@ -244,53 +326,90 @@ class _PremiumTabBar extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    return Container(
-      padding: const EdgeInsets.all(5),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: 0.5),
-        ),
-      ),
-      child: TabBar(
-        controller: controller,
-        dividerColor: Colors.transparent,
-        indicatorSize: TabBarIndicatorSize.tab,
-        indicator: BoxDecoration(
-          color: cs.primary,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: cs.primary.withValues(alpha: 0.22),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        splashFactory: NoSplash.splashFactory,
-        overlayColor: WidgetStateProperty.all(Colors.transparent),
-        labelColor: cs.onPrimary,
-        unselectedLabelColor: cs.onSurface.withValues(alpha: 0.72),
-        labelStyle: theme.textTheme.labelLarge?.copyWith(
-          fontWeight: FontWeight.w700,
-        ),
-        unselectedLabelStyle: theme.textTheme.labelLarge?.copyWith(
-          fontWeight: FontWeight.w600,
-        ),
-        tabs: tabs
-            .map(
-              (tab) => Tab(
-            height: 42,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(tab),
-            ),
+    return SizedBox(
+      height: 50,
+      child: Container(
+        padding: const EdgeInsets.all(5),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: cs.outlineVariant.withValues(alpha: 0.5),
           ),
-        )
-            .toList(),
+        ),
+        child: TabBar(
+          controller: controller,
+          dividerColor: Colors.transparent,
+          indicatorSize: TabBarIndicatorSize.tab,
+          indicator: BoxDecoration(
+            color: cs.primary,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(
+                color: cs.primary.withValues(alpha: 0.22),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          splashFactory: NoSplash.splashFactory,
+          overlayColor: WidgetStateProperty.all(Colors.transparent),
+          labelColor: cs.onPrimary,
+          unselectedLabelColor: cs.onSurface.withValues(alpha: 0.72),
+          labelStyle: theme.textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+          unselectedLabelStyle: theme.textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+          tabs: tabs
+              .map(
+                (tab) => Tab(
+              height: 42,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(tab),
+              ),
+            ),
+          )
+              .toList(),
+        ),
       ),
     );
+  }
+}
+
+class _PinnedChatsTopAreaDelegate extends SliverPersistentHeaderDelegate {
+  final double minExtentValue;
+  final double maxExtentValue;
+  final Widget child;
+
+  _PinnedChatsTopAreaDelegate({
+    required this.minExtentValue,
+    required this.maxExtentValue,
+    required this.child,
+  });
+
+  @override
+  double get minExtent => minExtentValue;
+
+  @override
+  double get maxExtent => maxExtentValue;
+
+  @override
+  Widget build(
+      BuildContext context,
+      double shrinkOffset,
+      bool overlapsContent,
+      ) {
+    return child;
+  }
+
+  @override
+  bool shouldRebuild(covariant _PinnedChatsTopAreaDelegate oldDelegate) {
+    return oldDelegate.minExtentValue != minExtentValue ||
+        oldDelegate.maxExtentValue != maxExtentValue ||
+        oldDelegate.child != child;
   }
 }
 

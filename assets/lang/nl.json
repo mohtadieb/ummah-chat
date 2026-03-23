@@ -239,6 +239,34 @@
   "end_marriage_inquiry_confirm": "Weet je zeker dat je deze huwelijksaanvraag wilt beëindigen?",
   "notif_marriage_inquiry_ended": "{name} heeft de huwelijksaanvraag beëindigd",
 
+  "relationship_onboarding": {
+    "header": "Hoe verbindingen werken",
+    "skip": "Overslaan",
+    "next": "Volgende",
+    "start": "Start",
+    "page1": {
+      "title": "Respectvolle verbindingen",
+      "body": "In Ummah Chat volgen interacties islamitische richtlijnen.\n\nZelfde geslacht: je kunt vrienden toevoegen.\nTegenovergesteld geslacht: vriendschap is niet beschikbaar."
+    },
+    "page2": {
+      "title": "Een partner vinden",
+      "body": "Voor tegenovergestelde geslachten gebeurt contact met een mahram.\n\nDruk op \"Verzoek\" op een profiel. De vrouw kiest eerst haar mahram voordat een huwelijksaanvraag wordt gestuurd."
+    },
+    "page3": {
+      "title": "Jij houdt de controle",
+      "body": "Huwelijksaanvragen kunnen worden geaccepteerd of afgewezen.\nMahram-verzoeken moeten worden bevestigd.\n\nVerbindingen blijven duidelijk en respectvol."
+    }
+  },
+
+
+  "Username": "Gebruikersnaam",
+  "Only lowercase letters, numbers, dots and underscores": "Alleen kleine letters, cijfers, punten en underscores",
+
+
+  "Log out?": "Uitloggen?",
+  "Are you sure you want to log out of your Ummah Chat account on this device?": "Weet je zeker dat je wilt uitloggen van je Ummah Chat-account op dit apparaat?",
+
+
   "End": "Beëindigen",
 
 
@@ -309,7 +337,7 @@
   "Private account": "Privéaccount",
   "This account is private": "Dit account is privé",
   "Only the owner can view this profile.": "Alleen de eigenaar kan dit profiel bekijken.",
-  "Profile visibility": "Profielzichtbaarheid",
+  "Profile visibility": "Profiel zichtbaarheid",
   "Everyone": "Iedereen",
   "Nobody": "Niemand",
   "Visible to: Everyone": "Zichtbaar voor: Iedereen",
