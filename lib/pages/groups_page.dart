@@ -75,12 +75,10 @@ class _GroupsPageState extends State<GroupsPage>
     if (!widget.embeddedMode || !widget.isActiveTab) return;
     if (!_scrollController.hasClients) return;
 
-    final minOffset = widget.embeddedListTopCompensation;
-    final current = _scrollController.offset;
     final max = _scrollController.position.maxScrollExtent;
-    final target = minOffset.clamp(0.0, max);
+    final target = widget.embeddedListTopCompensation.clamp(0.0, max);
 
-    if (current < target) {
+    if ((_scrollController.offset - target).abs() >= 0.5) {
       _scrollController.jumpTo(target);
     }
   }

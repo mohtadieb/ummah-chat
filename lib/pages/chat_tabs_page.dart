@@ -49,31 +49,29 @@ class _ChatTabsPageState extends State<ChatTabsPage>
     _tabController.addListener(_handleTabChanged);
   }
 
-  void _prepareTabBeforeSwitch(int tabIndex) {
-    final targetOffset = _sharedHeaderOffset.clamp(0.0, kChatsHeaderOuterHeight);
-
-    ScrollController controller;
+  ScrollController _controllerForTab(int tabIndex) {
     switch (tabIndex) {
       case 0:
-        controller = _friendsScrollController;
-        break;
+        return _friendsScrollController;
       case 1:
-        controller = _groupsScrollController;
-        break;
+        return _groupsScrollController;
       default:
-        controller = _communitiesScrollController;
-        break;
+        return _communitiesScrollController;
     }
+  }
 
+  void _syncControllerToHeaderOffset(ScrollController controller, double header) {
     if (!controller.hasClients) return;
-
-    final current = controller.offset;
     final max = controller.position.maxScrollExtent;
-    final clampedTarget = targetOffset.clamp(0.0, max);
-
-    if (current < clampedTarget) {
-      controller.jumpTo(clampedTarget);
+    final target = header.clamp(0.0, max);
+    if ((controller.offset - target).abs() >= 0.5) {
+      controller.jumpTo(target);
     }
+  }
+
+  void _prepareTabBeforeSwitch(int tabIndex) {
+    final controller = _controllerForTab(tabIndex);
+    _syncControllerToHeaderOffset(controller, _sharedHeaderOffset);
   }
 
   void _handleTabChanged() {
@@ -84,12 +82,29 @@ class _ChatTabsPageState extends State<ChatTabsPage>
       _currentTabIndex = _tabController.index;
       _tabActivationTick++;
     });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _prepareTabBeforeSwitch(_currentTabIndex);
+    });
   }
 
   void _handleSharedScrollOffsetChanged(double offset) {
     if (!mounted) return;
+
     final normalized = offset.clamp(0.0, kChatsHeaderOuterHeight);
-    if ((_sharedHeaderOffset - normalized).abs() < 0.5) return;
+    final oldOffset = _sharedHeaderOffset;
+
+    if ((oldOffset - normalized).abs() < 0.5) return;
+
+    if (normalized < oldOffset) {
+      // Header is being revealed again.
+      // Pull inactive tabs down so they align back under their search card.
+      for (var i = 0; i < 3; i++) {
+        if (i == _currentTabIndex) continue;
+        _syncControllerToHeaderOffset(_controllerForTab(i), normalized);
+      }
+    }
 
     setState(() {
       _sharedHeaderOffset = normalized;

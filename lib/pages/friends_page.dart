@@ -77,12 +77,10 @@ class _FriendsPageState extends State<FriendsPage>
     if (!widget.embeddedMode || !widget.isActiveTab) return;
     if (!_scrollController.hasClients) return;
 
-    final minOffset = widget.embeddedListTopCompensation;
-    final current = _scrollController.offset;
     final max = _scrollController.position.maxScrollExtent;
-    final target = minOffset.clamp(0.0, max);
+    final target = widget.embeddedListTopCompensation.clamp(0.0, max);
 
-    if (current < target) {
+    if ((_scrollController.offset - target).abs() >= 0.5) {
       _scrollController.jumpTo(target);
     }
   }
@@ -441,7 +439,13 @@ class _FriendsPageState extends State<FriendsPage>
           final lastTime = lastInfo?.createdAt;
           final lastTimeLabel = formatLastMessageTime(lastTime);
 
-          final preview = (lastText == null || lastText.trim().isEmpty)
+          final preview = (lastText == null || lastText.trim().isNotEmpty == false)
+              ? null
+              : (lastInfo!.sentByCurrentUser
+              ? '${"You".tr()}: $lastText'
+              : lastText);
+
+          final effectivePreview = (lastText == null || lastText.trim().isEmpty)
               ? null
               : (lastInfo!.sentByCurrentUser
               ? '${"You".tr()}: $lastText'
@@ -455,7 +459,7 @@ class _FriendsPageState extends State<FriendsPage>
             customTitle: user.name,
             isOnline: user.isOnline,
             unreadCount: unreadCount,
-            lastMessagePreview: preview,
+            lastMessagePreview: effectivePreview,
             lastMessageTimeLabel: lastTimeLabel,
             onTap: () async {
               await Navigator.push(
