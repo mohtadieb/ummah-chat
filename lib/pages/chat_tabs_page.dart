@@ -29,6 +29,10 @@ class _ChatTabsPageState extends State<ChatTabsPage>
   double _sharedHeaderOffset = 0.0;
   int _tabActivationTick = 0;
 
+  final ScrollController _friendsScrollController = ScrollController();
+  final ScrollController _groupsScrollController = ScrollController();
+  final ScrollController _communitiesScrollController = ScrollController();
+
   double get _currentHeaderCollapse {
     return _sharedHeaderOffset.clamp(0.0, kChatsHeaderOuterHeight);
   }
@@ -43,6 +47,33 @@ class _ChatTabsPageState extends State<ChatTabsPage>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_handleTabChanged);
+  }
+
+  void _prepareTabBeforeSwitch(int tabIndex) {
+    final targetOffset = _sharedHeaderOffset.clamp(0.0, kChatsHeaderOuterHeight);
+
+    ScrollController controller;
+    switch (tabIndex) {
+      case 0:
+        controller = _friendsScrollController;
+        break;
+      case 1:
+        controller = _groupsScrollController;
+        break;
+      default:
+        controller = _communitiesScrollController;
+        break;
+    }
+
+    if (!controller.hasClients) return;
+
+    final current = controller.offset;
+    final max = controller.position.maxScrollExtent;
+    final clampedTarget = targetOffset.clamp(0.0, max);
+
+    if (current < clampedTarget) {
+      controller.jumpTo(clampedTarget);
+    }
   }
 
   void _handleTabChanged() {
@@ -69,6 +100,9 @@ class _ChatTabsPageState extends State<ChatTabsPage>
   void dispose() {
     _tabController.removeListener(_handleTabChanged);
     _tabController.dispose();
+    _friendsScrollController.dispose();
+    _groupsScrollController.dispose();
+    _communitiesScrollController.dispose();
     super.dispose();
   }
 
@@ -158,6 +192,7 @@ class _ChatTabsPageState extends State<ChatTabsPage>
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                 child: _PremiumTabBar(
                   controller: _tabController,
+                  onTap: _prepareTabBeforeSwitch,
                   tabs: [
                     "Friends".tr(),
                     "Groups".tr(),
@@ -173,6 +208,7 @@ class _ChatTabsPageState extends State<ChatTabsPage>
                       child: friends_page.FriendsPage(
                         includeMahrams: true,
                         embeddedMode: true,
+                        externalScrollController: _friendsScrollController,
                         embeddedListTopCompensation: _currentHeaderCollapse,
                         isActiveTab: _currentTabIndex == 0,
                         tabActivationTick: _tabActivationTick,
@@ -183,6 +219,7 @@ class _ChatTabsPageState extends State<ChatTabsPage>
                     _ChatsKeepAlive(
                       child: groups_page.GroupsPage(
                         embeddedMode: true,
+                        externalScrollController: _groupsScrollController,
                         embeddedListTopCompensation: _currentHeaderCollapse,
                         isActiveTab: _currentTabIndex == 1,
                         tabActivationTick: _tabActivationTick,
@@ -193,6 +230,8 @@ class _ChatTabsPageState extends State<ChatTabsPage>
                     _ChatsKeepAlive(
                       child: communities_page.CommunitiesPage(
                         embeddedMode: true,
+                        externalScrollController:
+                        _communitiesScrollController,
                         embeddedListTopCompensation: _currentHeaderCollapse,
                         isActiveTab: _currentTabIndex == 2,
                         tabActivationTick: _tabActivationTick,
@@ -338,10 +377,12 @@ class _PremiumChatsHeader extends StatelessWidget {
 class _PremiumTabBar extends StatelessWidget {
   final TabController controller;
   final List<String> tabs;
+  final ValueChanged<int>? onTap;
 
   const _PremiumTabBar({
     required this.controller,
     required this.tabs,
+    this.onTap,
   });
 
   @override
@@ -362,6 +403,7 @@ class _PremiumTabBar extends StatelessWidget {
         ),
         child: TabBar(
           controller: controller,
+          onTap: onTap,
           dividerColor: Colors.transparent,
           indicatorSize: TabBarIndicatorSize.tab,
           indicator: BoxDecoration(

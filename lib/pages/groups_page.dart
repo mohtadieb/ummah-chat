@@ -20,6 +20,7 @@ class GroupsPage extends StatefulWidget {
   final double embeddedListTopCompensation;
   final bool isActiveTab;
   final int tabActivationTick;
+  final ScrollController? externalScrollController;
 
   const GroupsPage({
     super.key,
@@ -28,6 +29,7 @@ class GroupsPage extends StatefulWidget {
     this.embeddedListTopCompensation = 0,
     this.isActiveTab = false,
     this.tabActivationTick = 0,
+    this.externalScrollController,
   });
 
   @override
@@ -37,7 +39,7 @@ class GroupsPage extends StatefulWidget {
 class _GroupsPageState extends State<GroupsPage>
     with AutomaticKeepAliveClientMixin<GroupsPage> {
   final AuthService _authService = AuthService();
-  final ScrollController _listController = ScrollController();
+  final ScrollController _fallbackScrollController = ScrollController();
 
   Map<String, MessageModel> _lastGroupMessages = {};
   Map<String, int> _groupUnreadCounts = {};
@@ -47,6 +49,9 @@ class _GroupsPageState extends State<GroupsPage>
 
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+
+  ScrollController get _scrollController =>
+      widget.externalScrollController ?? _fallbackScrollController;
 
   @override
   bool get wantKeepAlive => true;
@@ -68,15 +73,15 @@ class _GroupsPageState extends State<GroupsPage>
 
   void _syncToHeaderIfNeeded() {
     if (!widget.embeddedMode || !widget.isActiveTab) return;
-    if (!_listController.hasClients) return;
+    if (!_scrollController.hasClients) return;
 
     final minOffset = widget.embeddedListTopCompensation;
-    final current = _listController.offset;
-    final max = _listController.position.maxScrollExtent;
+    final current = _scrollController.offset;
+    final max = _scrollController.position.maxScrollExtent;
     final target = minOffset.clamp(0.0, max);
 
     if (current < target) {
-      _listController.jumpTo(target);
+      _scrollController.jumpTo(target);
     }
   }
 
@@ -133,7 +138,7 @@ class _GroupsPageState extends State<GroupsPage>
     _lastMsgSub?.cancel();
     _unreadSub?.cancel();
     _searchController.dispose();
-    _listController.dispose();
+    _fallbackScrollController.dispose();
     super.dispose();
   }
 
@@ -244,7 +249,7 @@ class _GroupsPageState extends State<GroupsPage>
     return ScrollConfiguration(
       behavior: ScrollConfiguration.of(context).copyWith(overscroll: false),
       child: ListView.builder(
-        controller: _listController,
+        controller: _scrollController,
         key: storageKey == null ? null : PageStorageKey<String>(storageKey),
         physics: const AlwaysScrollableScrollPhysics(
           parent: ClampingScrollPhysics(),

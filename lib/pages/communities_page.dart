@@ -17,6 +17,7 @@ class CommunitiesPage extends StatefulWidget {
   final double embeddedListTopCompensation;
   final bool isActiveTab;
   final int tabActivationTick;
+  final ScrollController? externalScrollController;
 
   const CommunitiesPage({
     super.key,
@@ -25,6 +26,7 @@ class CommunitiesPage extends StatefulWidget {
     this.embeddedListTopCompensation = 0,
     this.isActiveTab = false,
     this.tabActivationTick = 0,
+    this.externalScrollController,
   });
 
   @override
@@ -34,7 +36,7 @@ class CommunitiesPage extends StatefulWidget {
 class _CommunitiesPageState extends State<CommunitiesPage>
     with AutomaticKeepAliveClientMixin<CommunitiesPage> {
   late final DatabaseProvider _db;
-  final ScrollController _listController = ScrollController();
+  final ScrollController _fallbackScrollController = ScrollController();
 
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -44,6 +46,9 @@ class _CommunitiesPageState extends State<CommunitiesPage>
 
   bool _isSearching = false;
   bool _hasCompletedSearch = false;
+
+  ScrollController get _scrollController =>
+      widget.externalScrollController ?? _fallbackScrollController;
 
   @override
   bool get wantKeepAlive => true;
@@ -65,15 +70,15 @@ class _CommunitiesPageState extends State<CommunitiesPage>
 
   void _syncToHeaderIfNeeded() {
     if (!widget.embeddedMode || !widget.isActiveTab) return;
-    if (!_listController.hasClients) return;
+    if (!_scrollController.hasClients) return;
 
     final minOffset = widget.embeddedListTopCompensation;
-    final current = _listController.offset;
-    final max = _listController.position.maxScrollExtent;
+    final current = _scrollController.offset;
+    final max = _scrollController.position.maxScrollExtent;
     final target = minOffset.clamp(0.0, max);
 
     if (current < target) {
-      _listController.jumpTo(target);
+      _scrollController.jumpTo(target);
     }
   }
 
@@ -95,7 +100,7 @@ class _CommunitiesPageState extends State<CommunitiesPage>
   void dispose() {
     _searchDebounce?.cancel();
     _searchController.dispose();
-    _listController.dispose();
+    _fallbackScrollController.dispose();
     super.dispose();
   }
 
@@ -190,7 +195,7 @@ class _CommunitiesPageState extends State<CommunitiesPage>
                   behavior: ScrollConfiguration.of(context)
                       .copyWith(overscroll: false),
                   child: ListView.builder(
-                    controller: _listController,
+                    controller: _scrollController,
                     key: PageStorageKey<String>(
                       widget.embeddedMode
                           ? 'communities_embedded_list'

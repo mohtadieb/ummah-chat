@@ -25,6 +25,7 @@ class FriendsPage extends StatefulWidget {
   final double embeddedListTopCompensation;
   final bool isActiveTab;
   final int tabActivationTick;
+  final ScrollController? externalScrollController;
 
   const FriendsPage({
     super.key,
@@ -35,6 +36,7 @@ class FriendsPage extends StatefulWidget {
     this.embeddedListTopCompensation = 0,
     this.isActiveTab = false,
     this.tabActivationTick = 0,
+    this.externalScrollController,
   });
 
   @override
@@ -44,9 +46,12 @@ class FriendsPage extends StatefulWidget {
 class _FriendsPageState extends State<FriendsPage>
     with AutomaticKeepAliveClientMixin<FriendsPage> {
   final TextEditingController _searchController = TextEditingController();
-  final ScrollController _listController = ScrollController();
+  final ScrollController _fallbackScrollController = ScrollController();
 
   String _searchQuery = '';
+
+  ScrollController get _scrollController =>
+      widget.externalScrollController ?? _fallbackScrollController;
 
   bool get _isOtherUserView => widget.userId != null;
 
@@ -70,15 +75,15 @@ class _FriendsPageState extends State<FriendsPage>
 
   void _syncToHeaderIfNeeded() {
     if (!widget.embeddedMode || !widget.isActiveTab) return;
-    if (!_listController.hasClients) return;
+    if (!_scrollController.hasClients) return;
 
     final minOffset = widget.embeddedListTopCompensation;
-    final current = _listController.offset;
-    final max = _listController.position.maxScrollExtent;
+    final current = _scrollController.offset;
+    final max = _scrollController.position.maxScrollExtent;
     final target = minOffset.clamp(0.0, max);
 
     if (current < target) {
-      _listController.jumpTo(target);
+      _scrollController.jumpTo(target);
     }
   }
 
@@ -92,7 +97,7 @@ class _FriendsPageState extends State<FriendsPage>
   @override
   void dispose() {
     _searchController.dispose();
-    _listController.dispose();
+    _fallbackScrollController.dispose();
     super.dispose();
   }
 
@@ -337,7 +342,7 @@ class _FriendsPageState extends State<FriendsPage>
     return ScrollConfiguration(
       behavior: ScrollConfiguration.of(context).copyWith(overscroll: false),
       child: ListView.builder(
-        controller: _listController,
+        controller: _scrollController,
         key: storageKey == null ? null : PageStorageKey<String>(storageKey),
         physics: const AlwaysScrollableScrollPhysics(
           parent: ClampingScrollPhysics(),
@@ -410,7 +415,7 @@ class _FriendsPageState extends State<FriendsPage>
     return ScrollConfiguration(
       behavior: ScrollConfiguration.of(context).copyWith(overscroll: false),
       child: ListView.builder(
-        controller: _listController,
+        controller: _scrollController,
         key: storageKey == null ? null : PageStorageKey<String>(storageKey),
         physics: const AlwaysScrollableScrollPhysics(
           parent: ClampingScrollPhysics(),
