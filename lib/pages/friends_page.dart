@@ -439,12 +439,6 @@ class _FriendsPageState extends State<FriendsPage>
           final lastTime = lastInfo?.createdAt;
           final lastTimeLabel = formatLastMessageTime(lastTime);
 
-          final preview = (lastText == null || lastText.trim().isNotEmpty == false)
-              ? null
-              : (lastInfo!.sentByCurrentUser
-              ? '${"You".tr()}: $lastText'
-              : lastText);
-
           final effectivePreview = (lastText == null || lastText.trim().isEmpty)
               ? null
               : (lastInfo!.sentByCurrentUser
