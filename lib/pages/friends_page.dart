@@ -15,12 +15,16 @@ import '../services/database/database_provider.dart';
 import '../services/notifications/notification_service.dart';
 import 'chat_page.dart';
 
+const double kChatsHeaderOuterHeight = 148.0;
+
 class FriendsPage extends StatefulWidget {
   final String? userId;
   final bool includeMahrams;
   final bool embeddedMode;
   final ValueChanged<double>? onEmbeddedScrollOffsetChanged;
   final double embeddedListTopCompensation;
+  final bool isActiveTab;
+  final int tabActivationTick;
 
   const FriendsPage({
     super.key,
@@ -29,6 +33,8 @@ class FriendsPage extends StatefulWidget {
     this.embeddedMode = false,
     this.onEmbeddedScrollOffsetChanged,
     this.embeddedListTopCompensation = 0,
+    this.isActiveTab = false,
+    this.tabActivationTick = 0,
   });
 
   @override
@@ -38,6 +44,8 @@ class FriendsPage extends StatefulWidget {
 class _FriendsPageState extends State<FriendsPage>
     with AutomaticKeepAliveClientMixin<FriendsPage> {
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _listController = ScrollController();
+
   String _searchQuery = '';
 
   bool get _isOtherUserView => widget.userId != null;
@@ -45,8 +53,37 @@ class _FriendsPageState extends State<FriendsPage>
   @override
   bool get wantKeepAlive => true;
 
+  @override
+  void didUpdateWidget(covariant FriendsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    final becameActive =
+        widget.embeddedMode &&
+            widget.isActiveTab &&
+            (!oldWidget.isActiveTab ||
+                oldWidget.tabActivationTick != widget.tabActivationTick);
+
+    if (becameActive) {
+      _syncToHeaderIfNeeded();
+    }
+  }
+
+  void _syncToHeaderIfNeeded() {
+    if (!widget.embeddedMode || !widget.isActiveTab) return;
+    if (!_listController.hasClients) return;
+
+    final minOffset = widget.embeddedListTopCompensation;
+    final current = _listController.offset;
+    final max = _listController.position.maxScrollExtent;
+    final target = minOffset.clamp(0.0, max);
+
+    if (current < target) {
+      _listController.jumpTo(target);
+    }
+  }
+
   bool _handleScrollNotification(ScrollNotification notification) {
-    if (!widget.embeddedMode) return false;
+    if (!widget.embeddedMode || !widget.isActiveTab) return false;
     if (notification.depth != 0) return false;
     widget.onEmbeddedScrollOffsetChanged?.call(notification.metrics.pixels);
     return false;
@@ -55,6 +92,7 @@ class _FriendsPageState extends State<FriendsPage>
   @override
   void dispose() {
     _searchController.dispose();
+    _listController.dispose();
     super.dispose();
   }
 
@@ -294,15 +332,20 @@ class _FriendsPageState extends State<FriendsPage>
       List<UserProfile> filteredFriends, {
         String? storageKey,
       }) {
+    final bottomPad = MediaQuery.of(context).padding.bottom + 72;
+
     return ScrollConfiguration(
       behavior: ScrollConfiguration.of(context).copyWith(overscroll: false),
       child: ListView.builder(
+        controller: _listController,
         key: storageKey == null ? null : PageStorageKey<String>(storageKey),
-        physics: const ClampingScrollPhysics(),
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: ClampingScrollPhysics(),
+        ),
         padding: EdgeInsets.only(
           top: widget.embeddedMode ? widget.embeddedListTopCompensation : 0,
           bottom: widget.embeddedMode
-              ? MediaQuery.of(context).size.height
+              ? bottomPad + kChatsHeaderOuterHeight
               : MediaQuery.of(context).padding.bottom + 96,
         ),
         itemCount: filteredFriends.length,
@@ -362,15 +405,20 @@ class _FriendsPageState extends State<FriendsPage>
     required DatabaseProvider dbProvider,
     String? storageKey,
   }) {
+    final bottomPad = MediaQuery.of(context).padding.bottom + 72;
+
     return ScrollConfiguration(
       behavior: ScrollConfiguration.of(context).copyWith(overscroll: false),
       child: ListView.builder(
+        controller: _listController,
         key: storageKey == null ? null : PageStorageKey<String>(storageKey),
-        physics: const ClampingScrollPhysics(),
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: ClampingScrollPhysics(),
+        ),
         padding: EdgeInsets.only(
           top: widget.embeddedMode ? widget.embeddedListTopCompensation : 0,
           bottom: widget.embeddedMode
-              ? MediaQuery.of(context).size.height
+              ? bottomPad + kChatsHeaderOuterHeight
               : MediaQuery.of(context).padding.bottom + 96,
         ),
         itemCount: filteredFriends.length,

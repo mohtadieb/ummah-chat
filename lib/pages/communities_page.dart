@@ -9,16 +9,22 @@ import '../components/my_community_tile.dart';
 import '../services/database/database_provider.dart';
 import 'community_posts_page.dart';
 
+const double kChatsHeaderOuterHeight = 148.0;
+
 class CommunitiesPage extends StatefulWidget {
   final bool embeddedMode;
   final ValueChanged<double>? onEmbeddedScrollOffsetChanged;
   final double embeddedListTopCompensation;
+  final bool isActiveTab;
+  final int tabActivationTick;
 
   const CommunitiesPage({
     super.key,
     this.embeddedMode = false,
     this.onEmbeddedScrollOffsetChanged,
     this.embeddedListTopCompensation = 0,
+    this.isActiveTab = false,
+    this.tabActivationTick = 0,
   });
 
   @override
@@ -28,6 +34,7 @@ class CommunitiesPage extends StatefulWidget {
 class _CommunitiesPageState extends State<CommunitiesPage>
     with AutomaticKeepAliveClientMixin<CommunitiesPage> {
   late final DatabaseProvider _db;
+  final ScrollController _listController = ScrollController();
 
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -41,8 +48,37 @@ class _CommunitiesPageState extends State<CommunitiesPage>
   @override
   bool get wantKeepAlive => true;
 
+  @override
+  void didUpdateWidget(covariant CommunitiesPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    final becameActive =
+        widget.embeddedMode &&
+            widget.isActiveTab &&
+            (!oldWidget.isActiveTab ||
+                oldWidget.tabActivationTick != widget.tabActivationTick);
+
+    if (becameActive) {
+      _syncToHeaderIfNeeded();
+    }
+  }
+
+  void _syncToHeaderIfNeeded() {
+    if (!widget.embeddedMode || !widget.isActiveTab) return;
+    if (!_listController.hasClients) return;
+
+    final minOffset = widget.embeddedListTopCompensation;
+    final current = _listController.offset;
+    final max = _listController.position.maxScrollExtent;
+    final target = minOffset.clamp(0.0, max);
+
+    if (current < target) {
+      _listController.jumpTo(target);
+    }
+  }
+
   bool _handleScrollNotification(ScrollNotification notification) {
-    if (!widget.embeddedMode) return false;
+    if (!widget.embeddedMode || !widget.isActiveTab) return false;
     if (notification.depth != 0) return false;
     widget.onEmbeddedScrollOffsetChanged?.call(notification.metrics.pixels);
     return false;
@@ -59,6 +95,7 @@ class _CommunitiesPageState extends State<CommunitiesPage>
   void dispose() {
     _searchDebounce?.cancel();
     _searchController.dispose();
+    _listController.dispose();
     super.dispose();
   }
 
@@ -153,12 +190,15 @@ class _CommunitiesPageState extends State<CommunitiesPage>
                   behavior: ScrollConfiguration.of(context)
                       .copyWith(overscroll: false),
                   child: ListView.builder(
+                    controller: _listController,
                     key: PageStorageKey<String>(
                       widget.embeddedMode
                           ? 'communities_embedded_list'
                           : 'communities_normal_list',
                     ),
-                    physics: const ClampingScrollPhysics(),
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: ClampingScrollPhysics(),
+                    ),
                     keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
                     padding: EdgeInsets.only(
@@ -166,7 +206,9 @@ class _CommunitiesPageState extends State<CommunitiesPage>
                           ? widget.embeddedListTopCompensation
                           : 0,
                       bottom: widget.embeddedMode
-                          ? MediaQuery.of(context).size.height
+                          ? MediaQuery.of(context).padding.bottom +
+                          72 +
+                          kChatsHeaderOuterHeight
                           : MediaQuery.of(context).padding.bottom + 96,
                     ),
                     itemCount: joinedCommunities.length,

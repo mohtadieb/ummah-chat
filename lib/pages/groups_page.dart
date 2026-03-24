@@ -12,16 +12,22 @@ import '../components/my_search_bar.dart';
 import '../components/my_group_tile.dart';
 import '../services/notifications/notification_service.dart';
 
+const double kChatsHeaderOuterHeight = 148.0;
+
 class GroupsPage extends StatefulWidget {
   final bool embeddedMode;
   final ValueChanged<double>? onEmbeddedScrollOffsetChanged;
   final double embeddedListTopCompensation;
+  final bool isActiveTab;
+  final int tabActivationTick;
 
   const GroupsPage({
     super.key,
     this.embeddedMode = false,
     this.onEmbeddedScrollOffsetChanged,
     this.embeddedListTopCompensation = 0,
+    this.isActiveTab = false,
+    this.tabActivationTick = 0,
   });
 
   @override
@@ -31,6 +37,7 @@ class GroupsPage extends StatefulWidget {
 class _GroupsPageState extends State<GroupsPage>
     with AutomaticKeepAliveClientMixin<GroupsPage> {
   final AuthService _authService = AuthService();
+  final ScrollController _listController = ScrollController();
 
   Map<String, MessageModel> _lastGroupMessages = {};
   Map<String, int> _groupUnreadCounts = {};
@@ -44,8 +51,37 @@ class _GroupsPageState extends State<GroupsPage>
   @override
   bool get wantKeepAlive => true;
 
+  @override
+  void didUpdateWidget(covariant GroupsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    final becameActive =
+        widget.embeddedMode &&
+            widget.isActiveTab &&
+            (!oldWidget.isActiveTab ||
+                oldWidget.tabActivationTick != widget.tabActivationTick);
+
+    if (becameActive) {
+      _syncToHeaderIfNeeded();
+    }
+  }
+
+  void _syncToHeaderIfNeeded() {
+    if (!widget.embeddedMode || !widget.isActiveTab) return;
+    if (!_listController.hasClients) return;
+
+    final minOffset = widget.embeddedListTopCompensation;
+    final current = _listController.offset;
+    final max = _listController.position.maxScrollExtent;
+    final target = minOffset.clamp(0.0, max);
+
+    if (current < target) {
+      _listController.jumpTo(target);
+    }
+  }
+
   bool _handleScrollNotification(ScrollNotification notification) {
-    if (!widget.embeddedMode) return false;
+    if (!widget.embeddedMode || !widget.isActiveTab) return false;
     if (notification.depth != 0) return false;
     widget.onEmbeddedScrollOffsetChanged?.call(notification.metrics.pixels);
     return false;
@@ -86,7 +122,6 @@ class _GroupsPageState extends State<GroupsPage>
         .groupUnreadCountsPollingStream(currentUserId)
         .listen((map) {
       if (!mounted) return;
-      debugPrint('📥 GroupsPage: unread map from provider: $map');
       setState(() {
         _groupUnreadCounts = map;
       });
@@ -98,6 +133,7 @@ class _GroupsPageState extends State<GroupsPage>
     _lastMsgSub?.cancel();
     _unreadSub?.cancel();
     _searchController.dispose();
+    _listController.dispose();
     super.dispose();
   }
 
@@ -203,15 +239,20 @@ class _GroupsPageState extends State<GroupsPage>
       String? activeChatRoomId, {
         String? storageKey,
       }) {
+    final bottomPad = MediaQuery.of(context).padding.bottom + 72;
+
     return ScrollConfiguration(
       behavior: ScrollConfiguration.of(context).copyWith(overscroll: false),
       child: ListView.builder(
+        controller: _listController,
         key: storageKey == null ? null : PageStorageKey<String>(storageKey),
-        physics: const ClampingScrollPhysics(),
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: ClampingScrollPhysics(),
+        ),
         padding: EdgeInsets.only(
           top: widget.embeddedMode ? widget.embeddedListTopCompensation : 0,
           bottom: widget.embeddedMode
-              ? MediaQuery.of(context).size.height
+              ? bottomPad + kChatsHeaderOuterHeight
               : MediaQuery.of(context).padding.bottom + 96,
         ),
         itemCount: filteredGroups.length,

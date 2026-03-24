@@ -26,19 +26,16 @@ class _ChatTabsPageState extends State<ChatTabsPage>
   late TabController _tabController;
   int _currentTabIndex = 0;
 
-  final List<double> _tabOffsets = [0, 0, 0];
+  double _sharedHeaderOffset = 0.0;
+  int _tabActivationTick = 0;
 
   double get _currentHeaderCollapse {
-    return _tabOffsets[_currentTabIndex].clamp(0.0, kChatsHeaderOuterHeight);
+    return _sharedHeaderOffset.clamp(0.0, kChatsHeaderOuterHeight);
   }
 
   double get _currentHeaderVisibleHeight {
     final h = kChatsHeaderOuterHeight - _currentHeaderCollapse;
     return h.clamp(0.0, kChatsHeaderOuterHeight);
-  }
-
-  double _tabListCompensation(int index) {
-    return _tabOffsets[index].clamp(0.0, kChatsHeaderOuterHeight);
   }
 
   @override
@@ -54,16 +51,17 @@ class _ChatTabsPageState extends State<ChatTabsPage>
 
     setState(() {
       _currentTabIndex = _tabController.index;
+      _tabActivationTick++;
     });
   }
 
-  void _handleTabScrollOffsetChanged(int tabIndex, double offset) {
+  void _handleSharedScrollOffsetChanged(double offset) {
     if (!mounted) return;
-    final normalized = offset < 0 ? 0.0 : offset;
-    if ((_tabOffsets[tabIndex] - normalized).abs() < 0.5) return;
+    final normalized = offset.clamp(0.0, kChatsHeaderOuterHeight);
+    if ((_sharedHeaderOffset - normalized).abs() < 0.5) return;
 
     setState(() {
-      _tabOffsets[tabIndex] = normalized;
+      _sharedHeaderOffset = normalized;
     });
   }
 
@@ -175,28 +173,31 @@ class _ChatTabsPageState extends State<ChatTabsPage>
                       child: friends_page.FriendsPage(
                         includeMahrams: true,
                         embeddedMode: true,
-                        embeddedListTopCompensation: _tabListCompensation(0),
-                        onEmbeddedScrollOffsetChanged: (offset) {
-                          _handleTabScrollOffsetChanged(0, offset);
-                        },
+                        embeddedListTopCompensation: _currentHeaderCollapse,
+                        isActiveTab: _currentTabIndex == 0,
+                        tabActivationTick: _tabActivationTick,
+                        onEmbeddedScrollOffsetChanged:
+                        _handleSharedScrollOffsetChanged,
                       ),
                     ),
                     _ChatsKeepAlive(
                       child: groups_page.GroupsPage(
                         embeddedMode: true,
-                        embeddedListTopCompensation: _tabListCompensation(1),
-                        onEmbeddedScrollOffsetChanged: (offset) {
-                          _handleTabScrollOffsetChanged(1, offset);
-                        },
+                        embeddedListTopCompensation: _currentHeaderCollapse,
+                        isActiveTab: _currentTabIndex == 1,
+                        tabActivationTick: _tabActivationTick,
+                        onEmbeddedScrollOffsetChanged:
+                        _handleSharedScrollOffsetChanged,
                       ),
                     ),
                     _ChatsKeepAlive(
                       child: communities_page.CommunitiesPage(
                         embeddedMode: true,
-                        embeddedListTopCompensation: _tabListCompensation(2),
-                        onEmbeddedScrollOffsetChanged: (offset) {
-                          _handleTabScrollOffsetChanged(2, offset);
-                        },
+                        embeddedListTopCompensation: _currentHeaderCollapse,
+                        isActiveTab: _currentTabIndex == 2,
+                        tabActivationTick: _tabActivationTick,
+                        onEmbeddedScrollOffsetChanged:
+                        _handleSharedScrollOffsetChanged,
                       ),
                     ),
                   ],
