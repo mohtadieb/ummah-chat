@@ -11,7 +11,6 @@ import 'groups_page.dart' as groups_page;
 import 'search_page.dart';
 
 const double kChatsHeaderCardHeight = 126.0;
-const double kChatsHeaderOuterHeight = 148.0;
 const double kChatsPinnedAreaHeight = 62.0;
 
 class ChatTabsPage extends StatefulWidget {
@@ -26,52 +25,11 @@ class _ChatTabsPageState extends State<ChatTabsPage>
   late TabController _tabController;
   int _currentTabIndex = 0;
 
-  double _sharedHeaderOffset = 0.0;
-  int _tabActivationTick = 0;
-
-  final ScrollController _friendsScrollController = ScrollController();
-  final ScrollController _groupsScrollController = ScrollController();
-  final ScrollController _communitiesScrollController = ScrollController();
-
-  double get _currentHeaderCollapse {
-    return _sharedHeaderOffset.clamp(0.0, kChatsHeaderOuterHeight);
-  }
-
-  double get _currentHeaderVisibleHeight {
-    final h = kChatsHeaderOuterHeight - _currentHeaderCollapse;
-    return h.clamp(0.0, kChatsHeaderOuterHeight);
-  }
-
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_handleTabChanged);
-  }
-
-  ScrollController _controllerForTab(int tabIndex) {
-    switch (tabIndex) {
-      case 0:
-        return _friendsScrollController;
-      case 1:
-        return _groupsScrollController;
-      default:
-        return _communitiesScrollController;
-    }
-  }
-
-  void _syncControllerToHeaderOffset(ScrollController controller, double header) {
-    if (!controller.hasClients) return;
-    final max = controller.position.maxScrollExtent;
-    final target = header.clamp(0.0, max);
-    if ((controller.offset - target).abs() >= 0.5) {
-      controller.jumpTo(target);
-    }
-  }
-
-  void _prepareTabBeforeSwitch(int tabIndex) {
-    final controller = _controllerForTab(tabIndex);
-    _syncControllerToHeaderOffset(controller, _sharedHeaderOffset);
   }
 
   void _handleTabChanged() {
@@ -80,34 +38,6 @@ class _ChatTabsPageState extends State<ChatTabsPage>
 
     setState(() {
       _currentTabIndex = _tabController.index;
-      _tabActivationTick++;
-    });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _prepareTabBeforeSwitch(_currentTabIndex);
-    });
-  }
-
-  void _handleSharedScrollOffsetChanged(double offset) {
-    if (!mounted) return;
-
-    final normalized = offset.clamp(0.0, kChatsHeaderOuterHeight);
-    final oldOffset = _sharedHeaderOffset;
-
-    if ((oldOffset - normalized).abs() < 0.5) return;
-
-    if (normalized < oldOffset) {
-      // Header is being revealed again.
-      // Pull inactive tabs down so they align back under their search card.
-      for (var i = 0; i < 3; i++) {
-        if (i == _currentTabIndex) continue;
-        _syncControllerToHeaderOffset(_controllerForTab(i), normalized);
-      }
-    }
-
-    setState(() {
-      _sharedHeaderOffset = normalized;
     });
   }
 
@@ -115,9 +45,6 @@ class _ChatTabsPageState extends State<ChatTabsPage>
   void dispose() {
     _tabController.removeListener(_handleTabChanged);
     _tabController.dispose();
-    _friendsScrollController.dispose();
-    _groupsScrollController.dispose();
-    _communitiesScrollController.dispose();
     super.dispose();
   }
 
@@ -162,7 +89,6 @@ class _ChatTabsPageState extends State<ChatTabsPage>
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final visibleHeight = _currentHeaderVisibleHeight;
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
@@ -186,78 +112,60 @@ class _ChatTabsPageState extends State<ChatTabsPage>
           ),
         ),
         child: SafeArea(
-          child: Column(
-            children: [
-              SizedBox(
-                height: visibleHeight,
-                child: ClipRect(
-                  child: OverflowBox(
-                    alignment: Alignment.topCenter,
-                    minHeight: kChatsHeaderOuterHeight,
-                    maxHeight: kChatsHeaderOuterHeight,
-                    child: Transform.translate(
-                      offset: Offset(0, -_currentHeaderCollapse),
-                      child: const _ChatsHeaderArea(),
+          child: NestedScrollView(
+            floatHeaderSlivers: false,
+            headerSliverBuilder: (context, innerBoxIsScrolled) {
+              return [
+                const SliverToBoxAdapter(
+                  child: _ChatsHeaderArea(),
+                ),
+                SliverOverlapAbsorber(
+                  handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
+                    context,
+                  ),
+                  sliver: SliverPersistentHeader(
+                    pinned: true,
+                    delegate: _PinnedChatsTopAreaDelegate(
+                      minExtentValue: kChatsPinnedAreaHeight,
+                      maxExtentValue: kChatsPinnedAreaHeight,
+                      child: Container(
+                        color: cs.surface,
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                        child: _PremiumTabBar(
+                          controller: _tabController,
+                          tabs: [
+                            "Friends".tr(),
+                            "Groups".tr(),
+                            "Communities".tr(),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              Container(
-                color: cs.surface,
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: _PremiumTabBar(
-                  controller: _tabController,
-                  onTap: _prepareTabBeforeSwitch,
-                  tabs: [
-                    "Friends".tr(),
-                    "Groups".tr(),
-                    "Communities".tr(),
-                  ],
+              ];
+            },
+            body: TabBarView(
+              controller: _tabController,
+              children: const [
+                _ChatsKeepAlive(
+                  child: friends_page.FriendsPage(
+                    includeMahrams: true,
+                    embeddedMode: true,
+                  ),
                 ),
-              ),
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _ChatsKeepAlive(
-                      child: friends_page.FriendsPage(
-                        includeMahrams: true,
-                        embeddedMode: true,
-                        externalScrollController: _friendsScrollController,
-                        embeddedListTopCompensation: _currentHeaderCollapse,
-                        isActiveTab: _currentTabIndex == 0,
-                        tabActivationTick: _tabActivationTick,
-                        onEmbeddedScrollOffsetChanged:
-                        _handleSharedScrollOffsetChanged,
-                      ),
-                    ),
-                    _ChatsKeepAlive(
-                      child: groups_page.GroupsPage(
-                        embeddedMode: true,
-                        externalScrollController: _groupsScrollController,
-                        embeddedListTopCompensation: _currentHeaderCollapse,
-                        isActiveTab: _currentTabIndex == 1,
-                        tabActivationTick: _tabActivationTick,
-                        onEmbeddedScrollOffsetChanged:
-                        _handleSharedScrollOffsetChanged,
-                      ),
-                    ),
-                    _ChatsKeepAlive(
-                      child: communities_page.CommunitiesPage(
-                        embeddedMode: true,
-                        externalScrollController:
-                        _communitiesScrollController,
-                        embeddedListTopCompensation: _currentHeaderCollapse,
-                        isActiveTab: _currentTabIndex == 2,
-                        tabActivationTick: _tabActivationTick,
-                        onEmbeddedScrollOffsetChanged:
-                        _handleSharedScrollOffsetChanged,
-                      ),
-                    ),
-                  ],
+                _ChatsKeepAlive(
+                  child: groups_page.GroupsPage(
+                    embeddedMode: true,
+                  ),
                 ),
-              ),
-            ],
+                _ChatsKeepAlive(
+                  child: communities_page.CommunitiesPage(
+                    embeddedMode: true,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -392,12 +300,10 @@ class _PremiumChatsHeader extends StatelessWidget {
 class _PremiumTabBar extends StatelessWidget {
   final TabController controller;
   final List<String> tabs;
-  final ValueChanged<int>? onTap;
 
   const _PremiumTabBar({
     required this.controller,
     required this.tabs,
-    this.onTap,
   });
 
   @override
@@ -418,7 +324,6 @@ class _PremiumTabBar extends StatelessWidget {
         ),
         child: TabBar(
           controller: controller,
-          onTap: onTap,
           dividerColor: Colors.transparent,
           indicatorSize: TabBarIndicatorSize.tab,
           indicator: BoxDecoration(
@@ -456,5 +361,39 @@ class _PremiumTabBar extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _PinnedChatsTopAreaDelegate extends SliverPersistentHeaderDelegate {
+  final double minExtentValue;
+  final double maxExtentValue;
+  final Widget child;
+
+  _PinnedChatsTopAreaDelegate({
+    required this.minExtentValue,
+    required this.maxExtentValue,
+    required this.child,
+  });
+
+  @override
+  double get minExtent => minExtentValue;
+
+  @override
+  double get maxExtent => maxExtentValue;
+
+  @override
+  Widget build(
+      BuildContext context,
+      double shrinkOffset,
+      bool overlapsContent,
+      ) {
+    return child;
+  }
+
+  @override
+  bool shouldRebuild(covariant _PinnedChatsTopAreaDelegate oldDelegate) {
+    return oldDelegate.minExtentValue != minExtentValue ||
+        oldDelegate.maxExtentValue != maxExtentValue ||
+        oldDelegate.child != child;
   }
 }

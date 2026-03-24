@@ -12,24 +12,14 @@ import '../components/my_search_bar.dart';
 import '../components/my_group_tile.dart';
 import '../services/notifications/notification_service.dart';
 
-const double kChatsHeaderOuterHeight = 148.0;
+const double kGroupsEmbeddedHeaderHeight = 126.0;
 
 class GroupsPage extends StatefulWidget {
   final bool embeddedMode;
-  final ValueChanged<double>? onEmbeddedScrollOffsetChanged;
-  final double embeddedListTopCompensation;
-  final bool isActiveTab;
-  final int tabActivationTick;
-  final ScrollController? externalScrollController;
 
   const GroupsPage({
     super.key,
     this.embeddedMode = false,
-    this.onEmbeddedScrollOffsetChanged,
-    this.embeddedListTopCompensation = 0,
-    this.isActiveTab = false,
-    this.tabActivationTick = 0,
-    this.externalScrollController,
   });
 
   @override
@@ -39,7 +29,6 @@ class GroupsPage extends StatefulWidget {
 class _GroupsPageState extends State<GroupsPage>
     with AutomaticKeepAliveClientMixin<GroupsPage> {
   final AuthService _authService = AuthService();
-  final ScrollController _fallbackScrollController = ScrollController();
 
   Map<String, MessageModel> _lastGroupMessages = {};
   Map<String, int> _groupUnreadCounts = {};
@@ -50,45 +39,8 @@ class _GroupsPageState extends State<GroupsPage>
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
-  ScrollController get _scrollController =>
-      widget.externalScrollController ?? _fallbackScrollController;
-
   @override
   bool get wantKeepAlive => true;
-
-  @override
-  void didUpdateWidget(covariant GroupsPage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    final becameActive =
-        widget.embeddedMode &&
-            widget.isActiveTab &&
-            (!oldWidget.isActiveTab ||
-                oldWidget.tabActivationTick != widget.tabActivationTick);
-
-    if (becameActive) {
-      _syncToHeaderIfNeeded();
-    }
-  }
-
-  void _syncToHeaderIfNeeded() {
-    if (!widget.embeddedMode || !widget.isActiveTab) return;
-    if (!_scrollController.hasClients) return;
-
-    final max = _scrollController.position.maxScrollExtent;
-    final target = widget.embeddedListTopCompensation.clamp(0.0, max);
-
-    if ((_scrollController.offset - target).abs() >= 0.5) {
-      _scrollController.jumpTo(target);
-    }
-  }
-
-  bool _handleScrollNotification(ScrollNotification notification) {
-    if (!widget.embeddedMode || !widget.isActiveTab) return false;
-    if (notification.depth != 0) return false;
-    widget.onEmbeddedScrollOffsetChanged?.call(notification.metrics.pixels);
-    return false;
-  }
 
   @override
   void initState() {
@@ -136,7 +88,6 @@ class _GroupsPageState extends State<GroupsPage>
     _lastMsgSub?.cancel();
     _unreadSub?.cancel();
     _searchController.dispose();
-    _fallbackScrollController.dispose();
     super.dispose();
   }
 
@@ -201,74 +152,115 @@ class _GroupsPageState extends State<GroupsPage>
         final noMatches =
             _searchQuery.trim().isNotEmpty && filteredGroups.isEmpty;
 
-        return Column(
-          children: [
-            _buildTopSection(
-              context,
-              title: "Your groups".tr(),
-              count: groups.length,
-              hintText: 'Search groups'.tr(),
-              embedded: widget.embeddedMode,
-            ),
-            Expanded(
-              child: noMatches
-                  ? _buildSimpleState(
+        if (!widget.embeddedMode) {
+          return Column(
+            children: [
+              _buildTopSection(
                 context,
-                icon: Icons.search_off_rounded,
-                title: 'No groups match your search'.tr(),
-                subtitle: '',
-                compact: true,
-              )
-                  : NotificationListener<ScrollNotification>(
-                onNotification: _handleScrollNotification,
-                child: _buildGroupsList(
-                  filteredGroups,
-                  currentUserId,
-                  activeChatRoomId,
-                  storageKey:
-                  widget.embeddedMode ? 'groups_embedded_list' : null,
+                title: "Your groups".tr(),
+                count: groups.length,
+                hintText: 'Search groups'.tr(),
+              ),
+              Expanded(
+                child: noMatches
+                    ? _buildSimpleState(
+                  context,
+                  icon: Icons.search_off_rounded,
+                  title: 'No groups match your search'.tr(),
+                  subtitle: '',
+                  compact: true,
+                )
+                    : ListView.builder(
+                  physics: const ClampingScrollPhysics(),
+                  padding: EdgeInsets.only(
+                    top: 2,
+                    bottom: MediaQuery.of(context).padding.bottom + 96,
+                  ),
+                  itemCount: filteredGroups.length,
+                  itemBuilder: (context, index) {
+                    final group = filteredGroups[index];
+                    return _buildGroupTile(
+                      context: context,
+                      group: group,
+                      currentUserId: currentUserId,
+                      activeChatRoomId: activeChatRoomId,
+                    );
+                  },
                 ),
               ),
-            ),
-          ],
+            ],
+          );
+        }
+
+        return Builder(
+          builder: (innerContext) {
+            return CustomScrollView(
+              key: const PageStorageKey<String>('groups_embedded'),
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: ClampingScrollPhysics(),
+              ),
+              slivers: [
+                SliverOverlapInjector(
+                  handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
+                    innerContext,
+                  ),
+                ),
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _EmbeddedGroupsHeaderDelegate(
+                    extent: kGroupsEmbeddedHeaderHeight,
+                    child: ColoredBox(
+                      color: Theme.of(context).colorScheme.surface,
+                      child: SizedBox(
+                        height: kGroupsEmbeddedHeaderHeight,
+                        child: _buildTopSection(
+                          context,
+                          title: "Your groups".tr(),
+                          count: groups.length,
+                          hintText: 'Search groups'.tr(),
+                          embedded: true,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (noMatches)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _buildSimpleState(
+                      context,
+                      icon: Icons.search_off_rounded,
+                      title: 'No groups match your search'.tr(),
+                      subtitle: '',
+                      compact: true,
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: EdgeInsets.only(
+                      top: 2,
+                      bottom: MediaQuery.of(context).padding.bottom + 96,
+                    ),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                          final group = filteredGroups[index];
+                          return _buildGroupTile(
+                            context: context,
+                            group: group,
+                            currentUserId: currentUserId,
+                            activeChatRoomId: activeChatRoomId,
+                          );
+                        },
+                        childCount: filteredGroups.length,
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
         );
       },
-    );
-  }
-
-  Widget _buildGroupsList(
-      List<Map<String, dynamic>> filteredGroups,
-      String currentUserId,
-      String? activeChatRoomId, {
-        String? storageKey,
-      }) {
-    final bottomPad = MediaQuery.of(context).padding.bottom + 72;
-
-    return ScrollConfiguration(
-      behavior: ScrollConfiguration.of(context).copyWith(overscroll: false),
-      child: ListView.builder(
-        controller: _scrollController,
-        key: storageKey == null ? null : PageStorageKey<String>(storageKey),
-        physics: const AlwaysScrollableScrollPhysics(
-          parent: ClampingScrollPhysics(),
-        ),
-        padding: EdgeInsets.only(
-          top: widget.embeddedMode ? widget.embeddedListTopCompensation : 0,
-          bottom: widget.embeddedMode
-              ? bottomPad + kChatsHeaderOuterHeight
-              : MediaQuery.of(context).padding.bottom + 96,
-        ),
-        itemCount: filteredGroups.length,
-        itemBuilder: (context, index) {
-          final group = filteredGroups[index];
-          return _buildGroupTile(
-            context: context,
-            group: group,
-            currentUserId: currentUserId,
-            activeChatRoomId: activeChatRoomId,
-          );
-        },
-      ),
     );
   }
 
@@ -534,5 +526,35 @@ class _GroupsPageState extends State<GroupsPage>
     const maxLen = 40;
     if (base.length <= maxLen) return base;
     return '${base.substring(0, maxLen)}…';
+  }
+}
+
+class _EmbeddedGroupsHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final double extent;
+  final Widget child;
+
+  _EmbeddedGroupsHeaderDelegate({
+    required this.extent,
+    required this.child,
+  });
+
+  @override
+  double get minExtent => extent;
+
+  @override
+  double get maxExtent => extent;
+
+  @override
+  Widget build(
+      BuildContext context,
+      double shrinkOffset,
+      bool overlapsContent,
+      ) {
+    return child;
+  }
+
+  @override
+  bool shouldRebuild(covariant _EmbeddedGroupsHeaderDelegate oldDelegate) {
+    return oldDelegate.extent != extent || oldDelegate.child != child;
   }
 }

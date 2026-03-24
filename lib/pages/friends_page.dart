@@ -15,28 +15,18 @@ import '../services/database/database_provider.dart';
 import '../services/notifications/notification_service.dart';
 import 'chat_page.dart';
 
-const double kChatsHeaderOuterHeight = 148.0;
+const double kFriendsEmbeddedHeaderHeight = 126.0;
 
 class FriendsPage extends StatefulWidget {
   final String? userId;
   final bool includeMahrams;
   final bool embeddedMode;
-  final ValueChanged<double>? onEmbeddedScrollOffsetChanged;
-  final double embeddedListTopCompensation;
-  final bool isActiveTab;
-  final int tabActivationTick;
-  final ScrollController? externalScrollController;
 
   const FriendsPage({
     super.key,
     this.userId,
     this.includeMahrams = false,
     this.embeddedMode = false,
-    this.onEmbeddedScrollOffsetChanged,
-    this.embeddedListTopCompensation = 0,
-    this.isActiveTab = false,
-    this.tabActivationTick = 0,
-    this.externalScrollController,
   });
 
   @override
@@ -46,12 +36,7 @@ class FriendsPage extends StatefulWidget {
 class _FriendsPageState extends State<FriendsPage>
     with AutomaticKeepAliveClientMixin<FriendsPage> {
   final TextEditingController _searchController = TextEditingController();
-  final ScrollController _fallbackScrollController = ScrollController();
-
   String _searchQuery = '';
-
-  ScrollController get _scrollController =>
-      widget.externalScrollController ?? _fallbackScrollController;
 
   bool get _isOtherUserView => widget.userId != null;
 
@@ -59,43 +44,8 @@ class _FriendsPageState extends State<FriendsPage>
   bool get wantKeepAlive => true;
 
   @override
-  void didUpdateWidget(covariant FriendsPage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    final becameActive =
-        widget.embeddedMode &&
-            widget.isActiveTab &&
-            (!oldWidget.isActiveTab ||
-                oldWidget.tabActivationTick != widget.tabActivationTick);
-
-    if (becameActive) {
-      _syncToHeaderIfNeeded();
-    }
-  }
-
-  void _syncToHeaderIfNeeded() {
-    if (!widget.embeddedMode || !widget.isActiveTab) return;
-    if (!_scrollController.hasClients) return;
-
-    final max = _scrollController.position.maxScrollExtent;
-    final target = widget.embeddedListTopCompensation.clamp(0.0, max);
-
-    if ((_scrollController.offset - target).abs() >= 0.5) {
-      _scrollController.jumpTo(target);
-    }
-  }
-
-  bool _handleScrollNotification(ScrollNotification notification) {
-    if (!widget.embeddedMode || !widget.isActiveTab) return false;
-    if (notification.depth != 0) return false;
-    widget.onEmbeddedScrollOffsetChanged?.call(notification.metrics.pixels);
-    return false;
-  }
-
-  @override
   void dispose() {
     _searchController.dispose();
-    _fallbackScrollController.dispose();
     super.dispose();
   }
 
@@ -167,18 +117,104 @@ class _FriendsPageState extends State<FriendsPage>
           final noMatches =
               _searchQuery.trim().isNotEmpty && filteredFriends.isEmpty;
 
-          return _buildEmbeddedOrNormalLayout(
-            title: "Friends".tr(),
-            count: allFriends.length,
-            hintText: 'Search friends'.tr(),
-            noMatches: noMatches,
-            noMatchesTitle: 'No friends match your search'.tr(),
-            listChild: _buildOtherUserList(
-              filteredFriends,
-              storageKey: widget.embeddedMode
-                  ? 'friends_other_user_embedded_list'
-                  : null,
-            ),
+          if (!widget.embeddedMode) {
+            return Column(
+              children: [
+                _buildTopSection(
+                  context,
+                  title: "Friends".tr(),
+                  count: allFriends.length,
+                  hintText: 'Search friends'.tr(),
+                ),
+                Expanded(
+                  child: noMatches
+                      ? _buildSimpleState(
+                    context,
+                    icon: Icons.search_off_rounded,
+                    title: 'No friends match your search'.tr(),
+                    subtitle: '',
+                    compact: true,
+                  )
+                      : ListView.builder(
+                    physics: const ClampingScrollPhysics(),
+                    padding: EdgeInsets.only(
+                      top: 2,
+                      bottom: MediaQuery.of(context).padding.bottom + 96,
+                    ),
+                    itemCount: filteredFriends.length,
+                    itemBuilder: (context, index) {
+                      final u = filteredFriends[index];
+                      return _buildOtherUserTile(context, u);
+                    },
+                  ),
+                ),
+              ],
+            );
+          }
+
+          return Builder(
+            builder: (innerContext) {
+              return CustomScrollView(
+                key: const PageStorageKey<String>('friends_other_embedded'),
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: ClampingScrollPhysics(),
+                ),
+                slivers: [
+                  SliverOverlapInjector(
+                    handle:
+                    NestedScrollView.sliverOverlapAbsorberHandleFor(
+                      innerContext,
+                    ),
+                  ),
+                  SliverPersistentHeader(
+                    pinned: true,
+                    delegate: _EmbeddedFriendsHeaderDelegate(
+                      extent: kFriendsEmbeddedHeaderHeight,
+                      child: ColoredBox(
+                        color: Theme.of(context).colorScheme.surface,
+                        child: SizedBox(
+                          height: kFriendsEmbeddedHeaderHeight,
+                          child: _buildTopSection(
+                            context,
+                            title: "Friends".tr(),
+                            count: allFriends.length,
+                            hintText: 'Search friends'.tr(),
+                            embedded: true,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (noMatches)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: _buildSimpleState(
+                        context,
+                        icon: Icons.search_off_rounded,
+                        title: 'No friends match your search'.tr(),
+                        subtitle: '',
+                        compact: true,
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: EdgeInsets.only(
+                        top: 2,
+                        bottom: MediaQuery.of(context).padding.bottom + 96,
+                      ),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                            final u = filteredFriends[index];
+                            return _buildOtherUserTile(context, u);
+                          },
+                          childCount: filteredFriends.length,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           );
         },
       );
@@ -263,30 +299,136 @@ class _FriendsPageState extends State<FriendsPage>
                 final String? activeDmFriendId =
                     notificationService.activeDmFriendId;
 
-                return _buildEmbeddedOrNormalLayout(
-                  title: widget.includeMahrams
-                      ? "Your chats".tr()
-                      : "Your friends".tr(),
-                  count: allFriends.length,
-                  hintText: widget.includeMahrams
-                      ? 'Search chats'.tr()
-                      : 'Search friends'.tr(),
-                  noMatches: noMatches,
-                  noMatchesTitle: widget.includeMahrams
-                      ? 'No chats match your search'.tr()
-                      : 'No friends match your search'.tr(),
-                  listChild: _buildChatsList(
-                    filteredFriends: filteredFriends,
-                    unreadByFriend: unreadByFriend,
-                    lastMessageByFriend: lastMessageByFriend,
-                    activeDmFriendId: activeDmFriendId,
-                    dbProvider: dbProvider,
-                    storageKey: widget.embeddedMode
-                        ? (widget.includeMahrams
-                        ? 'friends_embedded_chats_list'
-                        : 'friends_embedded_friends_list')
-                        : null,
-                  ),
+                if (!widget.embeddedMode) {
+                  return Column(
+                    children: [
+                      _buildTopSection(
+                        context,
+                        title: widget.includeMahrams
+                            ? "Your chats".tr()
+                            : "Your friends".tr(),
+                        count: allFriends.length,
+                        hintText: widget.includeMahrams
+                            ? 'Search chats'.tr()
+                            : 'Search friends'.tr(),
+                      ),
+                      Expanded(
+                        child: noMatches
+                            ? _buildSimpleState(
+                          context,
+                          icon: Icons.search_off_rounded,
+                          title: widget.includeMahrams
+                              ? 'No chats match your search'.tr()
+                              : 'No friends match your search'.tr(),
+                          subtitle: '',
+                          compact: true,
+                        )
+                            : ListView.builder(
+                          physics: const ClampingScrollPhysics(),
+                          padding: EdgeInsets.only(
+                            top: 2,
+                            bottom:
+                            MediaQuery.of(context).padding.bottom +
+                                96,
+                          ),
+                          itemCount: filteredFriends.length,
+                          itemBuilder: (context, index) {
+                            final user = filteredFriends[index];
+                            return _buildChatTile(
+                              context: context,
+                              user: user,
+                              unreadByFriend: unreadByFriend,
+                              lastMessageByFriend: lastMessageByFriend,
+                              activeDmFriendId: activeDmFriendId,
+                              dbProvider: dbProvider,
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  );
+                }
+
+                return Builder(
+                  builder: (innerContext) {
+                    return CustomScrollView(
+                      key: PageStorageKey<String>(
+                        widget.includeMahrams
+                            ? 'friends_chats_embedded'
+                            : 'friends_friends_embedded',
+                      ),
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: ClampingScrollPhysics(),
+                      ),
+                      slivers: [
+                        SliverOverlapInjector(
+                          handle:
+                          NestedScrollView.sliverOverlapAbsorberHandleFor(
+                            innerContext,
+                          ),
+                        ),
+                        SliverPersistentHeader(
+                          pinned: true,
+                          delegate: _EmbeddedFriendsHeaderDelegate(
+                            extent: kFriendsEmbeddedHeaderHeight,
+                            child: ColoredBox(
+                              color: Theme.of(context).colorScheme.surface,
+                              child: SizedBox(
+                                height: kFriendsEmbeddedHeaderHeight,
+                                child: _buildTopSection(
+                                  context,
+                                  title: widget.includeMahrams
+                                      ? "Your chats".tr()
+                                      : "Your friends".tr(),
+                                  count: allFriends.length,
+                                  hintText: widget.includeMahrams
+                                      ? 'Search chats'.tr()
+                                      : 'Search friends'.tr(),
+                                  embedded: true,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (noMatches)
+                          SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: _buildSimpleState(
+                              context,
+                              icon: Icons.search_off_rounded,
+                              title: widget.includeMahrams
+                                  ? 'No chats match your search'.tr()
+                                  : 'No friends match your search'.tr(),
+                              subtitle: '',
+                              compact: true,
+                            ),
+                          )
+                        else
+                          SliverPadding(
+                            padding: EdgeInsets.only(
+                              top: 2,
+                              bottom: MediaQuery.of(context).padding.bottom + 96,
+                            ),
+                            sliver: SliverList(
+                              delegate: SliverChildBuilderDelegate(
+                                    (context, index) {
+                                  final user = filteredFriends[index];
+                                  return _buildChatTile(
+                                    context: context,
+                                    user: user,
+                                    unreadByFriend: unreadByFriend,
+                                    lastMessageByFriend: lastMessageByFriend,
+                                    activeDmFriendId: activeDmFriendId,
+                                    dbProvider: dbProvider,
+                                  );
+                                },
+                                childCount: filteredFriends.length,
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
                 );
               },
             );
@@ -296,189 +438,106 @@ class _FriendsPageState extends State<FriendsPage>
     );
   }
 
-  Widget _buildEmbeddedOrNormalLayout({
-    required String title,
-    required int count,
-    required String hintText,
-    required bool noMatches,
-    required String noMatchesTitle,
-    required Widget listChild,
-  }) {
-    return Column(
-      children: [
-        _buildTopSection(
+  Widget _buildOtherUserTile(BuildContext context, UserProfile u) {
+    return MyFriendTile(
+      key: ValueKey(u.id),
+      user: u,
+      isMahram: false,
+      customTitle: u.name,
+      isOnline: u.isOnline,
+      unreadCount: 0,
+      lastMessagePreview: null,
+      lastMessageTimeLabel: null,
+      onTap: () {
+        final currentUserId = AuthService().getCurrentUserId();
+
+        if (u.id == currentUserId) {
+          goToOwnProfileTab(context);
+          return;
+        }
+
+        Navigator.push(
           context,
-          title: title,
-          count: count,
-          hintText: hintText,
-          embedded: widget.embeddedMode,
-        ),
-        Expanded(
-          child: noMatches
-              ? _buildSimpleState(
-            context,
-            icon: Icons.search_off_rounded,
-            title: noMatchesTitle,
-            subtitle: '',
-            compact: true,
-          )
-              : NotificationListener<ScrollNotification>(
-            onNotification: _handleScrollNotification,
-            child: listChild,
+          MaterialPageRoute(
+            builder: (_) => ProfilePage(userId: u.id),
           ),
-        ),
-      ],
+        );
+      },
+      onAvatarTap: () {
+        final currentUserId = AuthService().getCurrentUserId();
+
+        if (u.id == currentUserId) {
+          goToOwnProfileTab(context);
+          return;
+        }
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProfilePage(userId: u.id),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildOtherUserList(
-      List<UserProfile> filteredFriends, {
-        String? storageKey,
-      }) {
-    final bottomPad = MediaQuery.of(context).padding.bottom + 72;
-
-    return ScrollConfiguration(
-      behavior: ScrollConfiguration.of(context).copyWith(overscroll: false),
-      child: ListView.builder(
-        controller: _scrollController,
-        key: storageKey == null ? null : PageStorageKey<String>(storageKey),
-        physics: const AlwaysScrollableScrollPhysics(
-          parent: ClampingScrollPhysics(),
-        ),
-        padding: EdgeInsets.only(
-          top: widget.embeddedMode ? widget.embeddedListTopCompensation : 0,
-          bottom: widget.embeddedMode
-              ? bottomPad + kChatsHeaderOuterHeight
-              : MediaQuery.of(context).padding.bottom + 96,
-        ),
-        itemCount: filteredFriends.length,
-        itemBuilder: (context, index) {
-          final u = filteredFriends[index];
-
-          return MyFriendTile(
-            key: ValueKey(u.id),
-            user: u,
-            isMahram: false,
-            customTitle: u.name,
-            isOnline: u.isOnline,
-            unreadCount: 0,
-            lastMessagePreview: null,
-            lastMessageTimeLabel: null,
-            onTap: () {
-              final currentUserId = AuthService().getCurrentUserId();
-
-              if (u.id == currentUserId) {
-                goToOwnProfileTab(context);
-                return;
-              }
-
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ProfilePage(userId: u.id),
-                ),
-              );
-            },
-            onAvatarTap: () {
-              final currentUserId = AuthService().getCurrentUserId();
-
-              if (u.id == currentUserId) {
-                goToOwnProfileTab(context);
-                return;
-              }
-
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ProfilePage(userId: u.id),
-                ),
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildChatsList({
-    required List<UserProfile> filteredFriends,
+  Widget _buildChatTile({
+    required BuildContext context,
+    required UserProfile user,
     required Map<String, int> unreadByFriend,
     required Map<String, LastMessageInfo> lastMessageByFriend,
     required String? activeDmFriendId,
     required DatabaseProvider dbProvider,
-    String? storageKey,
   }) {
-    final bottomPad = MediaQuery.of(context).padding.bottom + 72;
+    final rawUnread = unreadByFriend[user.id] ?? 0;
+    final unreadCount =
+    (activeDmFriendId != null && activeDmFriendId == user.id)
+        ? 0
+        : rawUnread;
 
-    return ScrollConfiguration(
-      behavior: ScrollConfiguration.of(context).copyWith(overscroll: false),
-      child: ListView.builder(
-        controller: _scrollController,
-        key: storageKey == null ? null : PageStorageKey<String>(storageKey),
-        physics: const AlwaysScrollableScrollPhysics(
-          parent: ClampingScrollPhysics(),
-        ),
-        padding: EdgeInsets.only(
-          top: widget.embeddedMode ? widget.embeddedListTopCompensation : 0,
-          bottom: widget.embeddedMode
-              ? bottomPad + kChatsHeaderOuterHeight
-              : MediaQuery.of(context).padding.bottom + 96,
-        ),
-        itemCount: filteredFriends.length,
-        itemBuilder: (context, index) {
-          final user = filteredFriends[index];
+    final lastInfo = lastMessageByFriend[user.id];
+    final lastText = lastInfo?.text;
+    final lastTime = lastInfo?.createdAt;
+    final lastTimeLabel = formatLastMessageTime(lastTime);
 
-          final rawUnread = unreadByFriend[user.id] ?? 0;
-          final unreadCount =
-          (activeDmFriendId != null && activeDmFriendId == user.id)
-              ? 0
-              : rawUnread;
+    final preview = (lastText == null || lastText.trim().isEmpty)
+        ? null
+        : (lastInfo!.sentByCurrentUser
+        ? '${"You".tr()}: $lastText'
+        : lastText);
 
-          final lastInfo = lastMessageByFriend[user.id];
-          final lastText = lastInfo?.text;
-          final lastTime = lastInfo?.createdAt;
-          final lastTimeLabel = formatLastMessageTime(lastTime);
+    return MyFriendTile(
+      key: ValueKey(user.id),
+      user: user,
+      isMahram: widget.includeMahrams
+          ? dbProvider.isMahramUser(user.id)
+          : false,
+      customTitle: user.name,
+      isOnline: user.isOnline,
+      unreadCount: unreadCount,
+      lastMessagePreview: preview,
+      lastMessageTimeLabel: lastTimeLabel,
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatPage(
+              friendId: user.id,
+              friendName: user.name,
+            ),
+          ),
+        );
 
-          final effectivePreview = (lastText == null || lastText.trim().isEmpty)
-              ? null
-              : (lastInfo!.sentByCurrentUser
-              ? '${"You".tr()}: $lastText'
-              : lastText);
-
-          return MyFriendTile(
-            key: ValueKey(user.id),
-            user: user,
-            isMahram:
-            widget.includeMahrams ? dbProvider.isMahramUser(user.id) : false,
-            customTitle: user.name,
-            isOnline: user.isOnline,
-            unreadCount: unreadCount,
-            lastMessagePreview: effectivePreview,
-            lastMessageTimeLabel: lastTimeLabel,
-            onTap: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ChatPage(
-                    friendId: user.id,
-                    friendName: user.name,
-                  ),
-                ),
-              );
-
-              if (mounted) setState(() {});
-            },
-            onAvatarTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ProfilePage(userId: user.id),
-                ),
-              );
-            },
-          );
-        },
-      ),
+        if (mounted) setState(() {});
+      },
+      onAvatarTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProfilePage(userId: user.id),
+          ),
+        );
+      },
     );
   }
 
@@ -636,5 +695,35 @@ class _FriendsPageState extends State<FriendsPage>
         ),
       ),
     );
+  }
+}
+
+class _EmbeddedFriendsHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final double extent;
+  final Widget child;
+
+  _EmbeddedFriendsHeaderDelegate({
+    required this.extent,
+    required this.child,
+  });
+
+  @override
+  double get minExtent => extent;
+
+  @override
+  double get maxExtent => extent;
+
+  @override
+  Widget build(
+      BuildContext context,
+      double shrinkOffset,
+      bool overlapsContent,
+      ) {
+    return child;
+  }
+
+  @override
+  bool shouldRebuild(covariant _EmbeddedFriendsHeaderDelegate oldDelegate) {
+    return oldDelegate.extent != extent || oldDelegate.child != child;
   }
 }
