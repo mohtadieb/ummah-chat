@@ -6,7 +6,6 @@ import 'package:ummah_chat/pages/profile_page.dart';
 import 'package:ummah_chat/services/auth/auth_service.dart';
 
 import '../components/my_friend_tile.dart';
-import '../components/my_search_bar.dart';
 import '../helper/last_message_time_formatter.dart';
 import '../helper/navigate_pages.dart';
 import '../services/chat/chat_provider.dart';
@@ -15,18 +14,20 @@ import '../services/database/database_provider.dart';
 import '../services/notifications/notification_service.dart';
 import 'chat_page.dart';
 
-const double kFriendsEmbeddedHeaderHeight = 126.0;
-
 class FriendsPage extends StatefulWidget {
   final String? userId;
   final bool includeMahrams;
   final bool embeddedMode;
+  final String embeddedSearchQuery;
+  final ValueChanged<int>? onEmbeddedCountChanged;
 
   const FriendsPage({
     super.key,
     this.userId,
     this.includeMahrams = false,
     this.embeddedMode = false,
+    this.embeddedSearchQuery = '',
+    this.onEmbeddedCountChanged,
   });
 
   @override
@@ -36,16 +37,66 @@ class FriendsPage extends StatefulWidget {
 class _FriendsPageState extends State<FriendsPage>
     with AutomaticKeepAliveClientMixin<FriendsPage> {
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _standaloneScrollController = ScrollController();
+
   String _searchQuery = '';
+  int? _lastReportedCount;
+
+  Stream<List<UserProfile>>? _otherUserFriendsBroadcastStream;
 
   bool get _isOtherUserView => widget.userId != null;
+
+  String get _effectiveQuery =>
+      widget.embeddedMode ? widget.embeddedSearchQuery : _searchQuery;
 
   @override
   bool get wantKeepAlive => true;
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_isOtherUserView && _otherUserFriendsBroadcastStream == null) {
+      _bindOtherUserFriendsStream();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant FriendsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.userId != widget.userId) {
+      _bindOtherUserFriendsStream();
+    }
+  }
+
+  void _bindOtherUserFriendsStream() {
+    final otherUserId = widget.userId?.trim();
+    if (otherUserId == null || otherUserId.isEmpty) {
+      _otherUserFriendsBroadcastStream = null;
+      return;
+    }
+
+    _otherUserFriendsBroadcastStream = Provider.of<DatabaseProvider>(
+      context,
+      listen: false,
+    ).friendsStreamForUser(otherUserId).asBroadcastStream();
+  }
+
+  void _reportCount(int count) {
+    if (!widget.embeddedMode) return;
+    if (_lastReportedCount == count) return;
+    _lastReportedCount = count;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      widget.onEmbeddedCountChanged?.call(count);
+    });
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
+    _standaloneScrollController.dispose();
     super.dispose();
   }
 
@@ -76,7 +127,7 @@ class _FriendsPageState extends State<FriendsPage>
 
     if (_isOtherUserView) {
       return StreamBuilder<List<UserProfile>>(
-        stream: dbProvider.friendsStreamForUser(targetUserId),
+        stream: _otherUserFriendsBroadcastStream,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return _buildSimpleState(
@@ -92,9 +143,20 @@ class _FriendsPageState extends State<FriendsPage>
           }
 
           final allFriends = snapshot.data ?? [];
+          _reportCount(allFriends.length);
 
           if (allFriends.isEmpty) {
-            return _buildSimpleState(
+            return widget.embeddedMode
+                ? _buildEmbeddedScrollableEmptyState(
+              context,
+              icon: Icons.group_outlined,
+              title: "No friends yet".tr(),
+              subtitle: "No friends to show yet.".tr(),
+              storageKey: const PageStorageKey<String>(
+                'friends_other_embedded_empty',
+              ),
+            )
+                : _buildSimpleState(
               context,
               icon: Icons.group_outlined,
               title: "No friends yet".tr(),
@@ -103,8 +165,8 @@ class _FriendsPageState extends State<FriendsPage>
           }
 
           List<UserProfile> filteredFriends = allFriends;
-          if (_searchQuery.trim().isNotEmpty) {
-            final q = _searchQuery.toLowerCase();
+          if (_effectiveQuery.trim().isNotEmpty) {
+            final q = _effectiveQuery.toLowerCase();
             filteredFriends = allFriends.where((u) {
               final name = u.name.toLowerCase();
               final username = u.username.toLowerCase();
@@ -115,17 +177,11 @@ class _FriendsPageState extends State<FriendsPage>
           filteredFriends.sort((a, b) => a.username.compareTo(b.username));
 
           final noMatches =
-              _searchQuery.trim().isNotEmpty && filteredFriends.isEmpty;
+              _effectiveQuery.trim().isNotEmpty && filteredFriends.isEmpty;
 
           if (!widget.embeddedMode) {
             return Column(
               children: [
-                _buildTopSection(
-                  context,
-                  title: "Friends".tr(),
-                  count: allFriends.length,
-                  hintText: 'Search friends'.tr(),
-                ),
                 Expanded(
                   child: noMatches
                       ? _buildSimpleState(
@@ -135,20 +191,22 @@ class _FriendsPageState extends State<FriendsPage>
                     subtitle: '',
                     compact: true,
                   )
-                      : ListView.builder(
-                    physics: const ClampingScrollPhysics(),
-                    padding: EdgeInsets.only(
-                      top: 2,
-                      bottom: MediaQuery.of(context).padding.bottom + 96,
-                    ),
-                    itemCount: filteredFriends.length,
-                    itemBuilder: (context, index) {
-                      final u = filteredFriends[index];
-                      return _buildOtherUserTile(context, u);
-                    },
-                  ),
+                      : _buildOtherUserList(filteredFriends),
                 ),
               ],
+            );
+          }
+
+          if (noMatches) {
+            return _buildEmbeddedScrollableEmptyState(
+              context,
+              icon: Icons.search_off_rounded,
+              title: 'No friends match your search'.tr(),
+              subtitle: '',
+              compact: true,
+              storageKey: const PageStorageKey<String>(
+                'friends_other_embedded_no_matches',
+              ),
             );
           }
 
@@ -156,6 +214,7 @@ class _FriendsPageState extends State<FriendsPage>
             builder: (innerContext) {
               return CustomScrollView(
                 key: const PageStorageKey<String>('friends_other_embedded'),
+                primary: true,
                 physics: const AlwaysScrollableScrollPhysics(
                   parent: ClampingScrollPhysics(),
                 ),
@@ -166,52 +225,19 @@ class _FriendsPageState extends State<FriendsPage>
                       innerContext,
                     ),
                   ),
-                  SliverPersistentHeader(
-                    pinned: true,
-                    delegate: _EmbeddedFriendsHeaderDelegate(
-                      extent: kFriendsEmbeddedHeaderHeight,
-                      child: ColoredBox(
-                        color: Theme.of(context).colorScheme.surface,
-                        child: SizedBox(
-                          height: kFriendsEmbeddedHeaderHeight,
-                          child: _buildTopSection(
-                            context,
-                            title: "Friends".tr(),
-                            count: allFriends.length,
-                            hintText: 'Search friends'.tr(),
-                            embedded: true,
-                          ),
-                        ),
+                  SliverPadding(
+                    padding: EdgeInsets.only(
+                      top: 2,
+                      bottom: MediaQuery.of(context).padding.bottom + 84,
+                    ),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                            (context, index) =>
+                            _buildOtherUserTile(context, filteredFriends[index]),
+                        childCount: filteredFriends.length,
                       ),
                     ),
                   ),
-                  if (noMatches)
-                    SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: _buildSimpleState(
-                        context,
-                        icon: Icons.search_off_rounded,
-                        title: 'No friends match your search'.tr(),
-                        subtitle: '',
-                        compact: true,
-                      ),
-                    )
-                  else
-                    SliverPadding(
-                      padding: EdgeInsets.only(
-                        top: 2,
-                        bottom: MediaQuery.of(context).padding.bottom + 96,
-                      ),
-                      sliver: SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                              (context, index) {
-                            final u = filteredFriends[index];
-                            return _buildOtherUserTile(context, u);
-                          },
-                          childCount: filteredFriends.length,
-                        ),
-                      ),
-                    ),
                 ],
               );
             },
@@ -253,25 +279,44 @@ class _FriendsPageState extends State<FriendsPage>
                     .where((u) => u.id != currentUserId)
                     .toList();
 
+                _reportCount(allFriends.length);
+
                 if (allFriends.isEmpty) {
-                  return _buildSimpleState(
+                  final title = widget.includeMahrams
+                      ? "No chats yet".tr()
+                      : "No friends yet".tr();
+                  final subtitle = widget.includeMahrams
+                      ? "Add friends or mahrams to start chatting.".tr()
+                      : "Add people as friends or accept friend requests to start chatting."
+                      .tr();
+
+                  return widget.embeddedMode
+                      ? _buildEmbeddedScrollableEmptyState(
                     context,
                     icon: widget.includeMahrams
                         ? Icons.chat_bubble_outline_rounded
                         : Icons.group_outlined,
-                    title: widget.includeMahrams
-                        ? "No chats yet".tr()
-                        : "No friends yet".tr(),
-                    subtitle: widget.includeMahrams
-                        ? "Add friends or mahrams to start chatting.".tr()
-                        : "Add people as friends or accept friend requests to start chatting."
-                        .tr(),
+                    title: title,
+                    subtitle: subtitle,
+                    storageKey: PageStorageKey<String>(
+                      widget.includeMahrams
+                          ? 'friends_chats_embedded_empty'
+                          : 'friends_friends_embedded_empty',
+                    ),
+                  )
+                      : _buildSimpleState(
+                    context,
+                    icon: widget.includeMahrams
+                        ? Icons.chat_bubble_outline_rounded
+                        : Icons.group_outlined,
+                    title: title,
+                    subtitle: subtitle,
                   );
                 }
 
                 List<UserProfile> filteredFriends = allFriends;
-                if (_searchQuery.trim().isNotEmpty) {
-                  final q = _searchQuery.toLowerCase();
+                if (_effectiveQuery.trim().isNotEmpty) {
+                  final q = _effectiveQuery.toLowerCase();
                   filteredFriends = allFriends.where((u) {
                     final name = u.name.toLowerCase();
                     final username = u.username.toLowerCase();
@@ -294,7 +339,7 @@ class _FriendsPageState extends State<FriendsPage>
                 });
 
                 final noMatches =
-                    _searchQuery.trim().isNotEmpty && filteredFriends.isEmpty;
+                    _effectiveQuery.trim().isNotEmpty && filteredFriends.isEmpty;
 
                 final String? activeDmFriendId =
                     notificationService.activeDmFriendId;
@@ -302,16 +347,6 @@ class _FriendsPageState extends State<FriendsPage>
                 if (!widget.embeddedMode) {
                   return Column(
                     children: [
-                      _buildTopSection(
-                        context,
-                        title: widget.includeMahrams
-                            ? "Your chats".tr()
-                            : "Your friends".tr(),
-                        count: allFriends.length,
-                        hintText: widget.includeMahrams
-                            ? 'Search chats'.tr()
-                            : 'Search friends'.tr(),
-                      ),
                       Expanded(
                         child: noMatches
                             ? _buildSimpleState(
@@ -323,29 +358,32 @@ class _FriendsPageState extends State<FriendsPage>
                           subtitle: '',
                           compact: true,
                         )
-                            : ListView.builder(
-                          physics: const ClampingScrollPhysics(),
-                          padding: EdgeInsets.only(
-                            top: 2,
-                            bottom:
-                            MediaQuery.of(context).padding.bottom +
-                                96,
-                          ),
-                          itemCount: filteredFriends.length,
-                          itemBuilder: (context, index) {
-                            final user = filteredFriends[index];
-                            return _buildChatTile(
-                              context: context,
-                              user: user,
-                              unreadByFriend: unreadByFriend,
-                              lastMessageByFriend: lastMessageByFriend,
-                              activeDmFriendId: activeDmFriendId,
-                              dbProvider: dbProvider,
-                            );
-                          },
+                            : _buildChatsList(
+                          filteredFriends: filteredFriends,
+                          unreadByFriend: unreadByFriend,
+                          lastMessageByFriend: lastMessageByFriend,
+                          activeDmFriendId: activeDmFriendId,
+                          dbProvider: dbProvider,
                         ),
                       ),
                     ],
+                  );
+                }
+
+                if (noMatches) {
+                  return _buildEmbeddedScrollableEmptyState(
+                    context,
+                    icon: Icons.search_off_rounded,
+                    title: widget.includeMahrams
+                        ? 'No chats match your search'.tr()
+                        : 'No friends match your search'.tr(),
+                    subtitle: '',
+                    compact: true,
+                    storageKey: PageStorageKey<String>(
+                      widget.includeMahrams
+                          ? 'friends_chats_embedded_no_matches'
+                          : 'friends_friends_embedded_no_matches',
+                    ),
                   );
                 }
 
@@ -357,6 +395,7 @@ class _FriendsPageState extends State<FriendsPage>
                             ? 'friends_chats_embedded'
                             : 'friends_friends_embedded',
                       ),
+                      primary: true,
                       physics: const AlwaysScrollableScrollPhysics(
                         parent: ClampingScrollPhysics(),
                       ),
@@ -367,65 +406,28 @@ class _FriendsPageState extends State<FriendsPage>
                             innerContext,
                           ),
                         ),
-                        SliverPersistentHeader(
-                          pinned: true,
-                          delegate: _EmbeddedFriendsHeaderDelegate(
-                            extent: kFriendsEmbeddedHeaderHeight,
-                            child: ColoredBox(
-                              color: Theme.of(context).colorScheme.surface,
-                              child: SizedBox(
-                                height: kFriendsEmbeddedHeaderHeight,
-                                child: _buildTopSection(
-                                  context,
-                                  title: widget.includeMahrams
-                                      ? "Your chats".tr()
-                                      : "Your friends".tr(),
-                                  count: allFriends.length,
-                                  hintText: widget.includeMahrams
-                                      ? 'Search chats'.tr()
-                                      : 'Search friends'.tr(),
-                                  embedded: true,
-                                ),
-                              ),
+                        SliverPadding(
+                          padding: EdgeInsets.only(
+                            top: 2,
+                            bottom: MediaQuery.of(context).padding.bottom + 84,
+                          ),
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                                  (context, index) {
+                                final user = filteredFriends[index];
+                                return _buildChatTile(
+                                  context: context,
+                                  user: user,
+                                  unreadByFriend: unreadByFriend,
+                                  lastMessageByFriend: lastMessageByFriend,
+                                  activeDmFriendId: activeDmFriendId,
+                                  dbProvider: dbProvider,
+                                );
+                              },
+                              childCount: filteredFriends.length,
                             ),
                           ),
                         ),
-                        if (noMatches)
-                          SliverFillRemaining(
-                            hasScrollBody: false,
-                            child: _buildSimpleState(
-                              context,
-                              icon: Icons.search_off_rounded,
-                              title: widget.includeMahrams
-                                  ? 'No chats match your search'.tr()
-                                  : 'No friends match your search'.tr(),
-                              subtitle: '',
-                              compact: true,
-                            ),
-                          )
-                        else
-                          SliverPadding(
-                            padding: EdgeInsets.only(
-                              top: 2,
-                              bottom: MediaQuery.of(context).padding.bottom + 96,
-                            ),
-                            sliver: SliverList(
-                              delegate: SliverChildBuilderDelegate(
-                                    (context, index) {
-                                  final user = filteredFriends[index];
-                                  return _buildChatTile(
-                                    context: context,
-                                    user: user,
-                                    unreadByFriend: unreadByFriend,
-                                    lastMessageByFriend: lastMessageByFriend,
-                                    activeDmFriendId: activeDmFriendId,
-                                    dbProvider: dbProvider,
-                                  );
-                                },
-                                childCount: filteredFriends.length,
-                              ),
-                            ),
-                          ),
                       ],
                     );
                   },
@@ -433,6 +435,50 @@ class _FriendsPageState extends State<FriendsPage>
               },
             );
           },
+        );
+      },
+    );
+  }
+
+  Widget _buildOtherUserList(List<UserProfile> filteredFriends) {
+    return ListView.builder(
+      controller: _standaloneScrollController,
+      physics: const ClampingScrollPhysics(),
+      padding: EdgeInsets.only(
+        top: 2,
+        bottom: MediaQuery.of(context).padding.bottom + 96,
+      ),
+      itemCount: filteredFriends.length,
+      itemBuilder: (context, index) {
+        return _buildOtherUserTile(context, filteredFriends[index]);
+      },
+    );
+  }
+
+  Widget _buildChatsList({
+    required List<UserProfile> filteredFriends,
+    required Map<String, int> unreadByFriend,
+    required Map<String, LastMessageInfo> lastMessageByFriend,
+    required String? activeDmFriendId,
+    required DatabaseProvider dbProvider,
+  }) {
+    return ListView.builder(
+      controller: _standaloneScrollController,
+      physics: const ClampingScrollPhysics(),
+      padding: EdgeInsets.only(
+        top: 2,
+        bottom: MediaQuery.of(context).padding.bottom + 96,
+      ),
+      itemCount: filteredFriends.length,
+      itemBuilder: (context, index) {
+        final user = filteredFriends[index];
+        return _buildChatTile(
+          context: context,
+          user: user,
+          unreadByFriend: unreadByFriend,
+          lastMessageByFriend: lastMessageByFriend,
+          activeDmFriendId: activeDmFriendId,
+          dbProvider: dbProvider,
         );
       },
     );
@@ -491,9 +537,7 @@ class _FriendsPageState extends State<FriendsPage>
   }) {
     final rawUnread = unreadByFriend[user.id] ?? 0;
     final unreadCount =
-    (activeDmFriendId != null && activeDmFriendId == user.id)
-        ? 0
-        : rawUnread;
+    (activeDmFriendId != null && activeDmFriendId == user.id) ? 0 : rawUnread;
 
     final lastInfo = lastMessageByFriend[user.id];
     final lastText = lastInfo?.text;
@@ -502,9 +546,7 @@ class _FriendsPageState extends State<FriendsPage>
 
     final preview = (lastText == null || lastText.trim().isEmpty)
         ? null
-        : (lastInfo!.sentByCurrentUser
-        ? '${"You".tr()}: $lastText'
-        : lastText);
+        : (lastInfo!.sentByCurrentUser ? '${"You".tr()}: $lastText' : lastText);
 
     return MyFriendTile(
       key: ValueKey(user.id),
@@ -541,93 +583,46 @@ class _FriendsPageState extends State<FriendsPage>
     );
   }
 
-  Widget _buildTopSection(
+  Widget _buildEmbeddedScrollableEmptyState(
       BuildContext context, {
+        required IconData icon,
         required String title,
-        required int count,
-        required String hintText,
-        bool embedded = false,
+        required String subtitle,
+        required Key storageKey,
+        bool compact = false,
       }) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: embedded
-          ? const EdgeInsets.fromLTRB(16, 8, 16, 6)
-          : const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              colorScheme.surfaceContainerHigh,
-              colorScheme.surfaceContainer,
-            ],
+    return Builder(
+      builder: (innerContext) {
+        return CustomScrollView(
+          key: storageKey,
+          primary: true,
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: ClampingScrollPhysics(),
           ),
-          borderRadius: BorderRadius.circular(26),
-          border: Border.all(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.55),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
+          slivers: [
+            SliverOverlapInjector(
+              handle:
+              NestedScrollView.sliverOverlapAbsorberHandleFor(innerContext),
+            ),
+            SliverFillRemaining(
+              hasScrollBody: false,
+              fillOverscroll: true,
+              child: _buildSimpleState(
+                context,
+                icon: icon,
+                title: title,
+                subtitle: subtitle,
+                compact: compact,
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: MediaQuery.of(context).padding.bottom + 84,
+              ),
             ),
           ],
-        ),
-        child: Column(
-          children: [
-            MySearchBar(
-              controller: _searchController,
-              hintText: hintText,
-              onChanged: (value) {
-                setState(() => _searchQuery = value);
-              },
-              onClear: () {
-                setState(() {
-                  _searchController.clear();
-                  _searchQuery = '';
-                });
-              },
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: colorScheme.onSurface,
-                    letterSpacing: -0.2,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    '$count',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: colorScheme.primary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -695,35 +690,5 @@ class _FriendsPageState extends State<FriendsPage>
         ),
       ),
     );
-  }
-}
-
-class _EmbeddedFriendsHeaderDelegate extends SliverPersistentHeaderDelegate {
-  final double extent;
-  final Widget child;
-
-  _EmbeddedFriendsHeaderDelegate({
-    required this.extent,
-    required this.child,
-  });
-
-  @override
-  double get minExtent => extent;
-
-  @override
-  double get maxExtent => extent;
-
-  @override
-  Widget build(
-      BuildContext context,
-      double shrinkOffset,
-      bool overlapsContent,
-      ) {
-    return child;
-  }
-
-  @override
-  bool shouldRebuild(covariant _EmbeddedFriendsHeaderDelegate oldDelegate) {
-    return oldDelegate.extent != extent || oldDelegate.child != child;
   }
 }

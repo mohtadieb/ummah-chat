@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../components/my_search_bar.dart';
 import '../services/database/database_provider.dart';
 import 'communities_page.dart' as communities_page;
 import 'create_community_page.dart';
@@ -11,7 +14,9 @@ import 'groups_page.dart' as groups_page;
 import 'search_page.dart';
 
 const double kChatsHeaderCardHeight = 126.0;
-const double kChatsPinnedAreaHeight = 62.0;
+const double kChatsPinnedTabsHeight = 62.0;
+const double kChatsPinnedSearchHeight = 118.0;
+const double kChatsPinnedSearchCardHeight = 112.0;
 
 class ChatTabsPage extends StatefulWidget {
   const ChatTabsPage({super.key});
@@ -22,14 +27,40 @@ class ChatTabsPage extends StatefulWidget {
 
 class _ChatTabsPageState extends State<ChatTabsPage>
     with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+  late final TabController _tabController;
   int _currentTabIndex = 0;
+
+  final TextEditingController _friendsSearchController =
+  TextEditingController();
+  final TextEditingController _groupsSearchController = TextEditingController();
+  final TextEditingController _communitiesSearchController =
+  TextEditingController();
+
+  String _friendsQuery = '';
+  String _groupsQuery = '';
+  String _communitiesQuery = '';
+
+  int _friendsCount = 0;
+  int _groupsCount = 0;
+  int _communitiesCount = 0;
+
+  Timer? _communitiesSearchDebounce;
+  static const _communitiesDebounceDuration = Duration(milliseconds: 350);
+
+  bool _isSearchingCommunities = false;
+  bool _hasCompletedCommunitiesSearch = false;
 
   @override
   void initState() {
     super.initState();
+
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_handleTabChanged);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Provider.of<DatabaseProvider>(context, listen: false).getAllCommunities();
+    });
   }
 
   void _handleTabChanged() {
@@ -45,6 +76,12 @@ class _ChatTabsPageState extends State<ChatTabsPage>
   void dispose() {
     _tabController.removeListener(_handleTabChanged);
     _tabController.dispose();
+
+    _friendsSearchController.dispose();
+    _groupsSearchController.dispose();
+    _communitiesSearchController.dispose();
+    _communitiesSearchDebounce?.cancel();
+
     super.dispose();
   }
 
@@ -86,6 +123,152 @@ class _ChatTabsPageState extends State<ChatTabsPage>
     Provider.of<DatabaseProvider>(context, listen: false).getAllCommunities();
   }
 
+  void _onCommunitiesSearchChanged(String value) {
+    final trimmed = value.trim();
+
+    _communitiesSearchDebounce?.cancel();
+
+    setState(() {
+      _communitiesQuery = value;
+      _isSearchingCommunities = trimmed.isNotEmpty;
+      _hasCompletedCommunitiesSearch = false;
+    });
+
+    _communitiesSearchDebounce =
+        Timer(_communitiesDebounceDuration, () async {
+          if (!mounted) return;
+
+          final provider = Provider.of<DatabaseProvider>(context, listen: false);
+
+          if (trimmed.isNotEmpty) {
+            await provider.searchCommunities(trimmed);
+
+            if (!mounted) return;
+            setState(() {
+              _isSearchingCommunities = false;
+              _hasCompletedCommunitiesSearch = true;
+            });
+          } else {
+            provider.clearCommunitySearchResults();
+
+            if (!mounted) return;
+            setState(() {
+              _isSearchingCommunities = false;
+              _hasCompletedCommunitiesSearch = false;
+            });
+          }
+        });
+  }
+
+  void _clearCommunitiesSearch() {
+    _communitiesSearchDebounce?.cancel();
+
+    final provider = Provider.of<DatabaseProvider>(context, listen: false);
+
+    setState(() {
+      _communitiesSearchController.clear();
+      _communitiesQuery = '';
+      _isSearchingCommunities = false;
+      _hasCompletedCommunitiesSearch = false;
+    });
+
+    provider.clearCommunitySearchResults();
+  }
+
+  Widget _buildSearchCardForIndex(int index) {
+    switch (index) {
+      case 0:
+        return _PinnedSearchCardShell(
+          child: _PinnedSearchCard(
+            controller: _friendsSearchController,
+            hintText: 'Search chats'.tr(),
+            title: 'Your chats'.tr(),
+            count: _friendsCount,
+            onChanged: (value) {
+              setState(() => _friendsQuery = value);
+            },
+            onClear: () {
+              setState(() {
+                _friendsSearchController.clear();
+                _friendsQuery = '';
+              });
+            },
+          ),
+        );
+      case 1:
+        return _PinnedSearchCardShell(
+          child: _PinnedSearchCard(
+            controller: _groupsSearchController,
+            hintText: 'Search groups'.tr(),
+            title: 'Your groups'.tr(),
+            count: _groupsCount,
+            onChanged: (value) {
+              setState(() => _groupsQuery = value);
+            },
+            onClear: () {
+              setState(() {
+                _groupsSearchController.clear();
+                _groupsQuery = '';
+              });
+            },
+          ),
+        );
+      default:
+        return _PinnedSearchCardShell(
+          child: _PinnedSearchCard(
+            controller: _communitiesSearchController,
+            hintText: 'Search communities'.tr(),
+            title: 'Your communities'.tr(),
+            count: _communitiesCount,
+            onChanged: _onCommunitiesSearchChanged,
+            onClear: _clearCommunitiesSearch,
+          ),
+        );
+    }
+  }
+
+  Widget _buildAnimatedPinnedSearchArea() {
+    return AnimatedBuilder(
+      animation: _tabController.animation!,
+      builder: (context, _) {
+        final value = _tabController.animation!.value.clamp(0.0, 2.0);
+        final leftIndex = value.floor().clamp(0, 2);
+        final rightIndex = value.ceil().clamp(0, 2);
+        final t = value - leftIndex;
+
+        final leftOffset = Tween<Offset>(
+          begin: Offset.zero,
+          end: const Offset(-1, 0),
+        ).transform(t);
+
+        final rightOffset = Tween<Offset>(
+          begin: const Offset(1, 0),
+          end: Offset.zero,
+        ).transform(t);
+
+        return SizedBox(
+          height: kChatsPinnedSearchHeight,
+          child: ClipRect(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                SlideTransition(
+                  position: AlwaysStoppedAnimation<Offset>(leftOffset),
+                  child: _buildSearchCardForIndex(leftIndex),
+                ),
+                if (rightIndex != leftIndex)
+                  SlideTransition(
+                    position: AlwaysStoppedAnimation<Offset>(rightOffset),
+                    child: _buildSearchCardForIndex(rightIndex),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -113,61 +296,210 @@ class _ChatTabsPageState extends State<ChatTabsPage>
         ),
         child: SafeArea(
           child: NestedScrollView(
+            physics: const ClampingScrollPhysics(),
             floatHeaderSlivers: false,
             headerSliverBuilder: (context, innerBoxIsScrolled) {
               return [
                 const SliverToBoxAdapter(
                   child: _ChatsHeaderArea(),
                 ),
-                SliverOverlapAbsorber(
-                  handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
-                    context,
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _PinnedSimpleDelegate(
+                    extent: kChatsPinnedTabsHeight,
+                    child: Container(
+                      color: cs.surface,
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      child: _PremiumTabBar(
+                        controller: _tabController,
+                        tabs: [
+                          "Friends".tr(),
+                          "Groups".tr(),
+                          "Communities".tr(),
+                        ],
+                      ),
+                    ),
                   ),
+                ),
+                SliverOverlapAbsorber(
+                  handle:
+                  NestedScrollView.sliverOverlapAbsorberHandleFor(context),
                   sliver: SliverPersistentHeader(
                     pinned: true,
-                    delegate: _PinnedChatsTopAreaDelegate(
-                      minExtentValue: kChatsPinnedAreaHeight,
-                      maxExtentValue: kChatsPinnedAreaHeight,
+                    delegate: _PinnedSimpleDelegate(
+                      extent: kChatsPinnedSearchHeight,
                       child: Container(
                         color: cs.surface,
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                        child: _PremiumTabBar(
-                          controller: _tabController,
-                          tabs: [
-                            "Friends".tr(),
-                            "Groups".tr(),
-                            "Communities".tr(),
-                          ],
-                        ),
+                        child: _buildAnimatedPinnedSearchArea(),
                       ),
                     ),
                   ),
                 ),
               ];
             },
-            body: TabBarView(
-              controller: _tabController,
-              children: const [
-                _ChatsKeepAlive(
-                  child: friends_page.FriendsPage(
-                    includeMahrams: true,
-                    embeddedMode: true,
+            body: ClipRect(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _ChatsKeepAlive(
+                    child: friends_page.FriendsPage(
+                      includeMahrams: true,
+                      embeddedMode: true,
+                      embeddedSearchQuery: _friendsQuery,
+                      onEmbeddedCountChanged: (count) {
+                        if (_friendsCount == count) return;
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (!mounted) return;
+                          setState(() => _friendsCount = count);
+                        });
+                      },
+                    ),
                   ),
-                ),
-                _ChatsKeepAlive(
-                  child: groups_page.GroupsPage(
-                    embeddedMode: true,
+                  _ChatsKeepAlive(
+                    child: groups_page.GroupsPage(
+                      embeddedMode: true,
+                      embeddedSearchQuery: _groupsQuery,
+                      onEmbeddedCountChanged: (count) {
+                        if (_groupsCount == count) return;
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (!mounted) return;
+                          setState(() => _groupsCount = count);
+                        });
+                      },
+                    ),
                   ),
-                ),
-                _ChatsKeepAlive(
-                  child: communities_page.CommunitiesPage(
-                    embeddedMode: true,
+                  _ChatsKeepAlive(
+                    child: communities_page.CommunitiesPage(
+                      embeddedMode: true,
+                      embeddedSearchQuery: _communitiesQuery,
+                      embeddedCommunitiesSearching: _isSearchingCommunities,
+                      embeddedCommunitiesHasCompletedSearch:
+                      _hasCompletedCommunitiesSearch,
+                      onEmbeddedCountChanged: (count) {
+                        if (_communitiesCount == count) return;
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (!mounted) return;
+                          setState(() => _communitiesCount = count);
+                        });
+                      },
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _PinnedSearchCardShell extends StatelessWidget {
+  final Widget child;
+
+  const _PinnedSearchCardShell({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surface,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+        child: SizedBox(
+          height: kChatsPinnedSearchCardHeight,
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+class _PinnedSearchCard extends StatelessWidget {
+  final TextEditingController controller;
+  final String hintText;
+  final String title;
+  final int count;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  const _PinnedSearchCard({
+    required this.controller,
+    required this.hintText,
+    required this.title,
+    required this.count,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            cs.surfaceContainerHigh,
+            cs.surfaceContainer,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(
+          color: cs.outlineVariant.withValues(alpha: 0.55),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          MySearchBar(
+            controller: controller,
+            hintText: hintText,
+            onChanged: onChanged,
+            onClear: onClear,
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: cs.onSurface,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: cs.primary.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: cs.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -364,22 +696,20 @@ class _PremiumTabBar extends StatelessWidget {
   }
 }
 
-class _PinnedChatsTopAreaDelegate extends SliverPersistentHeaderDelegate {
-  final double minExtentValue;
-  final double maxExtentValue;
+class _PinnedSimpleDelegate extends SliverPersistentHeaderDelegate {
+  final double extent;
   final Widget child;
 
-  _PinnedChatsTopAreaDelegate({
-    required this.minExtentValue,
-    required this.maxExtentValue,
+  _PinnedSimpleDelegate({
+    required this.extent,
     required this.child,
   });
 
   @override
-  double get minExtent => minExtentValue;
+  double get minExtent => extent;
 
   @override
-  double get maxExtent => maxExtentValue;
+  double get maxExtent => extent;
 
   @override
   Widget build(
@@ -391,9 +721,7 @@ class _PinnedChatsTopAreaDelegate extends SliverPersistentHeaderDelegate {
   }
 
   @override
-  bool shouldRebuild(covariant _PinnedChatsTopAreaDelegate oldDelegate) {
-    return oldDelegate.minExtentValue != minExtentValue ||
-        oldDelegate.maxExtentValue != maxExtentValue ||
-        oldDelegate.child != child;
+  bool shouldRebuild(covariant _PinnedSimpleDelegate oldDelegate) {
+    return oldDelegate.extent != extent || oldDelegate.child != child;
   }
 }

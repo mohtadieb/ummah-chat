@@ -1,25 +1,27 @@
 import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../components/my_group_tile.dart';
+import '../helper/last_message_time_formatter.dart';
+import '../models/message.dart';
+import '../pages/group_chat_page.dart';
 import '../services/auth/auth_service.dart';
 import '../services/chat/chat_provider.dart';
-import '../pages/group_chat_page.dart';
-import '../models/message.dart';
-import '../helper/last_message_time_formatter.dart';
-import '../components/my_search_bar.dart';
-import '../components/my_group_tile.dart';
 import '../services/notifications/notification_service.dart';
-
-const double kGroupsEmbeddedHeaderHeight = 126.0;
 
 class GroupsPage extends StatefulWidget {
   final bool embeddedMode;
+  final String embeddedSearchQuery;
+  final ValueChanged<int>? onEmbeddedCountChanged;
 
   const GroupsPage({
     super.key,
     this.embeddedMode = false,
+    this.embeddedSearchQuery = '',
+    this.onEmbeddedCountChanged,
   });
 
   @override
@@ -29,6 +31,7 @@ class GroupsPage extends StatefulWidget {
 class _GroupsPageState extends State<GroupsPage>
     with AutomaticKeepAliveClientMixin<GroupsPage> {
   final AuthService _authService = AuthService();
+  final ScrollController _standaloneScrollController = ScrollController();
 
   Map<String, MessageModel> _lastGroupMessages = {};
   Map<String, int> _groupUnreadCounts = {};
@@ -38,6 +41,21 @@ class _GroupsPageState extends State<GroupsPage>
 
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  int? _lastReportedCount;
+
+  String get _effectiveQuery =>
+      widget.embeddedMode ? widget.embeddedSearchQuery : _searchQuery;
+
+  void _reportCount(int count) {
+    if (!widget.embeddedMode) return;
+    if (_lastReportedCount == count) return;
+    _lastReportedCount = count;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      widget.onEmbeddedCountChanged?.call(count);
+    });
+  }
 
   @override
   bool get wantKeepAlive => true;
@@ -73,14 +91,13 @@ class _GroupsPageState extends State<GroupsPage>
       });
     });
 
-    _unreadSub = chatProvider
-        .groupUnreadCountsPollingStream(currentUserId)
-        .listen((map) {
-      if (!mounted) return;
-      setState(() {
-        _groupUnreadCounts = map;
-      });
-    });
+    _unreadSub =
+        chatProvider.groupUnreadCountsPollingStream(currentUserId).listen((map) {
+          if (!mounted) return;
+          setState(() {
+            _groupUnreadCounts = map;
+          });
+        });
   }
 
   @override
@@ -88,6 +105,7 @@ class _GroupsPageState extends State<GroupsPage>
     _lastMsgSub?.cancel();
     _unreadSub?.cancel();
     _searchController.dispose();
+    _standaloneScrollController.dispose();
     super.dispose();
   }
 
@@ -128,9 +146,22 @@ class _GroupsPageState extends State<GroupsPage>
         }
 
         final groups = snapshot.data ?? [];
+        _reportCount(groups.length);
 
         if (groups.isEmpty) {
-          return _buildSimpleState(
+          return widget.embeddedMode
+              ? _buildEmbeddedScrollableEmptyState(
+            context,
+            icon: Icons.group_outlined,
+            title: 'No groups yet'.tr(),
+            subtitle:
+            'Create a group to start chatting with multiple friends at once.'
+                .tr(),
+            storageKey: const PageStorageKey<String>(
+              'groups_embedded_empty',
+            ),
+          )
+              : _buildSimpleState(
             context,
             icon: Icons.group_outlined,
             title: 'No groups yet'.tr(),
@@ -141,8 +172,8 @@ class _GroupsPageState extends State<GroupsPage>
         }
 
         List<Map<String, dynamic>> filteredGroups = groups;
-        if (_searchQuery.trim().isNotEmpty) {
-          final q = _searchQuery.toLowerCase();
+        if (_effectiveQuery.trim().isNotEmpty) {
+          final q = _effectiveQuery.toLowerCase();
           filteredGroups = groups.where((g) {
             final name = (g['name'] as String? ?? '').toLowerCase();
             return name.contains(q);
@@ -150,17 +181,11 @@ class _GroupsPageState extends State<GroupsPage>
         }
 
         final noMatches =
-            _searchQuery.trim().isNotEmpty && filteredGroups.isEmpty;
+            _effectiveQuery.trim().isNotEmpty && filteredGroups.isEmpty;
 
         if (!widget.embeddedMode) {
           return Column(
             children: [
-              _buildTopSection(
-                context,
-                title: "Your groups".tr(),
-                count: groups.length,
-                hintText: 'Search groups'.tr(),
-              ),
               Expanded(
                 child: noMatches
                     ? _buildSimpleState(
@@ -170,25 +195,26 @@ class _GroupsPageState extends State<GroupsPage>
                   subtitle: '',
                   compact: true,
                 )
-                    : ListView.builder(
-                  physics: const ClampingScrollPhysics(),
-                  padding: EdgeInsets.only(
-                    top: 2,
-                    bottom: MediaQuery.of(context).padding.bottom + 96,
-                  ),
-                  itemCount: filteredGroups.length,
-                  itemBuilder: (context, index) {
-                    final group = filteredGroups[index];
-                    return _buildGroupTile(
-                      context: context,
-                      group: group,
-                      currentUserId: currentUserId,
-                      activeChatRoomId: activeChatRoomId,
-                    );
-                  },
+                    : _buildGroupsList(
+                  filteredGroups,
+                  currentUserId,
+                  activeChatRoomId,
                 ),
               ),
             ],
+          );
+        }
+
+        if (noMatches) {
+          return _buildEmbeddedScrollableEmptyState(
+            context,
+            icon: Icons.search_off_rounded,
+            title: 'No groups match your search'.tr(),
+            subtitle: '',
+            compact: true,
+            storageKey: const PageStorageKey<String>(
+              'groups_embedded_no_matches',
+            ),
           );
         }
 
@@ -196,69 +222,65 @@ class _GroupsPageState extends State<GroupsPage>
           builder: (innerContext) {
             return CustomScrollView(
               key: const PageStorageKey<String>('groups_embedded'),
+              primary: true,
               physics: const AlwaysScrollableScrollPhysics(
                 parent: ClampingScrollPhysics(),
               ),
               slivers: [
                 SliverOverlapInjector(
-                  handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
+                  handle:
+                  NestedScrollView.sliverOverlapAbsorberHandleFor(
                     innerContext,
                   ),
                 ),
-                SliverPersistentHeader(
-                  pinned: true,
-                  delegate: _EmbeddedGroupsHeaderDelegate(
-                    extent: kGroupsEmbeddedHeaderHeight,
-                    child: ColoredBox(
-                      color: Theme.of(context).colorScheme.surface,
-                      child: SizedBox(
-                        height: kGroupsEmbeddedHeaderHeight,
-                        child: _buildTopSection(
-                          context,
-                          title: "Your groups".tr(),
-                          count: groups.length,
-                          hintText: 'Search groups'.tr(),
-                          embedded: true,
-                        ),
-                      ),
+                SliverPadding(
+                  padding: EdgeInsets.only(
+                    top: 2,
+                    bottom: MediaQuery.of(context).padding.bottom + 84,
+                  ),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                        final group = filteredGroups[index];
+                        return _buildGroupTile(
+                          context: context,
+                          group: group,
+                          currentUserId: currentUserId,
+                          activeChatRoomId: activeChatRoomId,
+                        );
+                      },
+                      childCount: filteredGroups.length,
                     ),
                   ),
                 ),
-                if (noMatches)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _buildSimpleState(
-                      context,
-                      icon: Icons.search_off_rounded,
-                      title: 'No groups match your search'.tr(),
-                      subtitle: '',
-                      compact: true,
-                    ),
-                  )
-                else
-                  SliverPadding(
-                    padding: EdgeInsets.only(
-                      top: 2,
-                      bottom: MediaQuery.of(context).padding.bottom + 96,
-                    ),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                            (context, index) {
-                          final group = filteredGroups[index];
-                          return _buildGroupTile(
-                            context: context,
-                            group: group,
-                            currentUserId: currentUserId,
-                            activeChatRoomId: activeChatRoomId,
-                          );
-                        },
-                        childCount: filteredGroups.length,
-                      ),
-                    ),
-                  ),
               ],
             );
           },
+        );
+      },
+    );
+  }
+
+  Widget _buildGroupsList(
+      List<Map<String, dynamic>> filteredGroups,
+      String currentUserId,
+      String? activeChatRoomId,
+      ) {
+    return ListView.builder(
+      controller: _standaloneScrollController,
+      physics: const ClampingScrollPhysics(),
+      padding: EdgeInsets.only(
+        top: 2,
+        bottom: MediaQuery.of(context).padding.bottom + 96,
+      ),
+      itemCount: filteredGroups.length,
+      itemBuilder: (context, index) {
+        final group = filteredGroups[index];
+        return _buildGroupTile(
+          context: context,
+          group: group,
+          currentUserId: currentUserId,
+          activeChatRoomId: activeChatRoomId,
         );
       },
     );
@@ -343,93 +365,46 @@ class _GroupsPageState extends State<GroupsPage>
     );
   }
 
-  Widget _buildTopSection(
+  Widget _buildEmbeddedScrollableEmptyState(
       BuildContext context, {
+        required IconData icon,
         required String title,
-        required int count,
-        required String hintText,
-        bool embedded = false,
+        required String subtitle,
+        required Key storageKey,
+        bool compact = false,
       }) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: embedded
-          ? const EdgeInsets.fromLTRB(16, 8, 16, 6)
-          : const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              colorScheme.surfaceContainerHigh,
-              colorScheme.surfaceContainer,
-            ],
+    return Builder(
+      builder: (innerContext) {
+        return CustomScrollView(
+          key: storageKey,
+          primary: true,
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: ClampingScrollPhysics(),
           ),
-          borderRadius: BorderRadius.circular(26),
-          border: Border.all(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.55),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
+          slivers: [
+            SliverOverlapInjector(
+              handle:
+              NestedScrollView.sliverOverlapAbsorberHandleFor(innerContext),
+            ),
+            SliverFillRemaining(
+              hasScrollBody: false,
+              fillOverscroll: true,
+              child: _buildSimpleState(
+                context,
+                icon: icon,
+                title: title,
+                subtitle: subtitle,
+                compact: compact,
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: MediaQuery.of(context).padding.bottom + 84,
+              ),
             ),
           ],
-        ),
-        child: Column(
-          children: [
-            MySearchBar(
-              controller: _searchController,
-              hintText: hintText,
-              onChanged: (value) {
-                setState(() => _searchQuery = value);
-              },
-              onClear: () {
-                setState(() {
-                  _searchController.clear();
-                  _searchQuery = '';
-                });
-              },
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: colorScheme.onSurface,
-                    letterSpacing: -0.2,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    '$count',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: colorScheme.primary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -526,35 +501,5 @@ class _GroupsPageState extends State<GroupsPage>
     const maxLen = 40;
     if (base.length <= maxLen) return base;
     return '${base.substring(0, maxLen)}…';
-  }
-}
-
-class _EmbeddedGroupsHeaderDelegate extends SliverPersistentHeaderDelegate {
-  final double extent;
-  final Widget child;
-
-  _EmbeddedGroupsHeaderDelegate({
-    required this.extent,
-    required this.child,
-  });
-
-  @override
-  double get minExtent => extent;
-
-  @override
-  double get maxExtent => extent;
-
-  @override
-  Widget build(
-      BuildContext context,
-      double shrinkOffset,
-      bool overlapsContent,
-      ) {
-    return child;
-  }
-
-  @override
-  bool shouldRebuild(covariant _EmbeddedGroupsHeaderDelegate oldDelegate) {
-    return oldDelegate.extent != extent || oldDelegate.child != child;
   }
 }

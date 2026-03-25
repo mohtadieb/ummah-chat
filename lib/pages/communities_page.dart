@@ -1,22 +1,25 @@
-import 'dart:async';
-
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../components/my_search_bar.dart';
 import '../components/my_community_tile.dart';
 import '../services/database/database_provider.dart';
 import 'community_posts_page.dart';
 
-const double kCommunitiesEmbeddedHeaderHeight = 126.0;
-
 class CommunitiesPage extends StatefulWidget {
   final bool embeddedMode;
+  final String embeddedSearchQuery;
+  final bool embeddedCommunitiesSearching;
+  final bool embeddedCommunitiesHasCompletedSearch;
+  final ValueChanged<int>? onEmbeddedCountChanged;
 
   const CommunitiesPage({
     super.key,
     this.embeddedMode = false,
+    this.embeddedSearchQuery = '',
+    this.embeddedCommunitiesSearching = false,
+    this.embeddedCommunitiesHasCompletedSearch = false,
+    this.onEmbeddedCountChanged,
   });
 
   @override
@@ -26,15 +29,32 @@ class CommunitiesPage extends StatefulWidget {
 class _CommunitiesPageState extends State<CommunitiesPage>
     with AutomaticKeepAliveClientMixin<CommunitiesPage> {
   late final DatabaseProvider _db;
+  final ScrollController _standaloneScrollController = ScrollController();
 
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  int? _lastReportedCount;
 
-  Timer? _searchDebounce;
-  static const _debounceDuration = Duration(milliseconds: 350);
+  String get _effectiveQuery =>
+      widget.embeddedMode ? widget.embeddedSearchQuery : _searchQuery;
 
-  bool _isSearching = false;
-  bool _hasCompletedSearch = false;
+  bool get _effectiveSearching =>
+      widget.embeddedMode ? widget.embeddedCommunitiesSearching : false;
+
+  bool get _effectiveHasCompletedSearch => widget.embeddedMode
+      ? widget.embeddedCommunitiesHasCompletedSearch
+      : false;
+
+  void _reportCount(int count) {
+    if (!widget.embeddedMode) return;
+    if (_lastReportedCount == count) return;
+    _lastReportedCount = count;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      widget.onEmbeddedCountChanged?.call(count);
+    });
+  }
 
   @override
   bool get wantKeepAlive => true;
@@ -48,56 +68,9 @@ class _CommunitiesPageState extends State<CommunitiesPage>
 
   @override
   void dispose() {
-    _searchDebounce?.cancel();
     _searchController.dispose();
+    _standaloneScrollController.dispose();
     super.dispose();
-  }
-
-  void _onCommunitySearchChanged(String value) {
-    final trimmed = value.trim();
-
-    _searchDebounce?.cancel();
-
-    setState(() {
-      _searchQuery = value;
-      _isSearching = trimmed.isNotEmpty;
-      _hasCompletedSearch = false;
-    });
-
-    _searchDebounce = Timer(_debounceDuration, () async {
-      if (!mounted) return;
-
-      final provider = Provider.of<DatabaseProvider>(context, listen: false);
-
-      if (trimmed.isNotEmpty) {
-        await provider.searchCommunities(trimmed);
-
-        if (!mounted) return;
-        setState(() {
-          _isSearching = false;
-          _hasCompletedSearch = true;
-        });
-      } else {
-        provider.clearCommunitySearchResults();
-
-        if (!mounted) return;
-        setState(() {
-          _isSearching = false;
-          _hasCompletedSearch = false;
-        });
-      }
-    });
-  }
-
-  void _clearSearch(DatabaseProvider provider) {
-    _searchDebounce?.cancel();
-    setState(() {
-      _searchController.clear();
-      _searchQuery = '';
-      _isSearching = false;
-      _hasCompletedSearch = false;
-    });
-    provider.clearCommunitySearchResults();
   }
 
   @override
@@ -109,28 +82,22 @@ class _CommunitiesPageState extends State<CommunitiesPage>
         .where((c) => c['is_joined'] == true)
         .toList();
 
-    final hasSearchText = _searchQuery.trim().isNotEmpty;
+    _reportCount(joinedCommunities.length);
+
+    final hasSearchText = _effectiveQuery.trim().isNotEmpty;
     final searchResults = listeningProvider.communitySearchResults;
     final hasSearchResults = searchResults.isNotEmpty;
 
     if (!widget.embeddedMode) {
       return Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: _buildTopSection(
-              context,
-              title: 'Your communities'.tr(),
-              count: joinedCommunities.length,
-            ),
-          ),
           Expanded(
             child: hasSearchText
                 ? _buildSearchBody(
               context,
-              isSearching: _isSearching,
+              isSearching: _effectiveSearching,
               hasSearchResults: hasSearchResults,
-              hasCompletedSearch: _hasCompletedSearch,
+              hasCompletedSearch: _effectiveHasCompletedSearch,
               searchResults: searchResults,
               horizontalPadding: 16,
             )
@@ -144,6 +111,7 @@ class _CommunitiesPageState extends State<CommunitiesPage>
                   .tr(),
             )
                 : ListView.builder(
+              controller: _standaloneScrollController,
               physics: const ClampingScrollPhysics(),
               padding: EdgeInsets.only(
                 top: 2,
@@ -164,164 +132,85 @@ class _CommunitiesPageState extends State<CommunitiesPage>
       );
     }
 
+    if (hasSearchText) {
+      return Builder(
+        builder: (innerContext) {
+          return CustomScrollView(
+            key: const PageStorageKey<String>('communities_embedded_search'),
+            primary: true,
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: ClampingScrollPhysics(),
+            ),
+            slivers: [
+              SliverOverlapInjector(
+                handle:
+                NestedScrollView.sliverOverlapAbsorberHandleFor(innerContext),
+              ),
+              SliverToBoxAdapter(
+                child: _buildSearchBody(
+                  context,
+                  isSearching: _effectiveSearching,
+                  hasSearchResults: hasSearchResults,
+                  hasCompletedSearch: _effectiveHasCompletedSearch,
+                  searchResults: searchResults,
+                  horizontalPadding: 16,
+                ),
+              ),
+            ],
+          );
+        },
+      );
+    }
+
+    if (joinedCommunities.isEmpty) {
+      return _buildEmbeddedScrollableEmptyState(
+        context,
+        icon: Icons.groups_2_outlined,
+        title: "You haven't joined any communities yet".tr(),
+        subtitle:
+        "Explore communities above or create your own to connect with others."
+            .tr(),
+        storageKey: const PageStorageKey<String>(
+          'communities_embedded_empty',
+        ),
+      );
+    }
+
     return Builder(
       builder: (innerContext) {
         return CustomScrollView(
           key: const PageStorageKey<String>('communities_embedded'),
+          primary: true,
           physics: const AlwaysScrollableScrollPhysics(
             parent: ClampingScrollPhysics(),
           ),
           slivers: [
             SliverOverlapInjector(
-              handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
-                innerContext,
-              ),
+              handle:
+              NestedScrollView.sliverOverlapAbsorberHandleFor(innerContext),
             ),
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: _EmbeddedCommunitiesHeaderDelegate(
-                extent: kCommunitiesEmbeddedHeaderHeight,
-                child: ColoredBox(
-                  color: Theme.of(context).colorScheme.surface,
-                  child: SizedBox(
-                    height: kCommunitiesEmbeddedHeaderHeight,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
-                      child: _buildTopSection(
-                        context,
-                        title: 'Your communities'.tr(),
-                        count: joinedCommunities.length,
-                      ),
-                    ),
-                  ),
+            SliverPadding(
+              padding: EdgeInsets.only(
+                top: 2,
+                bottom: MediaQuery.of(context).padding.bottom + 84,
+              ),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                    final community = joinedCommunities[index];
+                    return _buildCommunityTile(
+                      context,
+                      community,
+                      horizontalPadding: 16,
+                    );
+                  },
+                  childCount: joinedCommunities.length,
                 ),
               ),
             ),
-            if (hasSearchText)
-              SliverToBoxAdapter(
-                child: _buildSearchBody(
-                  context,
-                  isSearching: _isSearching,
-                  hasSearchResults: hasSearchResults,
-                  hasCompletedSearch: _hasCompletedSearch,
-                  searchResults: searchResults,
-                  horizontalPadding: 16,
-                ),
-              )
-            else if (joinedCommunities.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: _buildSimpleState(
-                  context,
-                  icon: Icons.groups_2_outlined,
-                  title: "You haven't joined any communities yet".tr(),
-                  subtitle:
-                  "Explore communities above or create your own to connect with others."
-                      .tr(),
-                ),
-              )
-            else
-              SliverPadding(
-                padding: EdgeInsets.only(
-                  top: 2,
-                  bottom: MediaQuery.of(context).padding.bottom + 96,
-                ),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                      final community = joinedCommunities[index];
-                      return _buildCommunityTile(
-                        context,
-                        community,
-                        horizontalPadding: 16,
-                      );
-                    },
-                    childCount: joinedCommunities.length,
-                  ),
-                ),
-              ),
           ],
         );
       },
-    );
-  }
-
-  Widget _buildTopSection(
-      BuildContext context, {
-        required String title,
-        required int count,
-      }) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colorScheme.surfaceContainerHigh,
-            colorScheme.surfaceContainer,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.55),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          MySearchBar(
-            controller: _searchController,
-            hintText: 'Search communities'.tr(),
-            onChanged: _onCommunitySearchChanged,
-            onClear: () => _clearSearch(
-              Provider.of<DatabaseProvider>(context, listen: false),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: colorScheme.onSurface,
-                  letterSpacing: -0.2,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  '$count',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: colorScheme.primary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
@@ -342,7 +231,7 @@ class _CommunitiesPageState extends State<CommunitiesPage>
     availableOverlayHeight > 180 ? availableOverlayHeight : 180;
 
     return Padding(
-      padding: const EdgeInsets.only(top: 2, bottom: 96),
+      padding: const EdgeInsets.only(top: 2, bottom: 84),
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
         child: ConstrainedBox(
@@ -540,6 +429,47 @@ class _CommunitiesPageState extends State<CommunitiesPage>
     );
   }
 
+  Widget _buildEmbeddedScrollableEmptyState(
+      BuildContext context, {
+        required IconData icon,
+        required String title,
+        required String subtitle,
+        required Key storageKey,
+      }) {
+    return Builder(
+      builder: (innerContext) {
+        return CustomScrollView(
+          key: storageKey,
+          primary: true,
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: ClampingScrollPhysics(),
+          ),
+          slivers: [
+            SliverOverlapInjector(
+              handle:
+              NestedScrollView.sliverOverlapAbsorberHandleFor(innerContext),
+            ),
+            SliverFillRemaining(
+              hasScrollBody: false,
+              fillOverscroll: true,
+              child: _buildSimpleState(
+                context,
+                icon: icon,
+                title: title,
+                subtitle: subtitle,
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: MediaQuery.of(context).padding.bottom + 84,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildSimpleState(
       BuildContext context, {
         required IconData icon,
@@ -631,37 +561,5 @@ class _CommunitiesPageState extends State<CommunitiesPage>
         ),
       ),
     );
-  }
-}
-
-class _EmbeddedCommunitiesHeaderDelegate extends SliverPersistentHeaderDelegate {
-  final double extent;
-  final Widget child;
-
-  _EmbeddedCommunitiesHeaderDelegate({
-    required this.extent,
-    required this.child,
-  });
-
-  @override
-  double get minExtent => extent;
-
-  @override
-  double get maxExtent => extent;
-
-  @override
-  Widget build(
-      BuildContext context,
-      double shrinkOffset,
-      bool overlapsContent,
-      ) {
-    return child;
-  }
-
-  @override
-  bool shouldRebuild(
-      covariant _EmbeddedCommunitiesHeaderDelegate oldDelegate,
-      ) {
-    return oldDelegate.extent != extent || oldDelegate.child != child;
   }
 }
