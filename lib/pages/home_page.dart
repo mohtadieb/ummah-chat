@@ -4,13 +4,15 @@
 // ✅ Daily Ayah removed from HomePage
 // ✅ For You remains frozen for session
 // ✅ Local tile theme added so text posts have better contrast
-// ✅ Top card scrolls away fluently
+// ✅ Top card scrolls away fluently from feed scroll
 // ✅ Tab selector stays pinned
-// ✅ Each tab keeps its own independent scroll position
-// ✅ Other tabs do not scroll along
-// ✅ Sliver/NestedScrollView architecture for proper scroll handoff
+// ✅ Each tab keeps its own remembered list position
+// ✅ Header collapse / pinned tabs are shared globally
+// ✅ Feed no longer slips under the tabs
+// ✅ Uses ExtendedNestedScrollView to avoid inner tab sync bleed
 
 import 'package:easy_localization/easy_localization.dart';
+import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -34,7 +36,6 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage>
     with SingleTickerProviderStateMixin {
-  static const double _headerCardHeight = kHomeHeaderCardHeight;
   static const double _tabBarHeaderHeight = kHomeTabBarAreaHeight;
 
   @override
@@ -270,6 +271,11 @@ class _HomePageState extends State<HomePage>
     );
   }
 
+  double _pinnedHeaderHeight(BuildContext context) {
+    final media = MediaQuery.of(context);
+    return media.padding.top + _tabBarHeaderHeight;
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -320,15 +326,23 @@ class _HomePageState extends State<HomePage>
           ),
         ),
         child: SafeArea(
-          child: NestedScrollView(
-            floatHeaderSlivers: false,
+          top: false,
+          child: ExtendedNestedScrollView(
+            onlyOneScrollInBody: true,
+            pinnedHeaderSliverHeightBuilder: () =>
+                _pinnedHeaderHeight(context),
             headerSliverBuilder: (context, innerBoxIsScrolled) {
               return [
                 SliverOverlapAbsorber(
                   handle:
-                  NestedScrollView.sliverOverlapAbsorberHandleFor(context),
-                  sliver: const SliverToBoxAdapter(
-                    child: _HeaderArea(),
+                  ExtendedNestedScrollView.sliverOverlapAbsorberHandleFor(
+                    context,
+                  ),
+                  sliver: SliverToBoxAdapter(
+                    child: SafeArea(
+                      bottom: false,
+                      child: const _HeaderArea(),
+                    ),
                   ),
                 ),
                 SliverPersistentHeader(
@@ -338,7 +352,12 @@ class _HomePageState extends State<HomePage>
                     maxExtentValue: _tabBarHeaderHeight,
                     child: Container(
                       color: cs.surface,
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      padding: EdgeInsets.only(
+                        left: 16,
+                        right: 16,
+                        top: MediaQuery.of(context).padding.top,
+                        bottom: 12,
+                      ),
                       child: Align(
                         alignment: Alignment.center,
                         child: _PremiumTabBar(
@@ -360,6 +379,7 @@ class _HomePageState extends State<HomePage>
               children: [
                 _HomeTabView(
                   storageKey: 'home_for_you',
+                  visibleKey: const Key('home_for_you_tab'),
                   onRefresh: () async {
                     await databaseProvider.reloadPosts();
                     await _rebuildFrozenForYou();
@@ -371,6 +391,7 @@ class _HomePageState extends State<HomePage>
                 ),
                 _HomeTabView(
                   storageKey: 'home_following',
+                  visibleKey: const Key('home_following_tab'),
                   onRefresh: () async {
                     await databaseProvider.reloadPosts();
                   },
@@ -378,6 +399,7 @@ class _HomePageState extends State<HomePage>
                 ),
                 _HomeTabView(
                   storageKey: 'home_communities',
+                  visibleKey: const Key('home_communities_tab'),
                   onRefresh: () async {
                     await databaseProvider.reloadPosts();
                   },
@@ -394,11 +416,13 @@ class _HomePageState extends State<HomePage>
 
 class _HomeTabView extends StatefulWidget {
   final String storageKey;
+  final Key visibleKey;
   final Future<void> Function() onRefresh;
   final Widget sliver;
 
   const _HomeTabView({
     required this.storageKey,
+    required this.visibleKey,
     required this.onRefresh,
     required this.sliver,
   });
@@ -416,25 +440,30 @@ class _HomeTabViewState extends State<_HomeTabView>
   Widget build(BuildContext context) {
     super.build(context);
 
-    return Builder(
-      builder: (context) {
-        return RefreshIndicator(
-          onRefresh: widget.onRefresh,
-          child: CustomScrollView(
-            key: PageStorageKey<String>(widget.storageKey),
-            physics: const AlwaysScrollableScrollPhysics(
-              parent: BouncingScrollPhysics(),
-            ),
-            slivers: [
-              SliverOverlapInjector(
-                handle:
-                NestedScrollView.sliverOverlapAbsorberHandleFor(context),
+    return ExtendedVisibilityDetector(
+      uniqueKey: widget.visibleKey,
+      child: Builder(
+        builder: (context) {
+          return RefreshIndicator(
+            onRefresh: widget.onRefresh,
+            child: CustomScrollView(
+              key: PageStorageKey<String>(widget.storageKey),
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
               ),
-              widget.sliver,
-            ],
-          ),
-        );
-      },
+              slivers: [
+                SliverOverlapInjector(
+                  handle:
+                  ExtendedNestedScrollView.sliverOverlapAbsorberHandleFor(
+                    context,
+                  ),
+                ),
+                widget.sliver,
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -651,7 +680,9 @@ class _PinnedTabBarDelegate extends SliverPersistentHeaderDelegate {
       double shrinkOffset,
       bool overlapsContent,
       ) {
-    return child;
+    return ClipRect(
+      child: child,
+    );
   }
 
   @override

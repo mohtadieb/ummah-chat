@@ -52,6 +52,7 @@ dependencies:
   image: ^4.2.0
 
   app_links: ^6.0.0
+  extended_nested_scroll_view: any
 
 
 
