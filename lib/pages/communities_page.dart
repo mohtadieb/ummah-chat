@@ -1,4 +1,5 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -41,9 +42,8 @@ class _CommunitiesPageState extends State<CommunitiesPage>
   bool get _effectiveSearching =>
       widget.embeddedMode ? widget.embeddedCommunitiesSearching : false;
 
-  bool get _effectiveHasCompletedSearch => widget.embeddedMode
-      ? widget.embeddedCommunitiesHasCompletedSearch
-      : false;
+  bool get _effectiveHasCompletedSearch =>
+      widget.embeddedMode ? widget.embeddedCommunitiesHasCompletedSearch : false;
 
   void _reportCount(int count) {
     if (!widget.embeddedMode) return;
@@ -135,28 +135,30 @@ class _CommunitiesPageState extends State<CommunitiesPage>
     if (hasSearchText) {
       return Builder(
         builder: (innerContext) {
-          return CustomScrollView(
-            key: const PageStorageKey<String>('communities_embedded_search'),
-            primary: true,
-            physics: const AlwaysScrollableScrollPhysics(
-              parent: ClampingScrollPhysics(),
-            ),
-            slivers: [
-              SliverOverlapInjector(
-                handle:
-                NestedScrollView.sliverOverlapAbsorberHandleFor(innerContext),
+          return ExtendedVisibilityDetector(
+            uniqueKey: const Key('communities_embedded_search_visible'),
+            child: CustomScrollView(
+              key: const PageStorageKey<String>('communities_embedded_search'),
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: ClampingScrollPhysics(),
               ),
-              SliverToBoxAdapter(
-                child: _buildSearchBody(
-                  context,
-                  isSearching: _effectiveSearching,
-                  hasSearchResults: hasSearchResults,
-                  hasCompletedSearch: _effectiveHasCompletedSearch,
-                  searchResults: searchResults,
-                  horizontalPadding: 16,
+              slivers: [
+                SliverOverlapInjector(
+                  handle: ExtendedNestedScrollView
+                      .sliverOverlapAbsorberHandleFor(innerContext),
                 ),
-              ),
-            ],
+                SliverToBoxAdapter(
+                  child: _buildSearchBody(
+                    context,
+                    isSearching: _effectiveSearching,
+                    hasSearchResults: hasSearchResults,
+                    hasCompletedSearch: _effectiveHasCompletedSearch,
+                    searchResults: searchResults,
+                    horizontalPadding: 16,
+                  ),
+                ),
+              ],
+            ),
           );
         },
       );
@@ -178,37 +180,39 @@ class _CommunitiesPageState extends State<CommunitiesPage>
 
     return Builder(
       builder: (innerContext) {
-        return CustomScrollView(
-          key: const PageStorageKey<String>('communities_embedded'),
-          primary: true,
-          physics: const AlwaysScrollableScrollPhysics(
-            parent: ClampingScrollPhysics(),
-          ),
-          slivers: [
-            SliverOverlapInjector(
-              handle:
-              NestedScrollView.sliverOverlapAbsorberHandleFor(innerContext),
+        return ExtendedVisibilityDetector(
+          uniqueKey: const Key('communities_embedded_visible'),
+          child: CustomScrollView(
+            key: const PageStorageKey<String>('communities_embedded'),
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: ClampingScrollPhysics(),
             ),
-            SliverPadding(
-              padding: EdgeInsets.only(
-                top: 2,
-                bottom: MediaQuery.of(context).padding.bottom + 84,
+            slivers: [
+              SliverOverlapInjector(
+                handle: ExtendedNestedScrollView
+                    .sliverOverlapAbsorberHandleFor(innerContext),
               ),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                    final community = joinedCommunities[index];
-                    return _buildCommunityTile(
-                      context,
-                      community,
-                      horizontalPadding: 16,
-                    );
-                  },
-                  childCount: joinedCommunities.length,
+              SliverPadding(
+                padding: EdgeInsets.only(
+                  top: 2,
+                  bottom: MediaQuery.of(context).padding.bottom + 84,
+                ),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                      final community = joinedCommunities[index];
+                      return _buildCommunityTile(
+                        context,
+                        community,
+                        horizontalPadding: 16,
+                      );
+                    },
+                    childCount: joinedCommunities.length,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
@@ -438,33 +442,35 @@ class _CommunitiesPageState extends State<CommunitiesPage>
       }) {
     return Builder(
       builder: (innerContext) {
-        return CustomScrollView(
-          key: storageKey,
-          primary: true,
-          physics: const AlwaysScrollableScrollPhysics(
-            parent: ClampingScrollPhysics(),
+        return ExtendedVisibilityDetector(
+          uniqueKey: ValueKey(storageKey.toString()),
+          child: CustomScrollView(
+            key: storageKey,
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: ClampingScrollPhysics(),
+            ),
+            slivers: [
+              SliverOverlapInjector(
+                handle: ExtendedNestedScrollView
+                    .sliverOverlapAbsorberHandleFor(innerContext),
+              ),
+              SliverFillRemaining(
+                hasScrollBody: false,
+                fillOverscroll: true,
+                child: _buildSimpleState(
+                  context,
+                  icon: icon,
+                  title: title,
+                  subtitle: subtitle,
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: MediaQuery.of(context).padding.bottom + 84,
+                ),
+              ),
+            ],
           ),
-          slivers: [
-            SliverOverlapInjector(
-              handle:
-              NestedScrollView.sliverOverlapAbsorberHandleFor(innerContext),
-            ),
-            SliverFillRemaining(
-              hasScrollBody: false,
-              fillOverscroll: true,
-              child: _buildSimpleState(
-                context,
-                icon: icon,
-                title: title,
-                subtitle: subtitle,
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: SizedBox(
-                height: MediaQuery.of(context).padding.bottom + 84,
-              ),
-            ),
-          ],
         );
       },
     );

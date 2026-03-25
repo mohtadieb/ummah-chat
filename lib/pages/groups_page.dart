@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:easy_localization/easy_localization.dart';
+import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -220,40 +221,40 @@ class _GroupsPageState extends State<GroupsPage>
 
         return Builder(
           builder: (innerContext) {
-            return CustomScrollView(
-              key: const PageStorageKey<String>('groups_embedded'),
-              primary: true,
-              physics: const AlwaysScrollableScrollPhysics(
-                parent: ClampingScrollPhysics(),
-              ),
-              slivers: [
-                SliverOverlapInjector(
-                  handle:
-                  NestedScrollView.sliverOverlapAbsorberHandleFor(
-                    innerContext,
-                  ),
+            return ExtendedVisibilityDetector(
+              uniqueKey: const Key('groups_embedded_visible'),
+              child: CustomScrollView(
+                key: const PageStorageKey<String>('groups_embedded'),
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: ClampingScrollPhysics(),
                 ),
-                SliverPadding(
-                  padding: EdgeInsets.only(
-                    top: 2,
-                    bottom: MediaQuery.of(context).padding.bottom + 84,
+                slivers: [
+                  SliverOverlapInjector(
+                    handle: ExtendedNestedScrollView
+                        .sliverOverlapAbsorberHandleFor(innerContext),
                   ),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                        final group = filteredGroups[index];
-                        return _buildGroupTile(
-                          context: context,
-                          group: group,
-                          currentUserId: currentUserId,
-                          activeChatRoomId: activeChatRoomId,
-                        );
-                      },
-                      childCount: filteredGroups.length,
+                  SliverPadding(
+                    padding: EdgeInsets.only(
+                      top: 2,
+                      bottom: MediaQuery.of(context).padding.bottom + 84,
+                    ),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                          final group = filteredGroups[index];
+                          return _buildGroupTile(
+                            context: context,
+                            group: group,
+                            currentUserId: currentUserId,
+                            activeChatRoomId: activeChatRoomId,
+                          );
+                        },
+                        childCount: filteredGroups.length,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             );
           },
         );
@@ -375,34 +376,36 @@ class _GroupsPageState extends State<GroupsPage>
       }) {
     return Builder(
       builder: (innerContext) {
-        return CustomScrollView(
-          key: storageKey,
-          primary: true,
-          physics: const AlwaysScrollableScrollPhysics(
-            parent: ClampingScrollPhysics(),
+        return ExtendedVisibilityDetector(
+          uniqueKey: ValueKey(storageKey.toString()),
+          child: CustomScrollView(
+            key: storageKey,
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: ClampingScrollPhysics(),
+            ),
+            slivers: [
+              SliverOverlapInjector(
+                handle: ExtendedNestedScrollView
+                    .sliverOverlapAbsorberHandleFor(innerContext),
+              ),
+              SliverFillRemaining(
+                hasScrollBody: false,
+                fillOverscroll: true,
+                child: _buildSimpleState(
+                  context,
+                  icon: icon,
+                  title: title,
+                  subtitle: subtitle,
+                  compact: compact,
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: MediaQuery.of(context).padding.bottom + 84,
+                ),
+              ),
+            ],
           ),
-          slivers: [
-            SliverOverlapInjector(
-              handle:
-              NestedScrollView.sliverOverlapAbsorberHandleFor(innerContext),
-            ),
-            SliverFillRemaining(
-              hasScrollBody: false,
-              fillOverscroll: true,
-              child: _buildSimpleState(
-                context,
-                icon: icon,
-                title: title,
-                subtitle: subtitle,
-                compact: compact,
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: SizedBox(
-                height: MediaQuery.of(context).padding.bottom + 84,
-              ),
-            ),
-          ],
         );
       },
     );

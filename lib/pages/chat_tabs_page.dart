@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:easy_localization/easy_localization.dart';
+import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -14,6 +15,7 @@ import 'groups_page.dart' as groups_page;
 import 'search_page.dart';
 
 const double kChatsHeaderCardHeight = 126.0;
+const double kChatsHeaderOuterHeight = 148.0;
 const double kChatsPinnedTabsHeight = 62.0;
 const double kChatsPinnedSearchHeight = 118.0;
 const double kChatsPinnedSearchCardHeight = 112.0;
@@ -269,6 +271,10 @@ class _ChatTabsPageState extends State<ChatTabsPage>
     );
   }
 
+  double _pinnedHeaderHeight() {
+    return kChatsPinnedTabsHeight + kChatsPinnedSearchHeight;
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -295,13 +301,19 @@ class _ChatTabsPageState extends State<ChatTabsPage>
           ),
         ),
         child: SafeArea(
-          child: NestedScrollView(
-            physics: const ClampingScrollPhysics(),
-            floatHeaderSlivers: false,
+          child: ExtendedNestedScrollView(
+            onlyOneScrollInBody: true,
+            pinnedHeaderSliverHeightBuilder: _pinnedHeaderHeight,
             headerSliverBuilder: (context, innerBoxIsScrolled) {
               return [
-                const SliverToBoxAdapter(
-                  child: _ChatsHeaderArea(),
+                SliverOverlapAbsorber(
+                  handle:
+                  ExtendedNestedScrollView.sliverOverlapAbsorberHandleFor(
+                    context,
+                  ),
+                  sliver: const SliverToBoxAdapter(
+                    child: _ChatsHeaderArea(),
+                  ),
                 ),
                 SliverPersistentHeader(
                   pinned: true,
@@ -321,17 +333,13 @@ class _ChatTabsPageState extends State<ChatTabsPage>
                     ),
                   ),
                 ),
-                SliverOverlapAbsorber(
-                  handle:
-                  NestedScrollView.sliverOverlapAbsorberHandleFor(context),
-                  sliver: SliverPersistentHeader(
-                    pinned: true,
-                    delegate: _PinnedSimpleDelegate(
-                      extent: kChatsPinnedSearchHeight,
-                      child: Container(
-                        color: cs.surface,
-                        child: _buildAnimatedPinnedSearchArea(),
-                      ),
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _PinnedSimpleDelegate(
+                    extent: kChatsPinnedSearchHeight,
+                    child: Container(
+                      color: cs.surface,
+                      child: _buildAnimatedPinnedSearchArea(),
                     ),
                   ),
                 ),
@@ -717,7 +725,7 @@ class _PinnedSimpleDelegate extends SliverPersistentHeaderDelegate {
       double shrinkOffset,
       bool overlapsContent,
       ) {
-    return child;
+    return ClipRect(child: child);
   }
 
   @override

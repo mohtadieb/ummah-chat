@@ -1,4 +1,5 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ummah_chat/models/user_profile.dart';
@@ -212,33 +213,35 @@ class _FriendsPageState extends State<FriendsPage>
 
           return Builder(
             builder: (innerContext) {
-              return CustomScrollView(
-                key: const PageStorageKey<String>('friends_other_embedded'),
-                primary: true,
-                physics: const AlwaysScrollableScrollPhysics(
-                  parent: ClampingScrollPhysics(),
-                ),
-                slivers: [
-                  SliverOverlapInjector(
-                    handle:
-                    NestedScrollView.sliverOverlapAbsorberHandleFor(
-                      innerContext,
-                    ),
+              return ExtendedVisibilityDetector(
+                uniqueKey: const Key('friends_other_embedded_visible'),
+                child: CustomScrollView(
+                  key: const PageStorageKey<String>('friends_other_embedded'),
+                  physics: const AlwaysScrollableScrollPhysics(
+                    parent: ClampingScrollPhysics(),
                   ),
-                  SliverPadding(
-                    padding: EdgeInsets.only(
-                      top: 2,
-                      bottom: MediaQuery.of(context).padding.bottom + 84,
-                    ),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                            (context, index) =>
-                            _buildOtherUserTile(context, filteredFriends[index]),
-                        childCount: filteredFriends.length,
+                  slivers: [
+                    SliverOverlapInjector(
+                      handle:
+                      ExtendedNestedScrollView.sliverOverlapAbsorberHandleFor(
+                        innerContext,
                       ),
                     ),
-                  ),
-                ],
+                    SliverPadding(
+                      padding: EdgeInsets.only(
+                        top: 2,
+                        bottom: MediaQuery.of(context).padding.bottom + 84,
+                      ),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                              (context, index) =>
+                              _buildOtherUserTile(context, filteredFriends[index]),
+                          childCount: filteredFriends.length,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               );
             },
           );
@@ -389,46 +392,50 @@ class _FriendsPageState extends State<FriendsPage>
 
                 return Builder(
                   builder: (innerContext) {
-                    return CustomScrollView(
-                      key: PageStorageKey<String>(
+                    return ExtendedVisibilityDetector(
+                      uniqueKey: Key(
                         widget.includeMahrams
-                            ? 'friends_chats_embedded'
-                            : 'friends_friends_embedded',
+                            ? 'friends_chats_embedded_visible'
+                            : 'friends_friends_embedded_visible',
                       ),
-                      primary: true,
-                      physics: const AlwaysScrollableScrollPhysics(
-                        parent: ClampingScrollPhysics(),
-                      ),
-                      slivers: [
-                        SliverOverlapInjector(
-                          handle:
-                          NestedScrollView.sliverOverlapAbsorberHandleFor(
-                            innerContext,
-                          ),
+                      child: CustomScrollView(
+                        key: PageStorageKey<String>(
+                          widget.includeMahrams
+                              ? 'friends_chats_embedded'
+                              : 'friends_friends_embedded',
                         ),
-                        SliverPadding(
-                          padding: EdgeInsets.only(
-                            top: 2,
-                            bottom: MediaQuery.of(context).padding.bottom + 84,
+                        physics: const AlwaysScrollableScrollPhysics(
+                          parent: ClampingScrollPhysics(),
+                        ),
+                        slivers: [
+                          SliverOverlapInjector(
+                            handle: ExtendedNestedScrollView
+                                .sliverOverlapAbsorberHandleFor(innerContext),
                           ),
-                          sliver: SliverList(
-                            delegate: SliverChildBuilderDelegate(
-                                  (context, index) {
-                                final user = filteredFriends[index];
-                                return _buildChatTile(
-                                  context: context,
-                                  user: user,
-                                  unreadByFriend: unreadByFriend,
-                                  lastMessageByFriend: lastMessageByFriend,
-                                  activeDmFriendId: activeDmFriendId,
-                                  dbProvider: dbProvider,
-                                );
-                              },
-                              childCount: filteredFriends.length,
+                          SliverPadding(
+                            padding: EdgeInsets.only(
+                              top: 2,
+                              bottom: MediaQuery.of(context).padding.bottom + 84,
+                            ),
+                            sliver: SliverList(
+                              delegate: SliverChildBuilderDelegate(
+                                    (context, index) {
+                                  final user = filteredFriends[index];
+                                  return _buildChatTile(
+                                    context: context,
+                                    user: user,
+                                    unreadByFriend: unreadByFriend,
+                                    lastMessageByFriend: lastMessageByFriend,
+                                    activeDmFriendId: activeDmFriendId,
+                                    dbProvider: dbProvider,
+                                  );
+                                },
+                                childCount: filteredFriends.length,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     );
                   },
                 );
@@ -593,34 +600,36 @@ class _FriendsPageState extends State<FriendsPage>
       }) {
     return Builder(
       builder: (innerContext) {
-        return CustomScrollView(
-          key: storageKey,
-          primary: true,
-          physics: const AlwaysScrollableScrollPhysics(
-            parent: ClampingScrollPhysics(),
+        return ExtendedVisibilityDetector(
+          uniqueKey: ValueKey(storageKey.toString()),
+          child: CustomScrollView(
+            key: storageKey,
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: ClampingScrollPhysics(),
+            ),
+            slivers: [
+              SliverOverlapInjector(
+                handle: ExtendedNestedScrollView
+                    .sliverOverlapAbsorberHandleFor(innerContext),
+              ),
+              SliverFillRemaining(
+                hasScrollBody: false,
+                fillOverscroll: true,
+                child: _buildSimpleState(
+                  context,
+                  icon: icon,
+                  title: title,
+                  subtitle: subtitle,
+                  compact: compact,
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: MediaQuery.of(context).padding.bottom + 84,
+                ),
+              ),
+            ],
           ),
-          slivers: [
-            SliverOverlapInjector(
-              handle:
-              NestedScrollView.sliverOverlapAbsorberHandleFor(innerContext),
-            ),
-            SliverFillRemaining(
-              hasScrollBody: false,
-              fillOverscroll: true,
-              child: _buildSimpleState(
-                context,
-                icon: icon,
-                title: title,
-                subtitle: subtitle,
-                compact: compact,
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: SizedBox(
-                height: MediaQuery.of(context).padding.bottom + 84,
-              ),
-            ),
-          ],
         );
       },
     );
