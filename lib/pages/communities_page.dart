@@ -1,26 +1,24 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../components/my_search_bar.dart';
 import '../components/my_community_tile.dart';
 import '../services/database/database_provider.dart';
 import 'community_posts_page.dart';
 
+const double kCommunitiesPinnedSearchHeight = 126.0;
+const double kCommunitiesPinnedSearchCardHeight = 120.0;
+
 class CommunitiesPage extends StatefulWidget {
   final bool embeddedMode;
-  final String embeddedSearchQuery;
-  final bool embeddedCommunitiesSearching;
-  final bool embeddedCommunitiesHasCompletedSearch;
-  final ValueChanged<int>? onEmbeddedCountChanged;
 
   const CommunitiesPage({
     super.key,
     this.embeddedMode = false,
-    this.embeddedSearchQuery = '',
-    this.embeddedCommunitiesSearching = false,
-    this.embeddedCommunitiesHasCompletedSearch = false,
-    this.onEmbeddedCountChanged,
   });
 
   @override
@@ -30,31 +28,15 @@ class CommunitiesPage extends StatefulWidget {
 class _CommunitiesPageState extends State<CommunitiesPage>
     with AutomaticKeepAliveClientMixin<CommunitiesPage> {
   late final DatabaseProvider _db;
-  final ScrollController _standaloneScrollController = ScrollController();
 
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  int? _lastReportedCount;
 
-  String get _effectiveQuery =>
-      widget.embeddedMode ? widget.embeddedSearchQuery : _searchQuery;
+  Timer? _searchDebounce;
+  static const _debounceDuration = Duration(milliseconds: 350);
 
-  bool get _effectiveSearching =>
-      widget.embeddedMode ? widget.embeddedCommunitiesSearching : false;
-
-  bool get _effectiveHasCompletedSearch =>
-      widget.embeddedMode ? widget.embeddedCommunitiesHasCompletedSearch : false;
-
-  void _reportCount(int count) {
-    if (!widget.embeddedMode) return;
-    if (_lastReportedCount == count) return;
-    _lastReportedCount = count;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      widget.onEmbeddedCountChanged?.call(count);
-    });
-  }
+  bool _isSearching = false;
+  bool _hasCompletedSearch = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -68,9 +50,56 @@ class _CommunitiesPageState extends State<CommunitiesPage>
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
-    _standaloneScrollController.dispose();
     super.dispose();
+  }
+
+  void _onCommunitySearchChanged(String value) {
+    final trimmed = value.trim();
+
+    _searchDebounce?.cancel();
+
+    setState(() {
+      _searchQuery = value;
+      _isSearching = trimmed.isNotEmpty;
+      _hasCompletedSearch = false;
+    });
+
+    _searchDebounce = Timer(_debounceDuration, () async {
+      if (!mounted) return;
+
+      final provider = Provider.of<DatabaseProvider>(context, listen: false);
+
+      if (trimmed.isNotEmpty) {
+        await provider.searchCommunities(trimmed);
+
+        if (!mounted) return;
+        setState(() {
+          _isSearching = false;
+          _hasCompletedSearch = true;
+        });
+      } else {
+        provider.clearCommunitySearchResults();
+
+        if (!mounted) return;
+        setState(() {
+          _isSearching = false;
+          _hasCompletedSearch = false;
+        });
+      }
+    });
+  }
+
+  void _clearSearch(DatabaseProvider provider) {
+    _searchDebounce?.cancel();
+    setState(() {
+      _searchController.clear();
+      _searchQuery = '';
+      _isSearching = false;
+      _hasCompletedSearch = false;
+    });
+    provider.clearCommunitySearchResults();
   }
 
   @override
@@ -82,98 +111,81 @@ class _CommunitiesPageState extends State<CommunitiesPage>
         .where((c) => c['is_joined'] == true)
         .toList();
 
-    _reportCount(joinedCommunities.length);
-
-    final hasSearchText = _effectiveQuery.trim().isNotEmpty;
+    final hasSearchText = _searchQuery.trim().isNotEmpty;
     final searchResults = listeningProvider.communitySearchResults;
     final hasSearchResults = searchResults.isNotEmpty;
 
     if (!widget.embeddedMode) {
-      return Column(
-        children: [
-          Expanded(
-            child: hasSearchText
-                ? _buildSearchBody(
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: Column(
+          children: [
+            _buildTopSection(
               context,
-              isSearching: _effectiveSearching,
-              hasSearchResults: hasSearchResults,
-              hasCompletedSearch: _effectiveHasCompletedSearch,
-              searchResults: searchResults,
-              horizontalPadding: 16,
-            )
-                : joinedCommunities.isEmpty
-                ? _buildSimpleState(
-              context,
-              icon: Icons.groups_2_outlined,
-              title: "You haven't joined any communities yet".tr(),
-              subtitle:
-              "Explore communities above or create your own to connect with others."
-                  .tr(),
-            )
-                : ListView.builder(
-              controller: _standaloneScrollController,
-              physics: const ClampingScrollPhysics(),
-              padding: EdgeInsets.only(
-                top: 2,
-                bottom: MediaQuery.of(context).padding.bottom + 96,
-              ),
-              itemCount: joinedCommunities.length,
-              itemBuilder: (context, index) {
-                final community = joinedCommunities[index];
-                return _buildCommunityTile(
-                  context,
-                  community,
-                  horizontalPadding: 16,
-                );
-              },
+              title: 'Your communities'.tr(),
+              count: joinedCommunities.length,
             ),
-          ),
-        ],
-      );
-    }
-
-    if (hasSearchText) {
-      return Builder(
-        builder: (innerContext) {
-          return ExtendedVisibilityDetector(
-            uniqueKey: const Key('communities_embedded_search_visible'),
-            child: CustomScrollView(
-              key: const PageStorageKey<String>('communities_embedded_search'),
-              physics: const AlwaysScrollableScrollPhysics(
-                parent: ClampingScrollPhysics(),
-              ),
-              slivers: [
-                SliverOverlapInjector(
-                  handle: ExtendedNestedScrollView
-                      .sliverOverlapAbsorberHandleFor(innerContext),
-                ),
-                SliverToBoxAdapter(
-                  child: _buildSearchBody(
-                    context,
-                    isSearching: _effectiveSearching,
-                    hasSearchResults: hasSearchResults,
-                    hasCompletedSearch: _effectiveHasCompletedSearch,
-                    searchResults: searchResults,
-                    horizontalPadding: 16,
+            Expanded(
+              child: hasSearchText
+                  ? _buildSearchResultsBody(
+                context,
+                searchResults: searchResults,
+                hasSearchResults: hasSearchResults,
+                isSearching: _isSearching,
+                hasCompletedSearch: _hasCompletedSearch,
+                horizontalPadding: 0,
+              )
+                  : joinedCommunities.isEmpty
+                  ? _buildSimpleState(
+                context,
+                icon: Icons.groups_2_outlined,
+                title: "You haven't joined any communities yet".tr(),
+                subtitle:
+                "Explore communities above or create your own to connect with others."
+                    .tr(),
+              )
+                  : ScrollConfiguration(
+                behavior: ScrollConfiguration.of(context)
+                    .copyWith(overscroll: false),
+                child: ListView.builder(
+                  key: const PageStorageKey<String>(
+                    'communities_normal_list',
                   ),
-                ),
-              ],
-            ),
-          );
-        },
-      );
-    }
+                  physics: const ClampingScrollPhysics(),
+                  keyboardDismissBehavior:
+                  ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.only(top: 0, bottom: 96),
+                  itemCount: joinedCommunities.length,
+                  itemBuilder: (context, index) {
+                    final community = joinedCommunities[index];
 
-    if (joinedCommunities.isEmpty) {
-      return _buildEmbeddedScrollableEmptyState(
-        context,
-        icon: Icons.groups_2_outlined,
-        title: "You haven't joined any communities yet".tr(),
-        subtitle:
-        "Explore communities above or create your own to connect with others."
-            .tr(),
-        storageKey: const PageStorageKey<String>(
-          'communities_embedded_empty',
+                    return MyCommunityTile(
+                      name: community['name'] ?? '',
+                      description: community['description'],
+                      country: community['country'],
+                      avatarUrl: community['avatar_url'],
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => CommunityPostsPage(
+                              communityId: community['id'],
+                              communityName:
+                              community['name'] ?? '',
+                              communityDescription:
+                              community['description'],
+                              communityAvatarUrl:
+                              community['avatar_url'],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -181,34 +193,99 @@ class _CommunitiesPageState extends State<CommunitiesPage>
     return Builder(
       builder: (innerContext) {
         return ExtendedVisibilityDetector(
-          uniqueKey: const Key('communities_embedded_visible'),
+          uniqueKey: const Key('communities_embedded'),
           child: CustomScrollView(
-            key: const PageStorageKey<String>('communities_embedded'),
+            key: const PageStorageKey<String>('communities_embedded_scroll'),
             physics: const AlwaysScrollableScrollPhysics(
               parent: ClampingScrollPhysics(),
             ),
             slivers: [
               SliverOverlapInjector(
-                handle: ExtendedNestedScrollView
-                    .sliverOverlapAbsorberHandleFor(innerContext),
-              ),
-              SliverPadding(
-                padding: EdgeInsets.only(
-                  top: 2,
-                  bottom: MediaQuery.of(context).padding.bottom + 84,
+                handle: ExtendedNestedScrollView.sliverOverlapAbsorberHandleFor(
+                  innerContext,
                 ),
-                sliver: SliverList(
+              ),
+              SliverPersistentHeader(
+                pinned: true,
+                delegate: _PinnedBoxDelegate(
+                  extent: kCommunitiesPinnedSearchHeight,
+                  child: ColoredBox(
+                    color: Theme.of(context).colorScheme.surface,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+                      child: SizedBox(
+                        height: kCommunitiesPinnedSearchCardHeight,
+                        child: _buildTopSection(
+                          context,
+                          title: 'Your communities'.tr(),
+                          count: joinedCommunities.length,
+                          embedded: true,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              if (hasSearchText)
+                SliverToBoxAdapter(
+                  child: _buildSearchResultsBody(
+                    context,
+                    searchResults: searchResults,
+                    hasSearchResults: hasSearchResults,
+                    isSearching: _isSearching,
+                    hasCompletedSearch: _hasCompletedSearch,
+                    horizontalPadding: 16,
+                  ),
+                )
+              else if (joinedCommunities.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _buildSimpleState(
+                    context,
+                    icon: Icons.groups_2_outlined,
+                    title: "You haven't joined any communities yet".tr(),
+                    subtitle:
+                    "Explore communities above or create your own to connect with others."
+                        .tr(),
+                  ),
+                )
+              else
+                SliverList(
                   delegate: SliverChildBuilderDelegate(
                         (context, index) {
                       final community = joinedCommunities[index];
-                      return _buildCommunityTile(
-                        context,
-                        community,
-                        horizontalPadding: 16,
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: MyCommunityTile(
+                          name: community['name'] ?? '',
+                          description: community['description'],
+                          country: community['country'],
+                          avatarUrl: community['avatar_url'],
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => CommunityPostsPage(
+                                  communityId: community['id'],
+                                  communityName: community['name'] ?? '',
+                                  communityDescription:
+                                  community['description'],
+                                  communityAvatarUrl:
+                                  community['avatar_url'],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                       );
                     },
                     childCount: joinedCommunities.length,
                   ),
+                ),
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: MediaQuery.of(context).padding.bottom + 96,
                 ),
               ),
             ],
@@ -218,12 +295,98 @@ class _CommunitiesPageState extends State<CommunitiesPage>
     );
   }
 
-  Widget _buildSearchBody(
+  Widget _buildTopSection(
       BuildContext context, {
-        required bool isSearching,
-        required bool hasSearchResults,
-        required bool hasCompletedSearch,
+        required String title,
+        required int count,
+        bool embedded = false,
+      }) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colorScheme.surfaceContainerHigh,
+            colorScheme.surfaceContainer,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.55),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          MySearchBar(
+            controller: _searchController,
+            hintText: 'Search all communities'.tr(),
+            onChanged: _onCommunitySearchChanged,
+            onClear: () => _clearSearch(
+              Provider.of<DatabaseProvider>(context, listen: false),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: colorScheme.onSurface,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: colorScheme.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchResultsBody(
+      BuildContext context, {
         required List<dynamic> searchResults,
+        required bool hasSearchResults,
+        required bool isSearching,
+        required bool hasCompletedSearch,
         required double horizontalPadding,
       }) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -235,244 +398,164 @@ class _CommunitiesPageState extends State<CommunitiesPage>
     availableOverlayHeight > 180 ? availableOverlayHeight : 180;
 
     return Padding(
-      padding: const EdgeInsets.only(top: 2, bottom: 84),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: overlayMaxHeight),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  colorScheme.surfaceContainerHigh,
-                  colorScheme.surfaceContainer,
-                ],
-              ),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.55),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.12),
-                  blurRadius: 22,
-                  offset: const Offset(0, 10),
-                ),
+      padding: EdgeInsets.fromLTRB(horizontalPadding, 8, horizontalPadding, 96),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: overlayMaxHeight),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                colorScheme.surfaceContainerHigh,
+                colorScheme.surfaceContainer,
               ],
             ),
-            child: isSearching
-                ? Padding(
-              padding: const EdgeInsets.symmetric(vertical: 28),
-              child: Center(
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: colorScheme.primary,
-                  ),
-                ),
-              ),
-            )
-                : hasSearchResults
-                ? ListView.separated(
-              shrinkWrap: true,
-              physics: const ClampingScrollPhysics(),
-              keyboardDismissBehavior:
-              ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: searchResults.length,
-              separatorBuilder: (_, __) => Divider(
-                height: 1,
-                color: colorScheme.outlineVariant.withValues(
-                  alpha: 0.5,
-                ),
-              ),
-              itemBuilder: (context, index) {
-                final community = searchResults[index];
-
-                return ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 2,
-                  ),
-                  leading: _buildSearchAvatar(
-                    context,
-                    community['name'] ?? '',
-                    community['avatar_url'],
-                  ),
-                  title: Text(
-                    community['name'],
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: colorScheme.onSurface,
-                    ),
-                  ),
-                  subtitle: (community['description'] ?? '')
-                      .toString()
-                      .isNotEmpty
-                      ? Text(
-                    community['description'],
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: colorScheme.onSurface.withValues(
-                        alpha: 0.68,
-                      ),
-                    ),
-                  )
-                      : null,
-                  trailing: Icon(
-                    Icons.chevron_right_rounded,
-                    color: colorScheme.onSurface.withValues(
-                      alpha: 0.5,
-                    ),
-                  ),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => CommunityPostsPage(
-                          communityId: community['id'],
-                          communityName: community['name'] ?? '',
-                          communityDescription:
-                          community['description'],
-                          communityAvatarUrl:
-                          community['avatar_url'],
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-            )
-                : hasCompletedSearch
-                ? Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 24,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 58,
-                    height: 58,
-                    decoration: BoxDecoration(
-                      color: colorScheme.primary.withValues(
-                        alpha: 0.10,
-                      ),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.search_off_rounded,
-                      size: 28,
-                      color: colorScheme.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'No communities found'.tr(),
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Try a different search term.'.tr(),
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: colorScheme.onSurface.withValues(
-                        alpha: 0.68,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            )
-                : const SizedBox.shrink(),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCommunityTile(
-      BuildContext context,
-      dynamic community, {
-        required double horizontalPadding,
-      }) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-      child: MyCommunityTile(
-        name: community['name'] ?? '',
-        description: community['description'],
-        country: community['country'],
-        avatarUrl: community['avatar_url'],
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => CommunityPostsPage(
-                communityId: community['id'],
-                communityName: community['name'] ?? '',
-                communityDescription: community['description'],
-                communityAvatarUrl: community['avatar_url'],
-              ),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.55),
             ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildEmbeddedScrollableEmptyState(
-      BuildContext context, {
-        required IconData icon,
-        required String title,
-        required String subtitle,
-        required Key storageKey,
-      }) {
-    return Builder(
-      builder: (innerContext) {
-        return ExtendedVisibilityDetector(
-          uniqueKey: ValueKey(storageKey.toString()),
-          child: CustomScrollView(
-            key: storageKey,
-            physics: const AlwaysScrollableScrollPhysics(
-              parent: ClampingScrollPhysics(),
-            ),
-            slivers: [
-              SliverOverlapInjector(
-                handle: ExtendedNestedScrollView
-                    .sliverOverlapAbsorberHandleFor(innerContext),
-              ),
-              SliverFillRemaining(
-                hasScrollBody: false,
-                fillOverscroll: true,
-                child: _buildSimpleState(
-                  context,
-                  icon: icon,
-                  title: title,
-                  subtitle: subtitle,
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height: MediaQuery.of(context).padding.bottom + 84,
-                ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.12),
+                blurRadius: 22,
+                offset: const Offset(0, 10),
               ),
             ],
           ),
-        );
-      },
+          child: isSearching
+              ? Padding(
+            padding: const EdgeInsets.symmetric(vertical: 28),
+            child: Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: colorScheme.primary,
+                ),
+              ),
+            ),
+          )
+              : hasSearchResults
+              ? ListView.separated(
+            shrinkWrap: true,
+            physics: const ClampingScrollPhysics(),
+            keyboardDismissBehavior:
+            ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            itemCount: searchResults.length,
+            separatorBuilder: (_, __) => Divider(
+              height: 1,
+              color:
+              colorScheme.outlineVariant.withValues(alpha: 0.5),
+            ),
+            itemBuilder: (context, index) {
+              final community = searchResults[index];
+
+              return ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 2,
+                ),
+                leading: _buildSearchAvatar(
+                  context,
+                  community['name'] ?? '',
+                  community['avatar_url'],
+                ),
+                title: Text(
+                  community['name'],
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                subtitle: (community['description'] ?? '')
+                    .toString()
+                    .isNotEmpty
+                    ? Text(
+                  community['description'],
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colorScheme.onSurface
+                        .withValues(alpha: 0.68),
+                  ),
+                )
+                    : null,
+                trailing: Icon(
+                  Icons.chevron_right_rounded,
+                  color:
+                  colorScheme.onSurface.withValues(alpha: 0.5),
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CommunityPostsPage(
+                        communityId: community['id'],
+                        communityName: community['name'] ?? '',
+                        communityDescription:
+                        community['description'],
+                        communityAvatarUrl:
+                        community['avatar_url'],
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          )
+              : hasCompletedSearch
+              ? Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 24,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 58,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary
+                        .withValues(alpha: 0.10),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.search_off_rounded,
+                    size: 28,
+                    color: colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'No communities found'.tr(),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Try a different search term.'.tr(),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: colorScheme.onSurface
+                        .withValues(alpha: 0.68),
+                  ),
+                ),
+              ],
+            ),
+          )
+              : const SizedBox.shrink(),
+        ),
+      ),
     );
   }
 
@@ -567,5 +650,35 @@ class _CommunitiesPageState extends State<CommunitiesPage>
         ),
       ),
     );
+  }
+}
+
+class _PinnedBoxDelegate extends SliverPersistentHeaderDelegate {
+  final double extent;
+  final Widget child;
+
+  _PinnedBoxDelegate({
+    required this.extent,
+    required this.child,
+  });
+
+  @override
+  double get minExtent => extent;
+
+  @override
+  double get maxExtent => extent;
+
+  @override
+  Widget build(
+      BuildContext context,
+      double shrinkOffset,
+      bool overlapsContent,
+      ) {
+    return ClipRect(child: child);
+  }
+
+  @override
+  bool shouldRebuild(covariant _PinnedBoxDelegate oldDelegate) {
+    return oldDelegate.extent != extent || oldDelegate.child != child;
   }
 }
