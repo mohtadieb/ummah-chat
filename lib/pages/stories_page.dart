@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -58,7 +60,8 @@ class _StoriesPageState extends State<StoriesPage> {
     });
 
     final db = Provider.of<DatabaseProvider>(context, listen: false);
-    final bool wasAlreadyCompleted = db.completedStoryIds.contains(widget.story.id);
+    final bool wasAlreadyCompleted =
+    db.completedStoryIds.contains(widget.story.id);
 
     await db.saveStoryAnswers(widget.story.id, _selectedIndices);
 
@@ -85,151 +88,15 @@ class _StoriesPageState extends State<StoriesPage> {
   Future<void> _showCompletionCelebration() async {
     if (!mounted) return;
 
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
     final isMuhammad = _isMuhammadStory();
-
-    final accent = isMuhammad ? _gold : cs.primary;
-    final accentDeep = isMuhammad ? _goldDeep : cs.primary;
 
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (dialogContext) {
-        return Dialog(
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          elevation: 0,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Container(
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(
-                color: accent.withValues(alpha: 0.35),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: accent.withValues(alpha: 0.20),
-                  blurRadius: 28,
-                  offset: const Offset(0, 16),
-                ),
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(22, 24, 22, 20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 84,
-                    height: 84,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: accent.withValues(alpha: 0.14),
-                      border: Border.all(
-                        color: accent.withValues(alpha: 0.30),
-                        width: 1.4,
-                      ),
-                    ),
-                    child: Icon(
-                      widget.story.icon,
-                      size: 36,
-                      color: accentDeep,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    '🎉 ${'Well done!'.tr()}',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: accentDeep,
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'You earned a new badge!'.tr(),
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: cs.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: cs.surface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: accent.withValues(alpha: 0.20),
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          'Badge unlocked'.tr(),
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            color: accentDeep,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          widget.story.title.tr(),
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: cs.onSurface,
-                          ),
-                        ),
-                        if (widget.story.subtitle != null) ...[
-                          const SizedBox(height: 6),
-                          Text(
-                            widget.story.subtitle!.tr(),
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: cs.onSurface.withValues(alpha: 0.64),
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: accentDeep,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                      ),
-                      onPressed: () => Navigator.of(dialogContext).pop(),
-                      icon: const Icon(Icons.check_rounded),
-                      label: Text(
-                        'Continue'.tr(),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+        return _StoryCompletionCelebrationDialog(
+          story: widget.story,
+          isMuhammad: isMuhammad,
         );
       },
     );
@@ -268,7 +135,6 @@ class _StoriesPageState extends State<StoriesPage> {
               ? const Center(child: CircularProgressIndicator())
               : Column(
             children: [
-              // FIXED BACK BUTTON
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                 child: Align(
@@ -276,10 +142,7 @@ class _StoriesPageState extends State<StoriesPage> {
                   child: _buildTopBackButton(context),
                 ),
               ),
-
               const SizedBox(height: 8),
-
-              // SCROLLABLE CONTENT
               Expanded(
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
@@ -779,5 +642,337 @@ class _StoriesPageState extends State<StoriesPage> {
         ),
       ),
     );
+  }
+}
+
+class _StoryCompletionCelebrationDialog extends StatefulWidget {
+  const _StoryCompletionCelebrationDialog({
+    required this.story,
+    required this.isMuhammad,
+  });
+
+  final StoryData story;
+  final bool isMuhammad;
+
+  @override
+  State<_StoryCompletionCelebrationDialog> createState() =>
+      _StoryCompletionCelebrationDialogState();
+}
+
+class _StoryCompletionCelebrationDialogState
+    extends State<_StoryCompletionCelebrationDialog>
+    with SingleTickerProviderStateMixin {
+  static const Color _gold = Color(0xFFC9A74E);
+  static const Color _goldDeep = Color(0xFF9F7B22);
+
+  late final AnimationController _controller;
+  late final List<_ConfettiParticle> _particles;
+  final Random _rand = Random();
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    )..forward();
+
+    _particles = List.generate(90, (_) => _makeParticle());
+  }
+
+  _ConfettiParticle _makeParticle() {
+    final angle = (-pi / 2) + (_rand.nextDouble() * 0.9 - 0.45);
+    final speed = 250 + _rand.nextDouble() * 260;
+    final size = 4 + _rand.nextDouble() * 6;
+    final gravity = 650 + _rand.nextDouble() * 550;
+    final rotationSpeed = (_rand.nextDouble() * 8 - 4);
+
+    final colors = widget.isMuhammad
+        ? const [
+      Color(0xFFC9A74E),
+      Color(0xFF9F7B22),
+      Color(0xFFE8D28D),
+      Color(0xFFB88A2F),
+      Color(0xFFF0E0A6),
+      Color(0xFFD4B15A),
+    ]
+        : const [
+      Color(0xFF2E7D32),
+      Color(0xFF43A047),
+      Color(0xFF66BB6A),
+      Color(0xFF81C784),
+      Color(0xFF26A69A),
+      Color(0xFFA5D6A7),
+    ];
+
+    return _ConfettiParticle(
+      angle: angle,
+      speed: speed,
+      size: size,
+      gravity: gravity,
+      rotation: _rand.nextDouble() * pi,
+      rotationSpeed: rotationSpeed,
+      color: colors[_rand.nextInt(colors.length)],
+      xOffset: (_rand.nextDouble() * 120) - 60,
+      yOffset: -10 - _rand.nextDouble() * 20,
+      isCircle: _rand.nextBool(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    final accent = widget.isMuhammad ? _gold : cs.primary;
+    final accentDeep = widget.isMuhammad ? _goldDeep : cs.primary;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (_, __) {
+                  return CustomPaint(
+                    painter: _ConfettiPainter(
+                      t: _controller.value,
+                      particles: _particles,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(
+                color: accent.withValues(alpha: 0.35),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: accent.withValues(alpha: 0.20),
+                  blurRadius: 28,
+                  offset: const Offset(0, 16),
+                ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(22, 24, 22, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 84,
+                    height: 84,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: accent.withValues(alpha: 0.14),
+                      border: Border.all(
+                        color: accent.withValues(alpha: 0.30),
+                        width: 1.4,
+                      ),
+                    ),
+                    child: Icon(
+                      widget.story.icon,
+                      size: 36,
+                      color: accentDeep,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '🎉 ${'Well done!'.tr()}',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: accentDeep,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'You earned a new badge!'.tr(),
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: cs.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: accent.withValues(alpha: 0.20),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          'Badge unlocked'.tr(),
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: accentDeep,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          widget.story.title.tr(),
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: cs.onSurface,
+                          ),
+                        ),
+                        if (widget.story.subtitle != null) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            widget.story.subtitle!.tr(),
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: cs.onSurface.withValues(alpha: 0.64),
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: accentDeep,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                      ),
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.check_rounded),
+                      label: Text(
+                        'Continue'.tr(),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ConfettiParticle {
+  _ConfettiParticle({
+    required this.angle,
+    required this.speed,
+    required this.size,
+    required this.gravity,
+    required this.rotation,
+    required this.rotationSpeed,
+    required this.color,
+    required this.xOffset,
+    required this.yOffset,
+    required this.isCircle,
+  });
+
+  final double angle;
+  final double speed;
+  final double size;
+  final double gravity;
+  final double rotation;
+  final double rotationSpeed;
+  final Color color;
+  final double xOffset;
+  final double yOffset;
+  final bool isCircle;
+}
+
+class _ConfettiPainter extends CustomPainter {
+  _ConfettiPainter({
+    required this.t,
+    required this.particles,
+  });
+
+  final double t;
+  final List<_ConfettiParticle> particles;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final origin = Offset(size.width / 2, 58);
+    const totalSeconds = 1.1;
+    final time = t * totalSeconds;
+
+    for (final p in particles) {
+      final vx = cos(p.angle) * p.speed;
+      final vy = sin(p.angle) * p.speed;
+
+      final dx = (vx * time) + p.xOffset;
+      final dy = (vy * time) + (0.5 * p.gravity * time * time) + p.yOffset;
+
+      final fade =
+      (t < 0.85) ? 1.0 : (1.0 - ((t - 0.85) / 0.15)).clamp(0.0, 1.0);
+
+      final pos = origin + Offset(dx, dy);
+      if (pos.dy > size.height + 20) continue;
+
+      final paint = Paint()..color = p.color.withValues(alpha: 0.9 * fade);
+
+      final rot = p.rotation + p.rotationSpeed * time;
+
+      canvas.save();
+      canvas.translate(pos.dx, pos.dy);
+      canvas.rotate(rot);
+
+      if (p.isCircle) {
+        canvas.drawCircle(Offset.zero, p.size / 2, paint);
+      } else {
+        final rect = Rect.fromCenter(
+          center: Offset.zero,
+          width: p.size * 1.1,
+          height: p.size * 0.6,
+        );
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(rect, const Radius.circular(2)),
+          paint,
+        );
+      }
+
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ConfettiPainter oldDelegate) {
+    return oldDelegate.t != t;
   }
 }
