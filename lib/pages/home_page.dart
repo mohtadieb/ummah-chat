@@ -341,7 +341,7 @@ class _HomePageState extends State<HomePage>
                   sliver: SliverToBoxAdapter(
                     child: SafeArea(
                       bottom: false,
-                      child: const _HeaderArea(),
+                      child: _HeaderArea(),
                     ),
                   ),
                 ),

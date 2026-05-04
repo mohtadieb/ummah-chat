@@ -144,7 +144,7 @@ class _ChatTabsPageState extends State<ChatTabsPage>
                   sliver: SliverToBoxAdapter(
                     child: SafeArea(
                       bottom: false,
-                      child: const _ChatsHeaderArea(),
+                      child: _ChatsHeaderArea(),
                     ),
                   ),
                 ),

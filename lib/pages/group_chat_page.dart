@@ -40,7 +40,7 @@ enum _GroupMenuAction {
   addMembers,
   changeGroupPhoto,
   leaveGroup,
-  deleteGroup
+  deleteGroup,
 }
 
 class GroupChatPage extends StatefulWidget {
@@ -101,6 +101,10 @@ class _GroupChatPageState extends State<GroupChatPage> {
   final Map<String, Color> _senderColorCache = {};
 
   int _lastMessageCount = 0;
+
+  // ✅ Fix for empty-state flicker
+  bool _isInitializingRoom = true;
+  bool _hasResolvedInitialMessages = false;
 
   // 🆕 Unread separator behavior for groups
   int? _initialUnreadGroupIndex;
@@ -267,6 +271,13 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
+    if (mounted) {
+      setState(() {
+        _isInitializingRoom = true;
+        _hasResolvedInitialMessages = false;
+      });
+    }
+
     _notifService.setActiveChatRoomId(widget.chatRoomId);
 
     await chatProvider.setActiveChatRoom(
@@ -274,7 +285,15 @@ class _GroupChatPageState extends State<GroupChatPage> {
       chatRoomId: widget.chatRoomId,
     );
 
+    // ✅ Listen before allowing the UI to decide "empty"
     await chatProvider.listenToRoom(widget.chatRoomId);
+
+    if (!mounted) return;
+
+    setState(() {
+      _isInitializingRoom = false;
+      _hasResolvedInitialMessages = true;
+    });
 
     if (widget.sendDraftOnOpen == true &&
         widget.initialDraftMessage != null &&
@@ -286,8 +305,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
         _sendMessage(textOverride: marker);
       });
     }
-
-    if (!mounted) return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
@@ -1240,6 +1257,81 @@ class _GroupChatPageState extends State<GroupChatPage> {
     );
   }
 
+  Widget _buildEmptyGroupState(ColorScheme colorScheme) {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 24),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 24,
+          vertical: 28,
+        ),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.50),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: colorScheme.primary.withValues(alpha: 0.10),
+              ),
+              child: Icon(
+                Icons.forum_outlined,
+                size: 30,
+                color: colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Start the conversation'.tr(),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Send the first message to this group.'.tr(),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.45,
+                color: colorScheme.onSurface.withValues(alpha: 0.68),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Messages will appear here once the chat begins.'.tr(),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.4,
+                color: colorScheme.onSurface.withValues(alpha: 0.58),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // Build
   // ---------------------------------------------------------------------------
@@ -1489,92 +1581,26 @@ class _GroupChatPageState extends State<GroupChatPage> {
             child: Column(
               children: [
                 Expanded(
-                  child: Consumer<ChatProvider>(
+                  child: _isInitializingRoom
+                      ? const Center(child: CircularProgressIndicator())
+                      : Consumer<ChatProvider>(
                     builder: (context, provider, _) {
-                      final rawMessages = provider.getMessages(widget.chatRoomId);
+                      final rawMessages =
+                      provider.getMessages(widget.chatRoomId);
 
-                      if (rawMessages.isEmpty) {
-                        return Center(
-                          child: Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 24),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 28,
-                            ),
-                            decoration: BoxDecoration(
-                              color: colorScheme.surfaceContainerHigh,
-                              borderRadius: BorderRadius.circular(28),
-                              border: Border.all(
-                                color: colorScheme.outlineVariant
-                                    .withValues(alpha: 0.50),
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.04),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 8),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 64,
-                                  height: 64,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: colorScheme.primary
-                                        .withValues(alpha: 0.10),
-                                  ),
-                                  child: Icon(
-                                    Icons.forum_outlined,
-                                    size: 30,
-                                    color: colorScheme.primary,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Start the conversation'.tr(),
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
-                                    color: colorScheme.onSurface,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Send the first message to this group.'.tr(),
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    height: 1.45,
-                                    color: colorScheme.onSurface
-                                        .withValues(alpha: 0.68),
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Messages will appear here once the chat begins.'
-                                      .tr(),
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    height: 1.4,
-                                    color: colorScheme.onSurface
-                                        .withValues(alpha: 0.58),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                      if (!_hasResolvedInitialMessages) {
+                        return const Center(
+                          child: CircularProgressIndicator(),
                         );
                       }
 
-                      final messages =
-                      rawMessages.map((m) => MessageModel.fromMap(m)).toList()
+                      if (rawMessages.isEmpty) {
+                        return _buildEmptyGroupState(colorScheme);
+                      }
+
+                      final messages = rawMessages
+                          .map((m) => MessageModel.fromMap(m))
+                          .toList()
                         ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
                       int unreadCount = 0;
@@ -1625,9 +1651,11 @@ class _GroupChatPageState extends State<GroupChatPage> {
                         _hasCapturedInitialUnreadIndex = true;
                       }
 
-                      if (_hasCapturedInitialUnreadIndex && !_didInitialMarkRead) {
+                      if (_hasCapturedInitialUnreadIndex &&
+                          !_didInitialMarkRead) {
                         _didInitialMarkRead = true;
-                        WidgetsBinding.instance.addPostFrameCallback((_) async {
+                        WidgetsBinding.instance
+                            .addPostFrameCallback((_) async {
                           if (!mounted) return;
                           if (_currentUserId.isEmpty) return;
                           await provider.markGroupMessagesAsRead(
@@ -1700,14 +1728,16 @@ class _GroupChatPageState extends State<GroupChatPage> {
                               : null;
 
                           final List<String> likedBy = lastMsg.likedBy;
-                          final bool isLikedByMe = _currentUserId.isNotEmpty &&
-                              likedBy.contains(_currentUserId);
+                          final bool isLikedByMe =
+                              _currentUserId.isNotEmpty &&
+                                  likedBy.contains(_currentUserId);
                           final int likeCount = likedBy.length;
 
                           final msgDate = firstMsg.createdAt;
                           DateTime? prevDate;
                           if (groupIndex > 0) {
-                            prevDate = groups[groupIndex - 1].first.createdAt;
+                            prevDate =
+                                groups[groupIndex - 1].first.createdAt;
                           }
                           final showDayDivider =
                               prevDate == null || !isSameDay(msgDate, prevDate);
@@ -1741,11 +1771,13 @@ class _GroupChatPageState extends State<GroupChatPage> {
                             replyAuthorName =
                                 _displayNameForSender(repliedTo.senderId);
 
-                            if (PostShare.isPostShareMessage(repliedTo.message)) {
+                            if (PostShare.isPostShareMessage(
+                                repliedTo.message)) {
                               replyIsPostShare = true;
                               replyHasMedia = true;
-                              replyPostId =
-                                  PostShare.extractPostId(repliedTo.message);
+                              replyPostId = PostShare.extractPostId(
+                                repliedTo.message,
+                              );
                               replySnippet = 'Shared post'.tr();
                             } else if ((repliedTo.imageUrl ?? '')
                                 .trim()
@@ -1786,7 +1818,8 @@ class _GroupChatPageState extends State<GroupChatPage> {
                             return Column(
                               children: [
                                 if (showDayDivider)
-                                  buildDayBubble(context: context, date: msgDate),
+                                  buildDayBubble(
+                                      context: context, date: msgDate),
                                 if (showUnreadSeparator)
                                   buildUnreadBubble(
                                     context: context,
@@ -1807,10 +1840,12 @@ class _GroupChatPageState extends State<GroupChatPage> {
                                       decoration: BoxDecoration(
                                         color: Theme.of(context).brightness ==
                                             Brightness.dark
-                                            ? colorScheme.surfaceContainerHighest
+                                            ? colorScheme
+                                            .surfaceContainerHighest
                                             : colorScheme.primary
                                             .withValues(alpha: 0.16),
-                                        borderRadius: BorderRadius.circular(14),
+                                        borderRadius:
+                                        BorderRadius.circular(14),
                                         border: Border.all(
                                           color: colorScheme.primary
                                               .withValues(alpha: 0.20),
@@ -1823,7 +1858,8 @@ class _GroupChatPageState extends State<GroupChatPage> {
                                           fontSize: 13,
                                           fontStyle: FontStyle.italic,
                                           fontWeight: FontWeight.w600,
-                                          color: Theme.of(context).brightness ==
+                                          color: Theme.of(context)
+                                              .brightness ==
                                               Brightness.dark
                                               ? colorScheme.onSurface
                                               : colorScheme.onSurface
@@ -1846,9 +1882,11 @@ class _GroupChatPageState extends State<GroupChatPage> {
                               key: ValueKey(lastMsg.id),
                               audioUrl: lastMsg.audioUrl!,
                               isCurrentUser: isCurrentUser,
-                              durationSeconds: lastMsg.audioDurationSeconds,
+                              durationSeconds:
+                              lastMsg.audioDurationSeconds,
                             );
-                          } else if (PostShare.isPostShareMessage(lastMsg.message)) {
+                          } else if (PostShare.isPostShareMessage(
+                              lastMsg.message)) {
                             final sharedPostId =
                             PostShare.extractPostId(lastMsg.message);
 
@@ -1879,8 +1917,9 @@ class _GroupChatPageState extends State<GroupChatPage> {
                               key: ValueKey(lastMsg.id),
                               message: lastMsg.message,
                               imageUrls: imageUrls,
-                              imageUrl:
-                              imageUrls.isNotEmpty ? imageUrls.first : null,
+                              imageUrl: imageUrls.isNotEmpty
+                                  ? imageUrls.first
+                                  : null,
                               videoUrl: effectiveVideoUrl,
                               isCurrentUser: isCurrentUser,
                               createdAt: lastMsg.createdAt,
@@ -1913,16 +1952,19 @@ class _GroupChatPageState extends State<GroupChatPage> {
                                 _openLikesBottomSheet(likedBy);
                               },
                               senderName: isCurrentUser ? null : senderName,
-                              senderColor: isCurrentUser ? null : senderColor,
+                              senderColor:
+                              isCurrentUser ? null : senderColor,
                               replyAuthorName: replyAuthorName,
                               replySnippet: replySnippet,
                               replyHasMedia: replyHasMedia,
-                              onReplyTap: (lastMsg.replyToMessageId != null &&
+                              onReplyTap:
+                              (lastMsg.replyToMessageId != null &&
                                   lastMsg.replyToMessageId!
                                       .trim()
                                       .isNotEmpty)
                                   ? () => _handleReplyTap(
-                                lastMsg.replyToMessageId!.trim(),
+                                lastMsg.replyToMessageId!
+                                    .trim(),
                               )
                                   : null,
                               replyImageUrl: replyImageUrl,
@@ -1959,7 +2001,8 @@ class _GroupChatPageState extends State<GroupChatPage> {
                             child: Column(
                               children: [
                                 if (showDayDivider)
-                                  buildDayBubble(context: context, date: msgDate),
+                                  buildDayBubble(
+                                      context: context, date: msgDate),
                                 if (showUnreadSeparator)
                                   buildUnreadBubble(
                                     context: context,

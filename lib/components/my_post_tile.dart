@@ -540,7 +540,6 @@ class _MyPostTileState extends State<MyPostTile>
       final ratio = _imageAspectRatios[media.url];
       if (ratio == null) return fallback;
 
-      // allow taller portrait images to expand vertically
       return ratio.clamp(0.45, 1.4);
     }
 
@@ -705,14 +704,8 @@ class _MyPostTileState extends State<MyPostTile>
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: 0.45),
-        ),
-      ),
+      color: cs.surface,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: _buildSelectableLinkText(
         context,
         text: widget.post.message,
@@ -731,20 +724,17 @@ class _MyPostTileState extends State<MyPostTile>
     final cs = theme.colorScheme;
 
     if (!_mediaReady) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: AspectRatio(
-          aspectRatio: 4 / 5,
-          child: Container(
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerHigh,
-            ),
-            alignment: Alignment.center,
-            child: const SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
+      return AspectRatio(
+        aspectRatio: 4 / 5,
+        child: Container(
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHigh,
+          ),
+          alignment: Alignment.center,
+          child: const SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2),
           ),
         ),
       );
@@ -753,48 +743,45 @@ class _MyPostTileState extends State<MyPostTile>
     if (_media.isNotEmpty) {
       final aspectRatio = _currentMediaAspectRatio();
 
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: AspectRatio(
-          aspectRatio: aspectRatio,
-          child: PageView.builder(
-            key: PageStorageKey<String>('post_media_${widget.post.id}'),
-            itemCount: _media.length,
-            onPageChanged: (index) => setState(() => _currentMediaIndex = index),
-            itemBuilder: (context, index) {
-              final media = _media[index];
+      return AspectRatio(
+        aspectRatio: aspectRatio,
+        child: PageView.builder(
+          key: PageStorageKey<String>('post_media_${widget.post.id}'),
+          itemCount: _media.length,
+          onPageChanged: (index) => setState(() => _currentMediaIndex = index),
+          itemBuilder: (context, index) {
+            final media = _media[index];
 
-              if (media.type == 'video') {
-                return _VideoPostPlayer(videoUrl: media.url);
-              }
+            if (media.type == 'video') {
+              return _VideoPostPlayer(videoUrl: media.url);
+            }
 
-              return GestureDetector(
-                onTap: () => _openFullscreenForMedia(media),
-                child: Image.network(
-                  media.url,
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  cacheWidth: 1080,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: CircularProgressIndicator(),
-                      ),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: theme.colorScheme.surfaceContainerHigh,
-                      alignment: Alignment.center,
-                      child: Text('Failed to load media'.tr()),
-                    );
-                  },
-                ),
-              );
-            },
-          ),
+            return GestureDetector(
+              onTap: () => _openFullscreenForMedia(media),
+              child: Image.network(
+                media.url,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                cacheWidth: 1080,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: theme.colorScheme.surfaceContainerHigh,
+                    alignment: Alignment.center,
+                    child: Text('Failed to load media'.tr()),
+                  );
+                },
+              ),
+            );
+          },
         ),
       );
     }
@@ -836,19 +823,16 @@ class _MyPostTileState extends State<MyPostTile>
     required Widget icon,
     String? tooltip,
   }) {
-    final cs = Theme.of(context).colorScheme;
-
     return Tooltip(
       message: tooltip ?? '',
       child: Material(
-        color: cs.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(14),
+        color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(8),
           child: SizedBox(
-            width: 42,
-            height: 42,
+            width: 36,
+            height: 36,
             child: Center(child: icon),
           ),
         ),
@@ -926,100 +910,94 @@ class _MyPostTileState extends State<MyPostTile>
     final int commentCount = listeningProvider.getCommentCount(widget.post.id);
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (kShowSubtlePostSeparator) const SizedBox(height: 2),
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                cs.surfaceContainerHigh,
-                cs.surfaceContainer,
-              ],
-            ),
-            border: Border.all(
-              color: cs.outlineVariant.withValues(alpha: 0.55),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
+        if (kShowSubtlePostSeparator)
+          Divider(
+            height: 1,
+            thickness: 0.6,
+            color: cs.outlineVariant.withValues(alpha: 0.35),
           ),
-          child: Material(
-            color: Colors.transparent,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(context),
-                  const SizedBox(height: 10),
-                  _buildImageOrText(context),
-                  _buildMediaIndicator(context),
-                  const SizedBox(height: 12),
-                  _buildActionsRow(context),
-                  if (likeCount > 0) ...[
-                    const SizedBox(height: 10),
-                    Text(
-                      "likes".plural(
-                        likeCount,
-                        namedArgs: {"count": likeCount.toString()},
-                      ),
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: cs.onSurface,
-                      ),
-                    ),
-                  ],
-                  if (_media.isNotEmpty && widget.post.message.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    _buildSelectableLinkText(
-                      context,
-                      text: '${widget.post.username} ${widget.post.message}',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: cs.onSurface,
-                        height: 1.45,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      onTapNonLink: widget.onPostTap,
-                    ),
-                  ],
-                  if (!widget.isInPostPage) ...[
-                    const SizedBox(height: 10),
-                    GestureDetector(
-                      onTap: commentCount > 0 ? widget.onPostTap : null,
-                      child: Text(
-                        commentCount == 0
-                            ? 'No comments yet'.tr()
-                            : 'View all comments'.plural(
-                          commentCount,
-                          namedArgs: {'count': commentCount.toString()},
+        Material(
+          color: cs.surface,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(0, 12, 0, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: _buildHeader(context),
+                ),
+                const SizedBox(height: 10),
+                _buildImageOrText(context),
+                _buildMediaIndicator(context),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 12),
+                      _buildActionsRow(context),
+                      if (likeCount > 0) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          "likes".plural(
+                            likeCount,
+                            namedArgs: {"count": likeCount.toString()},
+                          ),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: cs.onSurface,
+                          ),
                         ),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: commentCount == 0
-                              ? cs.onSurface.withValues(alpha: 0.55)
-                              : cs.primary,
+                      ],
+                      if (_media.isNotEmpty && widget.post.message.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        _buildSelectableLinkText(
+                          context,
+                          text: '${widget.post.username} ${widget.post.message}',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: cs.onSurface,
+                            height: 1.45,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          onTapNonLink: widget.onPostTap,
+                        ),
+                      ],
+                      if (!widget.isInPostPage) ...[
+                        const SizedBox(height: 10),
+                        GestureDetector(
+                          onTap: commentCount > 0 ? widget.onPostTap : null,
+                          child: Text(
+                            commentCount == 0
+                                ? 'No comments yet'.tr()
+                                : 'View all comments'.plural(
+                              commentCount,
+                              namedArgs: {'count': commentCount.toString()},
+                            ),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: commentCount == 0
+                                  ? cs.onSurface.withValues(alpha: 0.55)
+                                  : cs.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      TimeAgoText(
+                        createdAt: widget.post.createdAt,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: cs.onSurface.withValues(alpha: 0.55),
+                          letterSpacing: 0.2,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  TimeAgoText(
-                    createdAt: widget.post.createdAt,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: cs.onSurface.withValues(alpha: 0.55),
-                      letterSpacing: 0.2,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
