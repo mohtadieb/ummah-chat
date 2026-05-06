@@ -100,6 +100,57 @@ class DatabaseProvider extends ChangeNotifier {
 
   bool get isLoadingPosts => _isLoadingPosts;
 
+  bool _loadingMorePosts = false;
+  bool _hasMorePosts = true;
+
+  bool get loadingMorePosts => _loadingMorePosts;
+  bool get hasMorePosts => _hasMorePosts;
+
+  static const int _postsPageSize = 20;
+
+  Future<List<Post>> loadMorePosts() async {
+    if (_loadingMorePosts || !_hasMorePosts) return [];
+
+    _loadingMorePosts = true;
+    notifyListeners();
+
+    try {
+      DateTime? oldestCreatedAt;
+
+      if (_posts.isNotEmpty) {
+        oldestCreatedAt = _posts
+            .map((p) => p.createdAt)
+            .reduce((a, b) => a.isBefore(b) ? a : b);
+      }
+
+      final newPosts = await _db.getMorePostsFromDatabase(
+        limit: _postsPageSize,
+        beforeCreatedAt: oldestCreatedAt,
+      );
+
+      if (newPosts.length < _postsPageSize) {
+        _hasMorePosts = false;
+      }
+
+      final existingIds = _posts.map((p) => p.id).toSet();
+
+      final uniqueNewPosts = newPosts
+          .where((p) => !existingIds.contains(p.id))
+          .toList();
+
+      _posts.addAll(uniqueNewPosts);
+      _posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      return uniqueNewPosts;
+    } catch (e) {
+      debugPrint('Error loading more posts: $e');
+      return [];
+    } finally {
+      _loadingMorePosts = false;
+      notifyListeners();
+    }
+  }
+
   void showLoadingPost({
     required String message,
     File? imageFile,

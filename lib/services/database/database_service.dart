@@ -252,6 +252,31 @@ class DatabaseService {
 
   /* ==================== POSTS ==================== */
 
+  Future<List<Post>> getMorePostsFromDatabase({
+    required int limit,
+    DateTime? beforeCreatedAt,
+  }) async {
+    var query = _db
+        .from('posts')
+        .select()
+        .isFilter('community_id', null);
+
+    if (beforeCreatedAt != null) {
+      query = query.lt(
+        'created_at',
+        beforeCreatedAt.toIso8601String(),
+      );
+    }
+
+    final data = await query
+        .order('created_at', ascending: false)
+        .limit(limit);
+
+    return (data as List)
+        .map((item) => Post.fromMap(item as Map<String, dynamic>))
+        .toList();
+  }
+
   /// Get all posts
   ///
   /// This returns both:

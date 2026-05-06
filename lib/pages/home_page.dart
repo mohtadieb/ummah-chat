@@ -213,7 +213,18 @@ class _HomePageState extends State<HomePage>
                   key: ValueKey(post.id),
                   post: post,
                   onUserTap: () => goUserPage(context, post.userId),
-                  onPostTap: () => goPostPage(context, post),
+                  onPostTap: () {
+                    final cleanPosts = list.where((p) => p.id != 'loading').toList();
+                    final cleanIndex = cleanPosts.indexWhere((p) => p.id == post.id);
+
+                    if (cleanIndex == -1) return;
+
+                    goPostFeedPage(
+                      context,
+                      posts: cleanPosts,
+                      initialIndex: cleanIndex,
+                    );
+                  },
                   scaffoldContext: context,
                 ),
               ),

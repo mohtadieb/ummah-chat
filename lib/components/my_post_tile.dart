@@ -18,6 +18,7 @@ import '../pages/share/share_post_to_group_page.dart';
 import '../services/database/database_provider.dart';
 import '../components/my_input_alert_box.dart';
 import '../services/auth/auth_service.dart';
+import 'my_comments_bottom_sheet.dart';
 import 'my_confirmation_box.dart';
 
 const bool kUseAdaptiveMediaAspectRatio = true;
@@ -68,6 +69,20 @@ class _MyPostTileState extends State<MyPostTile>
 
   @override
   bool get wantKeepAlive => true;
+
+  bool get _shouldOpenPostFeedOnMediaTap =>
+      !widget.isInPostPage && widget.onPostTap != null;
+
+  void _handleMediaTap(PostMedia media) {
+    if (_shouldOpenPostFeedOnMediaTap) {
+      widget.onPostTap!();
+      return;
+    }
+
+    if (media.type == 'image') {
+      _openFullscreenForMedia(media);
+    }
+  }
 
   @override
   void initState() {
@@ -259,50 +274,7 @@ class _MyPostTileState extends State<MyPostTile>
     );
   }
 
-  void _openNewCommentBox() {
-    final messenger = ScaffoldMessenger.maybeOf(widget.scaffoldContext);
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => MyInputAlertBox(
-        textController: _commentController,
-        title: 'add_comment_title'.tr(),
-        hintText: "Type a comment".tr(),
-        onPressedText: "Post".tr(),
-        onPressed: () async {
-          final comment = _commentController.text.trim();
-
-          if (comment.replaceAll(RegExp(r'\s+'), '').length < 5) {
-            messenger?.showSnackBar(
-              SnackBar(
-                content: Text("Comment must be at least 5 characters".tr()),
-              ),
-            );
-            return;
-          }
-
-          await _addComment();
-        },
-      ),
-    );
-  }
-
-  Future<void> _addComment() async {
-    if (_commentController.text.trim().isEmpty) return;
-
-    try {
-      await databaseProvider.addComment(
-        widget.post.id,
-        _commentController.text.trim(),
-      );
-    } catch (e) {
-      debugPrint('Error adding comment: $e');
-    } finally {
-      _commentController.clear();
-    }
-  }
-
-  Future<void> _openPrivateReflectionDialog() async {
+    Future<void> _openPrivateReflectionDialog() async {
     final messenger = ScaffoldMessenger.maybeOf(widget.scaffoldContext);
 
     await showDialog(
@@ -753,11 +725,16 @@ class _MyPostTileState extends State<MyPostTile>
             final media = _media[index];
 
             if (media.type == 'video') {
-              return _VideoPostPlayer(videoUrl: media.url);
+              return _VideoPostPlayer(
+                videoUrl: media.url,
+                openPostInsteadOfToggle: _shouldOpenPostFeedOnMediaTap,
+                onOpenPost: widget.onPostTap,
+              );
             }
 
             return GestureDetector(
-              onTap: () => _openFullscreenForMedia(media),
+              onTap: () => _handleMediaTap(media),
+              behavior: HitTestBehavior.opaque,
               child: Image.network(
                 media.url,
                 fit: BoxFit.cover,
@@ -822,7 +799,10 @@ class _MyPostTileState extends State<MyPostTile>
     required VoidCallback onTap,
     required Widget icon,
     String? tooltip,
+    String? count,
   }) {
+    final cs = Theme.of(context).colorScheme;
+
     return Tooltip(
       message: tooltip ?? '',
       child: Material(
@@ -830,10 +810,29 @@ class _MyPostTileState extends State<MyPostTile>
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
-          child: SizedBox(
-            width: 36,
-            height: 36,
-            child: Center(child: icon),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 30,
+                  height: 36,
+                  child: Center(child: icon),
+                ),
+                if (count != null && count != '0') ...[
+                  const SizedBox(width: 2),
+                  Text(
+                    count,
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.88),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),
@@ -859,6 +858,7 @@ class _MyPostTileState extends State<MyPostTile>
           context: context,
           onTap: _toggleLikePost,
           tooltip: 'like'.tr(),
+          count: listeningProvider.getLikeCount(widget.post.id).toString(),
           icon: Icon(
             likedByCurrentUser ? Icons.favorite : Icons.favorite_border,
             color: likedByCurrentUser ? Colors.red : iconColor,
@@ -867,8 +867,12 @@ class _MyPostTileState extends State<MyPostTile>
         const SizedBox(width: 8),
         _buildActionButton(
           context: context,
-          onTap: _openNewCommentBox,
+          onTap: () => openCommentsBottomSheet(
+            context: context,
+            post: widget.post,
+          ),
           tooltip: 'comment'.tr(),
+          count: listeningProvider.getCommentCount(widget.post.id).toString(),
           icon: Icon(Icons.mode_comment_outlined, color: iconColor),
         ),
         const SizedBox(width: 8),
@@ -906,9 +910,6 @@ class _MyPostTileState extends State<MyPostTile>
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    final likeCount = listeningProvider.getLikeCount(widget.post.id);
-    final int commentCount = listeningProvider.getCommentCount(widget.post.id);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -939,20 +940,8 @@ class _MyPostTileState extends State<MyPostTile>
                     children: [
                       const SizedBox(height: 12),
                       _buildActionsRow(context),
-                      if (likeCount > 0) ...[
-                        const SizedBox(height: 10),
-                        Text(
-                          "likes".plural(
-                            likeCount,
-                            namedArgs: {"count": likeCount.toString()},
-                          ),
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: cs.onSurface,
-                          ),
-                        ),
-                      ],
-                      if (_media.isNotEmpty && widget.post.message.isNotEmpty) ...[
+                      if (_media.isNotEmpty &&
+                          widget.post.message.isNotEmpty) ...[
                         const SizedBox(height: 10),
                         _buildSelectableLinkText(
                           context,
@@ -963,26 +952,6 @@ class _MyPostTileState extends State<MyPostTile>
                             fontWeight: FontWeight.w500,
                           ),
                           onTapNonLink: widget.onPostTap,
-                        ),
-                      ],
-                      if (!widget.isInPostPage) ...[
-                        const SizedBox(height: 10),
-                        GestureDetector(
-                          onTap: commentCount > 0 ? widget.onPostTap : null,
-                          child: Text(
-                            commentCount == 0
-                                ? 'No comments yet'.tr()
-                                : 'View all comments'.plural(
-                              commentCount,
-                              namedArgs: {'count': commentCount.toString()},
-                            ),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: commentCount == 0
-                                  ? cs.onSurface.withValues(alpha: 0.55)
-                                  : cs.primary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
                         ),
                       ],
                       const SizedBox(height: 8),
@@ -1010,8 +979,14 @@ class SharePostToChatPage {}
 
 class _VideoPostPlayer extends StatefulWidget {
   final String videoUrl;
+  final bool openPostInsteadOfToggle;
+  final VoidCallback? onOpenPost;
 
-  const _VideoPostPlayer({required this.videoUrl});
+  const _VideoPostPlayer({
+    required this.videoUrl,
+    this.openPostInsteadOfToggle = false,
+    this.onOpenPost,
+  });
 
   @override
   State<_VideoPostPlayer> createState() => _VideoPostPlayerState();
@@ -1040,6 +1015,15 @@ class _VideoPostPlayerState extends State<_VideoPostPlayer> {
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  void _handleMainVideoTap() {
+    if (widget.openPostInsteadOfToggle && widget.onOpenPost != null) {
+      widget.onOpenPost!();
+      return;
+    }
+
+    _togglePlay();
   }
 
   void _togglePlay() {
@@ -1094,7 +1078,7 @@ class _VideoPostPlayerState extends State<_VideoPostPlayer> {
         }
       },
       child: GestureDetector(
-        onTap: _togglePlay,
+        onTap: _handleMainVideoTap,
         behavior: HitTestBehavior.opaque,
         child: Stack(
           alignment: Alignment.center,

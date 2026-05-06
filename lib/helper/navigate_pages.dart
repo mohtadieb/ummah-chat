@@ -5,6 +5,7 @@ import 'package:ummah_chat/layouts/main_layout.dart';
 import '../pages/home_page.dart';
 import '../pages/account_settings_page.dart';
 import '../pages/blocked_users_page.dart';
+import '../pages/post_feed_page.dart';
 import '../pages/post_page.dart';
 import '../pages/profile_page.dart';
 import '../models/post.dart';
@@ -96,4 +97,20 @@ void goToOwnProfileTab(BuildContext context) {
   // Switch to your Profile tab
   final bottomNav = Provider.of<BottomNavProvider>(context, listen: false);
   bottomNav.setIndex(4);
+}
+
+void goPostFeedPage(
+    BuildContext context, {
+      required List<Post> posts,
+      required int initialIndex,
+    }) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => PostFeedPage(
+        posts: posts,
+        initialIndex: initialIndex,
+      ),
+    ),
+  );
 }
